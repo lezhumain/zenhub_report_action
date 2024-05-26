@@ -76,8 +76,11 @@ jobs:
       - name: Print Output
         id: output
         run: |
+          echo "===="
           echo "${{ steps.test-action.outputs.markdownContent }}"
+          echo "===="
           echo "$RES"
+          echo "===="
           echo "$(cat zenhub_report.md)"
         env:
           RES: ${{ steps.test-action.outputs.markdownContent }}
