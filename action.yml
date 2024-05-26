@@ -21,10 +21,6 @@ outputs:
   markdownFile:
     description: 'Generated markdown file'
 
-#runs:
-#  using: node20
-#  main: src/zenhub_reports/dist/bundle.js
-
 runs:
   using: "composite"
   steps:

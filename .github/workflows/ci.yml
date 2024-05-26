@@ -90,14 +90,29 @@ jobs:
           REPO_ID: ${{ github.event.repository.id }}
           WORKSPACE_ID: "5e3018c2d1715f5725d0b8c7"
 
+#      - name: Print Output
+#        id: output
+#        run: |
+#          echo "===="
+#          echo "${{ steps.test-action.outputs.markdownContent }}"
+#          echo "===="
+#          echo "$RES"
+#        env:
+#          RES: ${{ steps.test-action.outputs.markdownContent }}
+
       - name: Print Output
         id: output
         run: |
-          echo "===="
-          echo "${{ steps.test-action.outputs.markdownContent }}"
-          echo "===="
-          echo "$RES"
-          echo "===="
           echo "$(cat zenhub_report.md)"
         env:
           RES: ${{ steps.test-action.outputs.markdownContent }}
+
+      - name: Create issue
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: Monthly zenhub metrics report
+          content-filepath: ./zenhub_report.md
+          assignees: ""
+          labels: |
+            report
+          token: ${{ github.token }}
