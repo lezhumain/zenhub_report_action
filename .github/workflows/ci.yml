@@ -53,6 +53,10 @@ jobs:
         id: checkout
         uses: actions/checkout@v4
 
+      - name: Install
+        id: install
+        run: npm ci
+
       - name: Build webpack
         id: build-webpack
         run: pwd && ls -alh src && ls -alh src/zenhub_reports && cd src/zenhub_reports/ && npx webpack
