@@ -1,0 +1,8 @@
+name: 'Zenhub report'
+description: 'Generate zenhub report'
+outputs:
+  markdownContent: # id of output
+    description: 'Report as markdown'
+runs:
+  using: 'node20'
+  main: 'action_index.js'

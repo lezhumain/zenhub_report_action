@@ -1,0 +1,9 @@
+node_modules
+output/*
+!output/.gitkeep
+my_output
+old
+dist
+resources
+!resources/.gitkeep
+!resources/*.html
