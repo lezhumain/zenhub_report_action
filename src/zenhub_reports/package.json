@@ -9,11 +9,13 @@
     "main_args": "npx ts-node src/index.ts \\\"5e3018c2d1715f5725d0b8c7\\\" \\\"2024-04-18T00:00:00Z\\\" \\\"2024-05-18T23:59:59Z\\\" \\\"[\\\\\\\"regression\\\\\\\"]\\\" \\\"[93615076]\\\" \\\"[232779486,409231566]\\\" \\\"[]\\\" \\\"\\\" \\\"Awaiting TESS Review\\\" 99",
     "reviewers": "node src/check_pr_reviewers.js",
     "gg": "npx ts-node src/ExcelHelper.ts",
-    "postinstall": "npx -y make-dir-cli output"
+    "rep": "sed 's/chartJs(context, configuration/chartJs(context as any, configuration as any/g' /tmp/index.ts > node_modules/chartjs-node-canvas/src/index.ts",
+    "postinstall": "npx -y make-dir-cli output && cp node_modules/chartjs-node-canvas/src/index.ts /tmp/index.ts && npm run rep"
   },
   "author": "lezhumain",
   "license": "ISC",
   "dependencies": {
+    "@actions/core": "^1.10.1",
     "aspose.cells": "^24.5.0",
     "axios": "^1.7.2",
     "chartjs-node-canvas": "^4.1.6",

@@ -64,15 +64,17 @@ export async function run(): Promise<void> {
         }
       )
       .then((res: any) => {
-        fs.writeFileSync('zenhub_report.md', res.mark, { encoding: 'utf8' })
-        // core.setOutput('markdownContent', res.mark);
-        console.log('markdownContent', res.mark)
+          const file = 'zenhub_report.md';
+        fs.writeFileSync(file, res.mark, { encoding: 'utf8' })
+          core.setOutput('markdownContent', res.mark);
+          core.setOutput('markdownFile', file);
+        // console.log('markdownContent', res.mark)
       })
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) {
-      // core.setFailed(error.message);
-      console.log(error.message)
+      core.setFailed(error.message);
+      // console.log(error.message)
     }
   }
 }

@@ -101,3 +101,9 @@ __tests__/runner/*
 .idea
 .vscode
 *.code-workspace
+
+output
+dist
+
+src/zenhub_reports/output
+src/zenhub_reports/dist

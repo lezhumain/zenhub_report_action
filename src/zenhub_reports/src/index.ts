@@ -59,11 +59,11 @@ program.main(
   (issue: IIssue) => {
     const matchesLabel: boolean =
       config.labels !== undefined &&
-      config.labels.some(l => {
+      config.labels.some((l: string) => {
         const low = l.toLowerCase()
         return (
           issue.labels !== undefined &&
-          issue.labels.map(la => la.toLowerCase()).includes(low)
+          issue.labels.map((la: string) => la.toLowerCase()).includes(low)
         )
       })
     const idShouldSkip: boolean = !!config.issuesToSkip?.includes(issue.number)

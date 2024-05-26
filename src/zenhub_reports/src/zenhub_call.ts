@@ -2014,8 +2014,8 @@ fragment currentWorkspace on Workspace {
         // console.log(av);
         res.users.push(av)
 
-        // @ts-ignore
         const sbumaroes: ISummary[] = []
+          // @ts-ignore
           .concat(...allD.map(a => a.summary))
           .filter((u: ISummary) => u.author === us)
         res.summary.push(...sbumaroes)
