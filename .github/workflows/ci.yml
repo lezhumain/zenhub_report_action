@@ -66,6 +66,9 @@ jobs:
         uses: ./
 #        with:
 #          milliseconds: 2000
+        env:
+          API_KEY: ${{ secrets.ZH_TOKEN }}
+          GH_API_KEY: ${{ github.token }}
 
       - name: Print Output
         id: output
