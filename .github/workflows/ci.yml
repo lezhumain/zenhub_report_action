@@ -60,9 +60,11 @@ jobs:
       - name: Build webpack
         id: build-webpack
         #run: pwd && ls -alh src && ls -alh src/zenhub_reports && cd src/zenhub_reports/ && npx webpack && jq -r .pull_request.body <<< "$INPUT_GHEVENT"
-        run: jq . <<< "$ghevent"
+        run: jq . <<< "$ghevent" && echo "$repoIdJson" && echo "$repoId"
         env:
           ghevent: ${{ toJSON(github.event) }}
+          repoIdJson: ${{ toJSON(github.event.pull_request.repository.id) }}
+          repoId: ${{ github.event.pull_request.repository.id }}
 
       - name: Test Local Action
         id: test-action
