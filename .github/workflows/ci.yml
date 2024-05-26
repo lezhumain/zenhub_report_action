@@ -67,8 +67,6 @@ jobs:
       - name: Test Local Action
         id: test-action
         uses: ./
-#        with:
-#          milliseconds: 2000
         env:
           API_KEY: ${{ secrets.ZH_TOKEN }}
           GH_API_KEY: ${{ github.token }}

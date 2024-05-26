@@ -64,10 +64,10 @@ export async function run(): Promise<void> {
         }
       )
       .then((res: any) => {
-          const file = 'zenhub_report.md';
+        const file = 'zenhub_report.md';
         fs.writeFileSync(file, res.mark, { encoding: 'utf8' })
-          core.setOutput('markdownContent', res.mark);
-          core.setOutput('markdownFile', file);
+        core.setOutput('markdownContent', res.mark);
+        // core.setOutput('markdownFile', file);
         // console.log('markdownContent', res.mark)
       })
   } catch (error) {
