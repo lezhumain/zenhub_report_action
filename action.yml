@@ -30,5 +30,5 @@ runs:
   steps:
     # Reference the major version of a release
     - uses: actions/checkout@v4
-    - run: npx -y ts-node src/index.ts
+    - run: npm ci && npx -y ts-node src/index.ts
       shell: bash
