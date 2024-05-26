@@ -75,4 +75,9 @@ jobs:
 
       - name: Print Output
         id: output
-        run: echo "${{ steps.test-action.outputs.markdownContent }}"
+        run: |
+          echo "${{ steps.test-action.outputs.markdownContent }}"
+          echo "$RES"
+          echo "$(cat zenhub_report.md)"
+        env:
+          RES: ${{ steps.test-action.outputs.markdownContent }}
