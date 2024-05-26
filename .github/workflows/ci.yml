@@ -57,12 +57,12 @@ jobs:
         id: install
         run: npm ci
 
-      - name: Build webpack
-        id: build-webpack
-        #run: pwd && ls -alh src && ls -alh src/zenhub_reports && cd src/zenhub_reports/ && npx webpack && jq -r .pull_request.body <<< "$INPUT_GHEVENT"
-        run: echo "$repoId"
-        env:
-          repoId: ${{ github.event.repository.id }}
+#      - name: Build webpack
+#        id: build-webpack
+#        #run: pwd && ls -alh src && ls -alh src/zenhub_reports && cd src/zenhub_reports/ && npx webpack && jq -r .pull_request.body <<< "$INPUT_GHEVENT"
+#        run: echo "$REPO_ID"
+#        env:
+#          REPO_ID: ${{ github.event.repository.id }}
 
       - name: Test Local Action
         id: test-action
@@ -72,7 +72,8 @@ jobs:
         env:
           API_KEY: ${{ secrets.ZH_TOKEN }}
           GH_API_KEY: ${{ github.token }}
-          ghevent: ${{ toJSON(github.event) }}
+          REPO_ID: ${{ github.event.repository.id }}
+          WORKSPACE_ID: "5e3018c2d1715f5725d0b8c7"
 
       - name: Print Output
         id: output
