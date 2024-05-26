@@ -55,7 +55,7 @@ jobs:
 
       - name: Build webpack
         id: build-webpack
-        run: npx webpack
+        run: cd src/zenhub_reports/ && npx webpack
 
       - name: Test Local Action
         id: test-action
