@@ -1,6 +1,6 @@
-import md5 from 'md5';
-import * as fs from 'fs';
-import { ChartHelper, IChartItem, ISizeObj } from './chart_helper';
+import md5 from 'md5'
+import * as fs from 'fs'
+import { ChartHelper, IChartItem, ISizeObj } from './chart_helper'
 import {
   IControlChartItem,
   IIssue,
@@ -20,10 +20,10 @@ import {
   IPrUser,
   IBubbleData,
   IPrReviewStat
-} from './models';
-import * as path from 'node:path';
+} from './models'
+import * as path from 'node:path'
 import { all, toFormData } from 'axios'
-import { BubbleDataPoint } from 'chart.js';
+import { BubbleDataPoint } from 'chart.js'
 
 const reviewer_call = require('./check_pr_reviewers.js')
 
