@@ -21,6 +21,14 @@ outputs:
   markdownFile:
     description: 'Generated markdown file'
 
+#runs:
+#  using: node20
+#  main: src/zenhub_reports/dist/bundle.js
+
 runs:
-  using: node20
-  main: src/zenhub_reports/dist/bundle.js
+  using: "composite"
+  steps:
+    # Reference the major version of a release
+    - uses: actions/checkout@v4
+    - run: npx -y ts-node src/index.ts
+      shell: bash
