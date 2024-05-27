@@ -103,8 +103,18 @@ jobs:
       - name: Print Output
         id: output
         run: |
-          echo "$(cat zenhub_report.md)"
-          ls -aldh zenhub_report.md
+          TARGET="zenhub_report.md"
+          if [ ! -f "$TARGET" ];
+            echo "markdown file was not generated"
+            exit 1
+          fi
+          CONTENT="$(cat "$TARGET")"
+          if [ -z "$CONTENT" ]; then
+            echo "markdown file empty"
+            exit 1
+          fi
+          echo "$CONTENT"
+          ls -aldh "$TARGET"
 
       - name: Create issue
         uses: peter-evans/create-issue-from-file@v5
