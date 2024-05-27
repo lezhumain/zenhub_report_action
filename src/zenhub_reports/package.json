@@ -10,7 +10,8 @@
     "reviewers": "node src/check_pr_reviewers.js",
     "gg": "npx ts-node src/ExcelHelper.ts",
     "rep": "sed 's/chartJs(context, configuration/chartJs(context as any, configuration as any/g' /tmp/index.ts > node_modules/chartjs-node-canvas/src/index.ts",
-    "postinstall": "npx -y make-dir-cli output && cp node_modules/chartjs-node-canvas/src/index.ts /tmp/index.ts && npm run rep"
+    "postinstall": "npx -y make-dir-cli output && cp node_modules/chartjs-node-canvas/src/index.ts /tmp/index.ts && npm run rep",
+    "build": "npx webpack && cp src/*.html dist/"
   },
   "author": "lezhumain",
   "license": "ISC",

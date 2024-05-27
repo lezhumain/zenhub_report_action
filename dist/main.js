@@ -27,7 +27,7 @@ exports.run = void 0;
 const core = __importStar(require("@actions/core"));
 const zenhub_call_1 = require("./zenhub_reports/src/zenhub_call");
 const fs = __importStar(require("node:fs"));
-const current = new Date();
+const current = new Date(new Date().toDateString()); // hours set to 0
 const minus1month = new Date(current);
 minus1month.setMonth(minus1month.getMonth() - 1);
 const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID');

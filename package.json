@@ -30,12 +30,17 @@
     "format:write": "npx prettier --write .",
     "format:check": "npx prettier --check .",
     "lint": "npx eslint . -c ./.github/linters/.eslintrc.yml || true",
-    "package": "npx ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "package": "npx ncc build src/index.ts -o dist --source-map --license licenses.txt && npm run cp_extra_files",
     "package:watch": "npm run package -- --watch",
     "test": "npx jest",
     "all": "npm run format:write && npm run lint && npm run test && npm run coverage && npm run package",
     "postinstall": "cd src/zenhub_reports && npm ci",
-    "run": "npx ts-node src/index.ts"
+    "run": "npx ts-node src/index.ts",
+    "run1": "node dist/index.js",
+    "build_sub": "cd src/zenhub_reports && rm -rf dist/* && npm run build && cd ../..",
+    "build": "rm -rf dist/* && npx tsc && npm run build_sub && rm -rf dist/zenhub_reports/src/* && cp -r src/zenhub_reports/dist/* dist/zenhub_reports/src/",
+    "cp_extra_files": "cp src/zenhub_reports/src/check_pr_reviewers.js ./dist/zenhub_reports/src/ && cp src/zenhub_reports/src/*.html ./dist/zenhub_reports/src/",
+    "build_single": "npx tsc && npm run cp_extra_files"
   },
   "license": "MIT",
   "jest": {
@@ -73,7 +78,9 @@
     "chartjs-node-canvas": "^4.1.6",
     "exceljs": "^4.4.0",
     "md5": "^2.3.0",
-    "node-xlsx": "^0.24.0"
+    "node-xlsx": "^0.24.0",
+    "aspose.cells": "^24.5.0",
+    "node-html-markdown": "^1.3.0"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
@@ -95,6 +102,8 @@
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^5.1.4",
+    "webpack-node-externals": "^3.0.0",
+    "ts-loader": "^9.5.1"
   }
 }

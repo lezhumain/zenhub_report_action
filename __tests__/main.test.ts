@@ -7,9 +7,26 @@
  */
 
 import * as core from '@actions/core'
-import * as main from '../src/main'
+import * as main0 from '../src/main'
+import { config0 } from '../src/main'
+import { IMainConfig } from '../src/zenhub_reports/src/zenhub_call'
+
+class MockMain {
+  private readonly _conf: IMainConfig
+  constructor(private readonly _obj: any) {
+    this._conf = Object.assign({}, config0)
+    const minDate = new Date(this._conf.minDate as string)
+    minDate.setDate(minDate.getDate() + 1)
+    this._conf.maxDate = new Date(minDate.toISOString()).toISOString()
+  }
+
+  async run(): Promise<object> {
+    return this._obj.run(this._conf)
+  }
+}
 
 // Mock the action's main function
+const main = new MockMain(main0)
 const runMock = jest.spyOn(main, 'run')
 
 // Other utilities

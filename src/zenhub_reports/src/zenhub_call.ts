@@ -82,6 +82,7 @@ export interface IMainConfig {
 
 export class FileUtils {
   static fileExists(filePath: string) {
+    const ff = fs
     return fs.existsSync(filePath)
   }
 }
@@ -236,6 +237,7 @@ export class Program {
       this._mainOutputFolder,
       `${this._baseFilename}_${this._configHash}.json`
     )
+    console.log(`Target file: ${this._file}`)
   }
 
   private async generateChartFromObj(
@@ -386,12 +388,16 @@ export class Program {
     )
 
     if (doGen) {
-      await this.generateChartFromObj(
-        '',
-        evs,
-        `output_issue_${issueNumber}.png`,
-        { width: 1600, height: 1200 }
-      )
+      try {
+        await this.generateChartFromObj(
+          '',
+          evs,
+          `output_issue_${issueNumber}.png`,
+          { width: 1600, height: 1200 }
+        )
+      } catch (err: any) {
+        console.error(err.message)
+      }
     }
 
     return Promise.resolve({
@@ -707,6 +713,7 @@ export class Program {
     workspaceId: string,
     last = 73
   ): Promise<IWorkspace> {
+    console.log('Getting board data')
     const base: IWorkspace = await this.getBoard(workspaceId, last)
     this._config.releaseID = await this.getReleases(workspaceId)
 
@@ -883,7 +890,7 @@ fragment currentWorkspace on Workspace {
       { encoding: 'utf8' }
     )
     const html: string = fs
-      .readFileSync(path.join(__dirname, '..', 'resources', 'index.html'), {
+      .readFileSync(path.join(__dirname, 'index.html'), {
         encoding: 'utf8'
       })
       .replace('__DATA__', csv)
@@ -1058,6 +1065,7 @@ fragment currentWorkspace on Workspace {
         this._config.fromPipeline,
         this._config.toPipeline
       )
+
       const evs: ICSVItem[] = handleIssueResult.csvItems
       if (evs.length > 0) {
         allEvs.push(evs)
@@ -1173,9 +1181,11 @@ fragment currentWorkspace on Workspace {
         })
       }
     )
+
     fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
       encoding: 'utf8'
     })
+    console.log(`Wrote file ${this._file}`)
 
     const chartData: IControlChartItem[] = this.getControlChartData(issues)
     console.log(chartData)
@@ -1301,7 +1311,7 @@ fragment currentWorkspace on Workspace {
 					</div>
 				</section>`
     this.updateHTML(
-      path.join(__dirname, '..', 'resources', 'main_report.html'),
+      path.join(__dirname, 'main_report.html'),
       path.join(this._mainOutputFolder, 'main_index.html'),
       '__CONTROL_CHART_TABLE__',
       fullHTML
@@ -1330,21 +1340,25 @@ fragment currentWorkspace on Workspace {
 
     const strVal =
       this._estimateRemainingMs <= this._estimateRemainingPrveiousMs
-        ? `${Math.round(this._estimateRemainingMs / 1000)}s`
+        ? `${Utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
         : 'estimating...'
 
     console.log(`Remaining: ${strVal}`)
   }
 
   private getFromFile(): IWorkspace | null {
+    console.log(`Getting from file ${this._file}`)
     if (!FileUtils.fileExists(this._file)) {
+      console.log(`File doesn't exist`)
       return null
     }
 
     const content = fs.readFileSync(this._file, { encoding: 'utf8' })
     try {
       const obj: IWorkspace = JSON.parse(content) as IWorkspace
+      console.log(`Got existing`)
       if (obj.configHash !== this._configHash) {
+        console.log(`Using existing`)
         return null
       }
       return obj
