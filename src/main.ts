@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import { IMainConfig, Program } from './zenhub_reports/src/zenhub_call'
-import { IIssue } from './zenhub_reports/src/models'
+import { IGhEvent, IIssue } from './zenhub_reports/src/models'
 import * as fs from 'node:fs'
 
 const current = new Date()
@@ -39,7 +39,7 @@ export async function run(): Promise<void> {
     // skip ReBrowse
     program
       .main(
-        (issue: IIssue) => {
+        (issue: IIssue): Promise<boolean> => {
           const matchesLabel: boolean =
             config.labels !== undefined &&
             config.labels.some(l => {
@@ -56,7 +56,7 @@ export async function run(): Promise<void> {
           const skip = !matchesLabel && idShouldSkip
           return Promise.resolve(skip)
         },
-        (event: any) => {
+        (event: IGhEvent): Promise<boolean> => {
           if (!config.minDate || !config.maxDate) {
             return Promise.resolve(false)
           }
