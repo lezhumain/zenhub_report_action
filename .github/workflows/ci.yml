@@ -104,7 +104,7 @@ jobs:
         id: output
         run: |
           TARGET="zenhub_report.md"
-          if [ ! -f "$TARGET" ];
+          if [ ! -f "$TARGET" ]; then
             echo "markdown file was not generated"
             exit 1
           fi
