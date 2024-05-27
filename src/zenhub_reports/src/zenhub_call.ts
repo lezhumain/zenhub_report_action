@@ -253,7 +253,12 @@ export class Program {
   ): Promise<IChartItem[]> {
     const csv = this.get_csv(evs)
     // await generateExcelPieChart(csv, 'output.xlsx', "Pie Chart Data", "D", "A");
-    return this.generateChart(title, csv, fileName, param3)
+    return this.generateChart(title, csv, fileName, param3).catch((err) => {
+      if(this._hasChart) {
+        throw err;
+      }
+      return [];
+    })
   }
 
   private toCSV(
