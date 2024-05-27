@@ -28,6 +28,8 @@ runs:
     - run: |
         ls -alh
         echo "----"
+        pwd
+        echo "----"
         ls -alh zenhub_report_action
         npm ci && npx -y ts-node src/index.ts
       shell: bash
