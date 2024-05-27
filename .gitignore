@@ -104,7 +104,7 @@ __tests__/runner/*
 *.code-workspace
 
 output
-dist
+#dist
 
 src/zenhub_reports/output
 src/zenhub_reports/dist
