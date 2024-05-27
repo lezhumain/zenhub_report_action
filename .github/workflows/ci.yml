@@ -96,7 +96,7 @@ jobs:
 #          echo "===="
 #          echo "${{ steps.test-action.outputs.markdownContent }}"
 #          echo "===="
-#          echo "$RES"
+#          echo " $RES"
 #        env:
 #          RES: ${{ steps.test-action.outputs.markdownContent }}
 
@@ -105,8 +105,6 @@ jobs:
         run: |
           echo "$(cat zenhub_report.md)"
           ls -aldh zenhub_report.md
-        env:
-          RES: ${{ steps.test-action.outputs.markdownContent }}
 
       - name: Create issue
         uses: peter-evans/create-issue-from-file@v5
