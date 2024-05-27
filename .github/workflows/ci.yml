@@ -114,4 +114,4 @@ jobs:
           assignees: ""
           labels: |
             report
-          token: ${{ github.token }}
+          token: ${{ secrets.GH_TOKEN }}
