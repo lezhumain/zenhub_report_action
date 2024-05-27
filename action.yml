@@ -31,6 +31,6 @@ runs:
         GH_API_KEY: ${{ github.token }}
         REPO_ID: ${{ github.event.repository.id }}
 
-runs:
-  using: node20
-  main: dist/index.js
+#runs:
+#  using: node20
+#  main: dist/index.js
