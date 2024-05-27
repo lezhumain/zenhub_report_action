@@ -3,30 +3,30 @@ import { IMainConfig, Program } from './zenhub_reports/src/zenhub_call'
 import { IIssue } from './zenhub_reports/src/models'
 import * as fs from 'node:fs'
 
-const current = new Date();
-const minus1month = new Date(current);
-minus1month.setMonth(minus1month.getMonth() - 1);
+const current = new Date()
+const minus1month = new Date(current)
+minus1month.setMonth(minus1month.getMonth() - 1)
 
-const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID');
-if(!workspaceId || !process.env.REPO_ID) {
-    console.error("Need to export WORKSPACE_ID and REPO_ID");
-    process.exit(1);
+const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID')
+if (!workspaceId || !process.env.REPO_ID) {
+  console.error('Need to export WORKSPACE_ID and REPO_ID')
+  process.exit(1)
 }
 
 const config: IMainConfig = {
-    workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
-    outputJsonFilename: 'output/allEvs.json',
-    outputImageFilename: `output/output_average.png`,
-    minDate: minus1month.toISOString(),
-    maxDate: current.toISOString(),
-    labels: [],
-    skipRepos: [],
-    includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
-    issuesToSkip: [],
-    fromPipeline: 'Backlog',
-    toPipeline: 'Awaiting TESS Review',
-    maxCount: 5,
-    release: ''
+  workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+  outputJsonFilename: 'output/allEvs.json',
+  outputImageFilename: `output/output_average.png`,
+  minDate: minus1month.toISOString(),
+  maxDate: current.toISOString(),
+  labels: [],
+  skipRepos: [],
+  includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
+  issuesToSkip: [],
+  fromPipeline: 'Backlog',
+  toPipeline: 'Awaiting TESS Review',
+  maxCount: 5,
+  release: ''
 }
 
 /**
@@ -74,16 +74,16 @@ export async function run(): Promise<void> {
         }
       )
       .then((res: any) => {
-        const file = 'zenhub_report.md';
+        const file = 'zenhub_report.md'
         fs.writeFileSync(file, res.mark, { encoding: 'utf8' })
-        core.setOutput('markdownContent', res.mark);
+        core.setOutput('markdownContent', res.mark)
         // core.setOutput('markdownFile', file);
         // console.log('markdownContent', res.mark)
       })
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) {
-      core.setFailed(error.message);
+      core.setFailed(error.message)
       // console.log(error.message)
     }
   }

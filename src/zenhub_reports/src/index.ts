@@ -1,9 +1,9 @@
 import { IMainConfig, Program } from './zenhub_call'
 import { IIssue } from './models'
 
-const current = new Date();
-const minus1month = new Date(current);
-minus1month.setMonth(minus1month.getMonth() - 1);
+const current = new Date()
+const minus1month = new Date(current)
+minus1month.setMonth(minus1month.getMonth() - 1)
 
 const config: IMainConfig = {
   workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
