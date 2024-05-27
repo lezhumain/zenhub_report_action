@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports */
 import md5 from 'md5'
 import * as fs from 'fs'
 import { ChartHelper, IChartItem, ISizeObj } from './chart_helper'
@@ -18,11 +19,9 @@ import {
   ICheckPr,
   ISummary,
   IPrUser,
-  IBubbleData,
   IPrReviewStat
 } from './models'
 import * as path from 'node:path'
-import { all, toFormData } from 'axios'
 import { BubbleDataPoint } from 'chart.js'
 
 const reviewer_call = require('./check_pr_reviewers.js')
@@ -32,7 +31,7 @@ const reviewer_call = require('./check_pr_reviewers.js')
  */
 
 const apiKey = process.env.API_KEY
-const repoId = '409231566'
+// const repoId = '409231566'
 
 interface ICSVItem {
   duration: number
@@ -135,10 +134,10 @@ export class Program {
    */
   private _completed: IIssue[] = []
   private _pipelines: string[] = []
-  private _startTimestamp: number = 0
+  private _startTimestamp = 0
 
-  private _estimateRemainingMs: number = 0
-  private _estimateRemainingPrveiousMs: number = 0
+  private _estimateRemainingMs = 0
+  private _estimateRemainingPrveiousMs = 0
   private _eventsPerIssue: { [issueNumber: string]: IGhEvent[] } = {}
   private _preparedHTML: string[] = []
 
@@ -170,7 +169,7 @@ export class Program {
           }
         }`
 
-  private readonly _bubbleBaseWith: number = 10
+  private readonly _bubbleBaseWith = 10
   private readonly _mainOutputFolder: string
 
   constructor(config: Partial<IMainConfig>) {
@@ -263,7 +262,7 @@ export class Program {
     const keys: string[] = (withDate ? ['Date'] : []).concat(
       Object.keys(myArr[0])
     )
-    const csvHeaders: string = `${keys.join(this._delim)}\n`
+    const csvHeaders = `${keys.join(this._delim)}\n`
 
     const datePart = withDate ? `${new Date().toUTCString()}${this._delim}` : ''
 
@@ -273,13 +272,13 @@ export class Program {
       // for (const key of keys) {
       // 	csvData += arrItem[key] + this._delim;
       // }
-      csvData += keys.map(k => arrItem[k]).join(this._delim) + '\n'
+      csvData += `${keys.map(k => arrItem[k]).join(this._delim)}\n`
     }
     if (lastLineFn) {
       csvData += lastLineFn(this._delim)
     }
 
-    return `${title?.replace(/,/g, '_') || ''}\n` + csvHeaders + csvData
+    return `${title?.replace(/,/g, '_') || ''}\n${csvHeaders}${csvData}`
   }
 
   private generateAllCSV(title: string, report: IReport) {
@@ -287,16 +286,7 @@ export class Program {
 
     const all = this.getAllCSV(report, date)
 
-    const mainCSV =
-      all.csvChart +
-      '\n\n' +
-      all.csvOutstanding +
-      '\n\n' +
-      all.velocityList +
-      '\n\n' +
-      all.mainList +
-      '\n\n' +
-      all.csvPrAndCommits
+    const mainCSV = `${all.csvChart}\n\n${all.csvOutstanding}\n\n${all.velocityList}\n\n${all.mainList}\n\n${all.csvPrAndCommits}`
     fs.writeFileSync(
       path.join(this._mainOutputFolder, 'main_report.csv'),
       mainCSV,
@@ -411,7 +401,7 @@ export class Program {
   }
 
   private getAverages(allEvs: ICSVItem[]): IAVGItemMap {
-    let avgObj: IAVGItemMap = {}
+    const avgObj: IAVGItemMap = {}
     for (const ev of allEvs) {
       if (!avgObj[ev.pipeline]) {
         avgObj[ev.pipeline] = {
@@ -450,7 +440,7 @@ export class Program {
 
   private mapToUsefull(
     move_events: any[],
-    estimateValue: number = 0,
+    estimateValue = 0,
     issueNumber: number
   ): ICSVItem[] {
     // return move_events.map((mo) => {
@@ -597,9 +587,9 @@ export class Program {
 
     // releaseIds = ["Z2lkOi8vcmFwdG9yL1JlbGVhc2UvOTc3MTk"];
     const variables = {
-      pipelineId: pipelineId,
+      pipelineId,
       filters: {},
-      issueCursor: issueCursor
+      issueCursor
     }
     if (releaseIds.length > 0) {
       // @ts-ignore
@@ -801,7 +791,7 @@ fragment currentWorkspace on Workspace {
     )
 
     return releases
-      .find((r: string) => r.startsWith(this._config.release + ':'))
+      .find((r: string) => r.startsWith(`${this._config.release}:`))
       ?.split(':')[1]
   }
 
@@ -927,7 +917,7 @@ fragment currentWorkspace on Workspace {
   }
 
   private addControlChartListHTML(chartData: IControlChartItem[]) {
-    let htmlTableString = this.generateTable(chartData)
+    const htmlTableString = this.generateTable(chartData)
     this._preparedHTML.push(
       `<div class="control-chart-list"><h3>Control Chart list</h3>${htmlTableString}</div>`
     )
@@ -964,7 +954,7 @@ fragment currentWorkspace on Workspace {
         item: ICSVItem[]
       ) => {
         res.data.push(...item)
-        res.sum += item.reduce((res, item) => res + item.duration, 0)
+        res.sum += item.reduce((res0, item0) => res0 + item0.duration, 0)
         return res
       },
       { data: [], sum: 0 }
@@ -1007,7 +997,7 @@ fragment currentWorkspace on Workspace {
 
     if (board === null) {
       const msg = process.env.API_KEY
-        ? "Couldn't get board data for " + this._config.workspaceId
+        ? `Couldn't get board data for ${this._config.workspaceId}`
         : 'Need to export API_KEY'
       for (const err of this._errorMessages) {
         console.error(err)
@@ -1036,7 +1026,7 @@ fragment currentWorkspace on Workspace {
 
       this.printRemaining(i, issues.length)
 
-      const issue: IIssue = issues[i] as IIssue
+      const issue: IIssue = issues[i]
 
       if (
         !!issue.pullRequest !== !!this._config.pullRequest ||
@@ -1276,9 +1266,7 @@ fragment currentWorkspace on Workspace {
 					<div>
 						${await this.getControlChartHTML(chartData)}
 					</div>
-				</section>` +
-      this.generateTableFromCSV(ccsv.csvOutstanding) +
-      `<section>
+				</section>${this.generateTableFromCSV(ccsv.csvOutstanding)}<section>
 					<h3>Velocity list</h3>
 					${this.generateTableFromCSV(ccsv.velocityList)}
 					<div>
@@ -1374,9 +1362,9 @@ fragment currentWorkspace on Workspace {
       return (
         endTime !== undefined &&
         (configMaxDate === undefined ||
-          endTime <= new Date(configMaxDate!).getTime()) &&
+          endTime <= new Date(configMaxDate).getTime()) &&
         (configMinDate === undefined ||
-          endTime >= new Date(configMinDate!).getTime())
+          endTime >= new Date(configMinDate).getTime())
       )
     })
     const tmp: (ControlChartItem | null)[] = filteered.map((i: IIssue) => {
@@ -1405,7 +1393,7 @@ fragment currentWorkspace on Workspace {
     }
 
     const headers = Object.keys(arr[0])
-    let html = `<table class="table table-striped-columns"><thead>
+    const html = `<table class="table table-striped-columns"><thead>
                     <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
                 </thead>
                 <tbody>
@@ -1454,7 +1442,7 @@ fragment currentWorkspace on Workspace {
   }
 
   private getVelocity(issues: IControlChartItem[]): IVelocity {
-    const completed = 0
+    // const completed = 0
     const data: { [weekKey: string]: IVelocityItem } = {}
     for (const item of issues) {
       const weekOfMonth: string = this.getWeekOfMonth(item.comppleted)
@@ -1625,7 +1613,7 @@ fragment currentWorkspace on Workspace {
     )
 
     const userReviewStatsAnon = report.userReviewStats.map(
-      (item: IPrReviewStat, index: number) => {
+      (item: IPrReviewStat) => {
         const clone: Partial<IPrReviewStat> = Object.assign({}, item)
         // clone.user = "user" + index; // TODO uncomment me
         delete clone.shouldReviewCount
@@ -1654,7 +1642,7 @@ fragment currentWorkspace on Workspace {
       .split('\n')
       .map(i => i.split(','))
       .filter(e => !!e)
-    let title: string = ''
+    let title = ''
     if (lines[0].length === 1) {
       title = lines.splice(0, 1)[0][0]
     }
@@ -1662,7 +1650,7 @@ fragment currentWorkspace on Workspace {
     if (!headers || headers.length === 0) {
       return ''
     }
-    let tableStr = `<table class="table table-striped-columns">
+    const tableStr = `<table class="table table-striped-columns">
                 <thead>
                     <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
                 </thead>
@@ -1787,7 +1775,7 @@ fragment currentWorkspace on Workspace {
 
   private async getOpenedChartHTML(
     csvPrAndCommits: { pipeline: string; opened: number }[],
-    chartSizePerc: number = 50
+    chartSizePerc = 50
   ): Promise<string> {
     const imgFiles = [
       {
@@ -1835,7 +1823,7 @@ fragment currentWorkspace on Workspace {
     labelKey?: string
   ): Promise<string> {
     // await this.generateChartFromObj("", evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
-    let items: IChartItem[] = csvPrAndCommits.map(c => {
+    const items: IChartItem[] = csvPrAndCommits.map(c => {
       return {
         label: labelKey === undefined ? '' : c[labelKey],
         data: c[key]
@@ -1855,7 +1843,7 @@ fragment currentWorkspace on Workspace {
     if (sizePerc < 0) {
       sizePerc *= 100
     }
-    let res: string[] = []
+    const res: string[] = []
     for (const dat of imgFiles) {
       const b64img: string = await this.getChartGeneric(
         dat.title,
@@ -1879,7 +1867,7 @@ fragment currentWorkspace on Workspace {
     const result: any = {}
 
     objects.forEach((obj: any) => {
-      Object.keys(obj as any).forEach(key => {
+      Object.keys(obj).forEach(key => {
         if (Array.isArray(obj[key])) {
           result[key] = this.averageOBjects(obj[key], includeKeys)
         } else if (result[key] === undefined) {
