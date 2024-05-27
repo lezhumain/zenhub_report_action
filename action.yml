@@ -20,22 +20,23 @@ outputs:
   markdownFile:
     description: 'Generated markdown file'
 
-runs:
-  using: 'composite'
-  steps:
-    # Reference the major version of a release
-    - uses: actions/checkout@v4
-    - run: |
-        ls -alh
-        echo "----"
-        pwd
-        echo "----"
-        ls -alh zenhub_report_action
-        npm ci && npx -y ts-node src/index.ts
-      shell: bash
-      env:
-        GH_API_KEY: ${{ github.token }}
-        REPO_ID: ${{ github.event.repository.id }}
 #runs:
-#  using: node20
-#  main: dist/index.js
+#  using: 'composite'
+#  steps:
+#    # Reference the major version of a release
+#    - uses: actions/checkout@v4
+#    - run: |
+#        ls -alh
+#        echo "----"
+#        pwd
+#        echo "----"
+#        ls -alh zenhub_report_action
+#        npm ci && npx -y ts-node src/index.ts
+#      shell: bash
+#      env:
+#        GH_API_KEY: ${{ github.token }}
+#        REPO_ID: ${{ github.event.repository.id }}
+
+runs:
+  using: node20
+  main: dist/index.js
