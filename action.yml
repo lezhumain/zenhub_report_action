@@ -1,6 +1,6 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'The name of your action here TODO'
+description: 'Provide a description here TODO'
+author: 'Your name or organization here TODO'
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
@@ -9,16 +9,27 @@ branding:
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
+  WORKSPACE_ID:
+    description: "Your zenhub workspace's ID"
     required: true
-    default: '1000'
 
 # Define your outputs here.
 outputs:
-  time:
-    description: 'Your output description here'
+  markdownContent:
+    description: 'Mardown content'
+  markdownFile:
+    description: 'Generated markdown file'
 
 runs:
-  using: node20
-  main: dist/index.js
+  using: 'composite'
+  steps:
+    # Reference the major version of a release
+    - uses: actions/checkout@v4
+    - run: npm ci && npx -y ts-node src/index.ts
+      shell: bash
+      env:
+        GH_API_KEY: ${{ github.token }}
+        REPO_ID: ${{ github.event.repository.id }}
+#runs:
+#  using: node20
+#  main: dist/index.js

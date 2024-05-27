@@ -99,5 +99,12 @@ __tests__/runner/*
 
 # IDE files
 .idea
+!.idea/inspectionProfiles/*.xml
 .vscode
 *.code-workspace
+
+output
+#dist
+
+src/zenhub_reports/output
+src/zenhub_reports/dist
