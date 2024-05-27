@@ -88,8 +88,8 @@ jobs:
         #          WORKSPACE_ID: '5e3018c2d1715f5725d0b8c7'
         env:
           API_KEY: ${{ secrets.ZH_TOKEN }}
-          GH_API_KEY: ${{ github.token }}
-          REPO_ID: ${{ github.event.repository.id }}
+          #GH_API_KEY: ${{ github.token }}
+          #REPO_ID: ${{ github.event.repository.id }}
           WORKSPACE_ID: '5e3018c2d1715f5725d0b8c7'
 
       #      - name: Print Output
