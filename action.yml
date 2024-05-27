@@ -28,3 +28,6 @@ runs:
     - uses: actions/checkout@v4
     - run: npm ci && npx -y ts-node src/index.ts
       shell: bash
+      env:
+        GH_API_KEY: ${{ github.token }}
+        REPO_ID: ${{ github.event.repository.id }}
