@@ -24,7 +24,6 @@ import {
 import * as path from 'node:path'
 import { BubbleDataPoint } from 'chart.js'
 
-// eslint-disable-next-line import/extensions,import/no-commonjs,@typescript-eslint/no-var-requires
 const reviewer_call = require('./check_pr_reviewers.js')
 
 /*
@@ -81,9 +80,8 @@ export interface IMainConfig {
   release: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class FileUtils {
-  static fileExists(filePath: string): boolean {
+  static fileExists(filePath: string) {
     return fs.existsSync(filePath)
   }
 }
@@ -283,7 +281,7 @@ export class Program {
     return `${title?.replace(/,/g, '_') || ''}\n${csvHeaders}${csvData}`
   }
 
-  private generateAllCSV(title: string, report: IReport): any {
+  private generateAllCSV(title: string, report: IReport) {
     const date = new Date()
 
     const all = this.getAllCSV(report, date)
@@ -312,7 +310,7 @@ export class Program {
 
   private async handleIssue(
     issueObj: IIssue,
-    skipEventIfFn?: (issue: IGhEvent) => Promise<boolean>,
+    skipEventIfFn?: (issue: any) => Promise<boolean>,
     doGen = false,
     fromPipeline = 'New Issues',
     toPipeline = 'Awaiting TESS Review'
@@ -561,7 +559,7 @@ export class Program {
     const variables = { workspaceId }
     const res1 = await this.callZenhub(query, variables)
     const res: any[] = res1.data.workspace.pipelinesConnection.nodes.map(
-      (res0: any) => res0.name
+      (res: any) => res.name
     )
     return Promise.resolve(res)
   }
@@ -737,7 +735,7 @@ export class Program {
     return Promise.resolve(base)
   }
 
-  private async getReleases(workspaceId: string): Promise<string | undefined> {
+  private async getReleases(workspaceId: string) {
     // TODO last
     const query = `query getCurrentWorkspace($workspaceId: ID!) {
   workspace: workspace(id: $workspaceId) {
@@ -879,7 +877,7 @@ fragment currentWorkspace on Workspace {
     return allCSV
   }
 
-  private generateHTML(outstanding: ICSVItem[]): void {
+  private generateHTML(outstanding: ICSVItem[]) {
     const csv: string = fs.readFileSync(
       path.join(this._mainOutputFolder, 'main.csv'),
       { encoding: 'utf8' }
@@ -901,7 +899,7 @@ fragment currentWorkspace on Workspace {
     outFile = path.join(this._mainOutputFolder, 'index.html'),
     tag = '__MORE__',
     html: string
-  ): void {
+  ) {
     const htmlContent: string = fs
       .readFileSync(baseFile, { encoding: 'utf8' })
       .replace(tag, html)
@@ -909,7 +907,7 @@ fragment currentWorkspace on Workspace {
     fs.writeFileSync(outFile, htmlContent, { encoding: 'utf8' })
   }
 
-  private writeMoreHTML(): void {
+  private writeMoreHTML() {
     this.updateHTML(
       path.join(this._mainOutputFolder, 'index.html'),
       path.join(this._mainOutputFolder, 'index.html'),
@@ -918,14 +916,14 @@ fragment currentWorkspace on Workspace {
     )
   }
 
-  private addControlChartListHTML(chartData: IControlChartItem[]): void {
+  private addControlChartListHTML(chartData: IControlChartItem[]) {
     const htmlTableString = this.generateTable(chartData)
     this._preparedHTML.push(
       `<div class="control-chart-list"><h3>Control Chart list</h3>${htmlTableString}</div>`
     )
   }
 
-  getWorkingDays(currentDate: Date, endDate: Date): number {
+  getWorkingDays(currentDate: Date, endDate: Date) {
     let count = 0
 
     while (currentDate.getTime() <= endDate.getTime()) {
@@ -939,14 +937,14 @@ fragment currentWorkspace on Workspace {
     return count
   }
 
-  private comparePipelines(firstFrom: string, fromPipeline: string): number {
+  private comparePipelines(firstFrom: any, fromPipeline: string): number {
     // return firstFrom === fromPipeline;
     return (
       this._pipelines.indexOf(firstFrom) - this._pipelines.indexOf(fromPipeline)
     )
   }
 
-  private findOutstandingIssues(allEvs: ICSVItem[][]): ICSVItem[] {
+  private findOutstandingIssues(allEvs: ICSVItem[][]) {
     const flat: { data: ICSVItem[]; sum: number } = allEvs.reduce(
       (
         res: {
@@ -956,7 +954,7 @@ fragment currentWorkspace on Workspace {
         item: ICSVItem[]
       ) => {
         res.data.push(...item)
-        res.sum += item.reduce((res0: number, item0: ICSVItem) => res0 + item0.duration, 0)
+        res.sum += item.reduce((res0, item0) => res0 + item0.duration, 0)
         return res
       },
       { data: [], sum: 0 }
@@ -972,9 +970,9 @@ fragment currentWorkspace on Workspace {
   }
 
   async main(
-    skipIssueIfFn?: (issue: IIssue) => Promise<boolean>,
-    skipEventIfFn?: (event: IGhEvent) => Promise<boolean>
-  ): Promise<{ mark: string, allResult: IReport}> {
+    skipIssueIfFn?: (issue: any) => Promise<boolean>,
+    skipEventIfFn?: (issue: any) => Promise<boolean>
+  ) {
     // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
     // this._pipelines = pipelines
     //
@@ -1189,9 +1187,9 @@ fragment currentWorkspace on Workspace {
 
     // const chartWithEstimate: IControlChartItem[] = chartData.filter((cd: IControlChartItem) => cd.estimate > 0);
     // const completinListEstimate: number[] = chartWithEstimate.map((c: IControlChartItem) => Number(c.completionTimeStr));
-    // const completionTot = completinListEstimate.reduce((res: number, item: number) => res + item, 0);
-    // const estimateTot = chartWithEstimate.reduce((res: number, item: IControlChartItem) => res + item.estimate, 0);
-    // const averagePerEstimate = completionTot / estimateTot;
+    // const completionTot: number = completinListEstimate.reduce((res: number, item: number) => res + item, 0);
+    // const estimateTot: number = chartWithEstimate.reduce((res: number, item: IControlChartItem) => res + item.estimate, 0);
+    // const averagePerEstimate: number = completionTot / estimateTot;
 
     const completinEstimateList: number[] = chartData
       .filter((cd: IControlChartItem) => cd.estimate > 0)
@@ -1322,10 +1320,10 @@ fragment currentWorkspace on Workspace {
     })
   }
 
-  private printRemaining(i: number, length: number): void {
-    const elapsedMs = Date.now() - this._startTimestamp
+  private printRemaining(i: number, length: number) {
+    const elapsedMs: number = Date.now() - this._startTimestamp
     const remainingCount = length - i
-    const timePerIssueMs = elapsedMs / (i + 1)
+    const timePerIssueMs: number = elapsedMs / (i + 1)
 
     this._estimateRemainingPrveiousMs = this._estimateRemainingMs
     this._estimateRemainingMs = timePerIssueMs * remainingCount
@@ -1389,7 +1387,7 @@ fragment currentWorkspace on Workspace {
     return res
   }
 
-  private generateTable(arr: any[]): string {
+  private generateTable(arr: any[]) {
     if (arr.length === 0) {
       return ''
     }
@@ -1431,7 +1429,7 @@ fragment currentWorkspace on Workspace {
     stats: IStatResult,
     statsEstimate: IStatResult,
     veloccity: IVelocity
-  ): void {
+  ) {
     this._preparedHTML.push(`<div class="stats">
 			<h3>Stats</h3>
 			<p><b>Average per issue:</b>${stats.average.toFixed(1)}</p>
@@ -1483,7 +1481,7 @@ fragment currentWorkspace on Workspace {
     }
   }
 
-  private getWeekOfMonth(date: Date): string{
+  private getWeekOfMonth(date: Date) {
     const firstDayOfMonth: Date = new Date(date.getTime())
     firstDayOfMonth.setDate(1)
 
@@ -1504,7 +1502,7 @@ fragment currentWorkspace on Workspace {
     return `${date.getMonth()}${res}`
   }
 
-  private mapPipelineConnec(finalRes: any): any {
+  private mapPipelineConnec(finalRes: any) {
     return finalRes.pipelinesConnection.nodes.map(
       (pipelineConnectionItem: any) => {
         const tempRes = Object.assign({}, pipelineConnectionItem)
@@ -1532,7 +1530,7 @@ fragment currentWorkspace on Workspace {
   // 	}
   // }
 
-  private getAllCSV(report: IReport, date: Date): any {
+  private getAllCSV(report: IReport, date: Date) {
     const reportVelocityList = report.velocity.data
 
     const csvChart = this.toCSV(
@@ -1638,7 +1636,7 @@ fragment currentWorkspace on Workspace {
     }
   }
 
-  private generateTableFromCSV(csvChart: string): string {
+  private generateTableFromCSV(csvChart: string) {
     const lines = csvChart
       .trim()
       .split('\n')
@@ -1841,7 +1839,7 @@ fragment currentWorkspace on Workspace {
     imgFiles: any[],
     dataq: any[],
     sizePerc: number
-  ): Promise<string> {
+  ) {
     if (sizePerc < 0) {
       sizePerc *= 100
     }
@@ -1950,21 +1948,20 @@ fragment currentWorkspace on Workspace {
       (res: number, it: IPrUser) => res + it.created,
       0
     )
-    for (const u of uu) {
+    uu.forEach((u: IPrUser) => {
       const othersCreated = totalCreated - u.created
 
       u.createdPerc = Number((u.created / totalCreated).toFixed(2))
       u.reviewedPerc = Number((u.didReviewCount / othersCreated).toFixed(2))
-    }
+    })
     return uu
   }
 
-  private async getGithubData(repos: string[]): Promise<any> {
+  private async getGithubData(repos: string[]) {
     const allD: ICheckPr[] = []
     for (const repo of repos) {
       const d = (await reviewer_call
         .check_prs(repo, this._config)
-        // eslint-disable-next-line github/no-then
         .catch((err: Error) => {
           console.error(err.message)
           return {
@@ -1975,11 +1972,13 @@ fragment currentWorkspace on Workspace {
       allD.push(d)
     }
 
+    // @ts-ignore
     const prUsers: IPrUser[] = [].concat(
       // @ts-ignore
       ...allD.map((ad: ICheckPr) => ad.users)
     )
 
+    // @ts-ignore
     const users: string[] = Array.from(
       new Set(
         [].concat(
