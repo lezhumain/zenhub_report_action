@@ -3,20 +3,29 @@ import { IMainConfig, Program } from './zenhub_reports/src/zenhub_call'
 import { IIssue } from './zenhub_reports/src/models'
 import * as fs from 'node:fs'
 
+const current = new Date();
+const minus1month = new Date(current);
+minus1month.setMonth(minus1month.getMonth() - 1);
+
+if(!process.env.WORKSPACE_ID || !process.env.REPO_ID) {
+    console.error("Need to export WORKSPACE_ID and REPO_ID");
+    process.exit(1);
+}
+
 const config: IMainConfig = {
-  workspaceId: '5e3018c2d1715f5725d0b8c7',
-  outputJsonFilename: 'output/allEvs.json',
-  outputImageFilename: `output/output_average.png`,
-  minDate: '2024-04-18',
-  maxDate: '2024-05-18',
-  labels: ['regression'],
-  skipRepos: [93615076],
-  includeRepos: [232779486, 409231566],
-  issuesToSkip: [],
-  fromPipeline: 'Backlog',
-  toPipeline: 'Awaiting TESS Review',
-  maxCount: 5,
-  release: ''
+    workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+    outputJsonFilename: 'output/allEvs.json',
+    outputImageFilename: `output/output_average.png`,
+    minDate: minus1month.toISOString(),
+    maxDate: current.toISOString(),
+    labels: [],
+    skipRepos: [],
+    includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
+    issuesToSkip: [],
+    fromPipeline: 'Backlog',
+    toPipeline: 'Awaiting TESS Review',
+    maxCount: 5,
+    release: ''
 }
 
 /**
