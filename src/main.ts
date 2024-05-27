@@ -7,7 +7,8 @@ const current = new Date();
 const minus1month = new Date(current);
 minus1month.setMonth(minus1month.getMonth() - 1);
 
-if(!(process.env.WORKSPACE_ID || core.getInput('milliseconds')) || !process.env.REPO_ID) {
+const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID');
+if(!workspaceId || !process.env.REPO_ID) {
     console.error("Need to export WORKSPACE_ID and REPO_ID");
     process.exit(1);
 }
