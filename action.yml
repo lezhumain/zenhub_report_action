@@ -8,11 +8,10 @@ branding:
   color: 'red'
 
 # Define your inputs here.
-#inputs:
-#  milliseconds:
-#    description: 'Your input description here'
-#    required: true
-#    default: '1000'
+inputs:
+  WORKSPACE_ID:
+    description: "Your zenhub workspace's ID"
+    required: true
 
 # Define your outputs here.
 outputs:
