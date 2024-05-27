@@ -104,6 +104,7 @@ jobs:
         id: output
         run: |
           echo "$(cat zenhub_report.md)"
+          ls -aldh zenhub_report.md
         env:
           RES: ${{ steps.test-action.outputs.markdownContent }}
 
