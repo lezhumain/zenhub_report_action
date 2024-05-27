@@ -25,7 +25,11 @@ runs:
   steps:
     # Reference the major version of a release
     - uses: actions/checkout@v4
-    - run: npm ci && npx -y ts-node src/index.ts
+    - run: |
+        ls -alh
+        echo "----"
+        ls -alh zenhub_report_action
+        npm ci && npx -y ts-node src/index.ts
       shell: bash
       env:
         GH_API_KEY: ${{ github.token }}
