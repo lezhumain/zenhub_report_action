@@ -136,7 +136,7 @@ export class ChartHelper {
   }
 
   private static getColors(dataList: string[]): string[] {
-    // @ts-expect-error 123
+    // @ts-ignore
     return dataList.map(pKey => {
       const d = pKey.replace(/ \(\d+(\.\d+)?%\)$/g, '')
       let cached = this._colorCache[d]

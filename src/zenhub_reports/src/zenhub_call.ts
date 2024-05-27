@@ -224,9 +224,9 @@ export class Program {
     }
 
     for (const key of Object.keys(this._config)) {
-      // @ts-expect-error 123
+      // @ts-ignore
       if (!this._config[key]) {
-        // @ts-expect-error 123
+        // @ts-ignore
         // this._config[key] = undefined;
         delete this._config[key]
       }
@@ -593,11 +593,11 @@ export class Program {
       issueCursor
     }
     if (releaseIds.length > 0) {
-      // @ts-expect-error 123
+      // @ts-ignore
       variables.filters.releases = { in: releaseIds }
     }
     if (labels.length > 0) {
-      // @ts-expect-error 123
+      // @ts-ignore
       variables.filters.labels = { in: labels }
     }
 
@@ -1074,7 +1074,7 @@ fragment currentWorkspace on Workspace {
       iu => !iu.completed && !iu.filtered
     )
 
-    // @ts-expect-error 123
+    // @ts-ignore
     const avg: IAVGItemMap = this.getAverages([].concat(...allEvs))
     for (const pipeline of Object.keys(avg)) {
       // TODO use all pipelines
@@ -1466,7 +1466,7 @@ fragment currentWorkspace on Workspace {
         res[0] += it.count
         res[1] += it.estimate
 
-        // @ts-expect-error 123
+        // @ts-ignore
         it.key = item
         res[2].push(it)
         return res
@@ -1974,24 +1974,24 @@ fragment currentWorkspace on Workspace {
       allD.push(d)
     }
 
-    // @ts-expect-error 123
+    // @ts-ignore
     const prUsers: IPrUser[] = [].concat(
-      // @ts-expect-error 123
+      // @ts-ignore
       ...allD.map((ad: ICheckPr) => ad.users)
     )
 
-    // @ts-expect-error 123
+    // @ts-ignore
     const users: string[] = Array.from(
       new Set(
         [].concat(
-          // @ts-expect-error 123
+          // @ts-ignore
           ...allD.map((f: ICheckPr) => f.users.map((au: IPrUser) => au.user))
         )
       )
     )
     const usersAvg = users.reduce(
       (res: any, us: string) => {
-        // @ts-expect-error 123
+        // @ts-ignore
         const prUs: IPrUser[] = prUsers.filter((u: IPrUser) => u.user === us)
 
         const av: IPrUser = this.averageOBjects(prUs, [
@@ -2005,7 +2005,7 @@ fragment currentWorkspace on Workspace {
         res.users.push(av)
 
         const sbumaroes: ISummary[] = []
-          // @ts-expect-error 123
+          // @ts-ignore
           .concat(...allD.map(a => a.summary))
           .filter((u: ISummary) => u.author === us)
         res.summary.push(...sbumaroes)
