@@ -171,6 +171,7 @@ export class Program {
 
   private readonly _bubbleBaseWith = 10
   private readonly _mainOutputFolder: string
+  private _hasChart: boolean = false;
 
   constructor(config: Partial<IMainConfig>) {
     this._delim = ','
@@ -235,7 +236,13 @@ export class Program {
     this._file = path.join(
       this._mainOutputFolder,
       `${this._baseFilename}_${this._configHash}.json`
-    )
+    );
+
+    ChartHelper.generateScatterChart("", [], [], "", 3).then(() => {
+      this._hasChart = true;
+    }, () => {
+      this._hasChart = false;
+    });
   }
 
   private async generateChartFromObj(
@@ -246,7 +253,12 @@ export class Program {
   ): Promise<IChartItem[]> {
     const csv = this.get_csv(evs)
     // await generateExcelPieChart(csv, 'output.xlsx', "Pie Chart Data", "D", "A");
-    return this.generateChart(title, csv, fileName, param3)
+    return this.generateChart(title, csv, fileName, param3).catch((err) => {
+      if(this._hasChart) {
+        throw err;
+      }
+      return [];
+    })
   }
 
   private toCSV(
@@ -304,7 +316,11 @@ export class Program {
   ): Promise<IChartItem[]> {
     // Parse the CSV data
     const items: IChartItem[] = this.csvDataToChartItems(csvData)
-    await ChartHelper.generateChartFromObj(title, items, outputFile, sizeObj)
+    await ChartHelper.generateChartFromObj(title, items, outputFile, sizeObj).catch((err) => {
+      if(this._hasChart) {
+        throw err;
+      }
+    })
     return Promise.resolve(items)
   }
 
@@ -1148,7 +1164,11 @@ fragment currentWorkspace on Workspace {
       countChartItems,
       this._config.outputImageFilename.replace('.png', '_issues.png'),
       { width: 1600, height: 1200 }
-    )
+    ).catch((err) => {
+      if(this._hasChart) {
+        throw err;
+      }
+    })
 
     board.pipelinesConnection.forEach(
       (pipelineConnect: IPipelinesConnection) => {
@@ -1832,6 +1852,11 @@ fragment currentWorkspace on Workspace {
     return ChartHelper.generateChartFromObj(title, items, outputFile, {
       width: 1600,
       height: 1200
+    }).catch((err) => {
+      if(this._hasChart) {
+        throw err;
+      }
+      return "";
     })
   }
 
