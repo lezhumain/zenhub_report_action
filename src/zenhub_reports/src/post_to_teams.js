@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports,@typescript-eslint/no-var-requires,import/no-commonjs,filenames/match-regex
 const axios = require('axios')
 
 const formattedCardPayload = {

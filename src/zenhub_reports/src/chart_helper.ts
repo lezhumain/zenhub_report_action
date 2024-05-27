@@ -1,13 +1,8 @@
 import * as fs from 'fs'
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import { ChartJSNodeCanvasOptions } from 'chartjs-node-canvas/src'
-import {
-  ChartConfiguration,
-  ChartData,
-  BubbleDataPoint,
-  ScatterDataPoint
-} from 'chart.js'
-import { IBubbleData, Utils } from './models'
+import { ChartConfiguration, BubbleDataPoint, ScatterDataPoint } from 'chart.js'
+import { Utils } from './models'
 
 export interface ISizeObj {
   width: number
@@ -21,7 +16,7 @@ export interface IChartItem {
 
 export class ChartHelper {
   private static _colorCache: { [key: string]: string } = {}
-  private static _chartCallback = (ChartJS: any) => {
+  private static _chartCallback = (ChartJS: any): void => {
     const obj = { responsive: true, maintainAspectRatio: false }
     if (ChartJS.defaults.global === undefined) {
       ChartJS.defaults.global = obj
@@ -141,7 +136,6 @@ export class ChartHelper {
   }
 
   private static getColors(dataList: string[]): string[] {
-    // @ts-ignore
     return dataList.map(pKey => {
       const d = pKey.replace(/ \(\d+(\.\d+)?%\)$/g, '')
       let cached = this._colorCache[d]
@@ -154,7 +148,7 @@ export class ChartHelper {
     })
   }
 
-  private static getRandomColor() {
+  private static getRandomColor(): string {
     const randomNumber = Math.floor(Math.random() * 16777215) // Generates a random number up to FFFFFF in hexadecimal
     const hexNumber = randomNumber.toString(16) // Convert the random number to hexadecimal
     return `#${hexNumber}`
@@ -193,11 +187,11 @@ export class ChartHelper {
         res.push({
           x: Utils.getDaysAsMs(xValue),
           y: allSameX.reduce(
-            (res: number, item: BubbleDataPoint) => res + item.y,
+            (res0: number, item: BubbleDataPoint) => res0 + item.y,
             0
           ),
           r: allSameX.reduce(
-            (res: number, item: BubbleDataPoint) => res + item.r,
+            (res0: number, item: BubbleDataPoint) => res0 + item.r,
             0
           )
         } as BubbleDataPoint)
@@ -213,9 +207,9 @@ export class ChartHelper {
       } as ScatterDataPoint
     })
 
-    bubbleValues.forEach((v: BubbleDataPoint) => {
+    for (const v of bubbleValues) {
       v.r = v.r * bubbleBaseWith
-    })
+    }
 
     const data: ChartConfiguration = Object.assign({}, ChartHelper._chartConfig)
     data.type = 'bubble'
@@ -346,14 +340,14 @@ export class ChartHelper {
     fromColor: [number, number, number],
     toColor: [number, number, number],
     weight: number
-  ) {
+  ): string {
     const r = Math.round(fromColor[0] * (1 - weight) + toColor[0] * weight)
     const g = Math.round(fromColor[1] * (1 - weight) + toColor[1] * weight)
     const b = Math.round(fromColor[2] * (1 - weight) + toColor[2] * weight)
     return `rgb(${r}, ${g}, ${b})`
   }
 
-  private static getBubbleColors(values: BubbleDataPoint[]) {
+  private static getBubbleColors(values: BubbleDataPoint[]): string[] {
     const max = Math.max(...values.map(v => v.r))
     // const max = 13;
 
