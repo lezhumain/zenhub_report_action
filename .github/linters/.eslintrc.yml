@@ -80,5 +80,5 @@ rules:
     '@typescript-eslint/space-before-function-paren': 'off',
     '@typescript-eslint/type-annotation-spacing': 'error',
     '@typescript-eslint/unbound-method': 'error',
-    "github/array-foreach": 'warn'
+    'github/array-foreach': 'warn'
   }

@@ -51897,7 +51897,6 @@ const reviewer_call = __nccwpck_require__(2074);
 const apiKey = process.env.API_KEY;
 class FileUtils {
     static fileExists(filePath) {
-        const ff = fs;
         return fs.existsSync(filePath);
     }
 }
