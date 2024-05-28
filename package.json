@@ -40,7 +40,8 @@
     "build": "rm -rf dist/* && npx tsc && npm run build_sub && rm -rf /* && cp -r src/zenhub_reports/dist/* /",
     "cp_extra_files": "cp src/zenhub_reports/src/check_pr_reviewers.js ./ && cp src/zenhub_reports/src/*.html ./dist/",
     "build_single": "npx tsc && npm run cp_extra_files",
-    "rep": "cp node_modules/chartjs-node-canvas/src/index.ts /tmp/index.ts && sed 's/chartJs(context, configuration/chartJs(context as any, configuration as any/g' /tmp/index.ts > node_modules/chartjs-node-canvas/src/index.ts"
+    "rep": "cp node_modules/chartjs-node-canvas/src/index.ts /tmp/index.ts && sed 's/chartJs(context, configuration/chartJs(context as any, configuration as any/g' /tmp/index.ts > node_modules/chartjs-node-canvas/src/index.ts",
+    "prepFiles": "./prepareFiles.sh"
   },
   "license": "MIT",
   "jest": {
