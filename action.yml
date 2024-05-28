@@ -48,6 +48,7 @@ runs:
 
     - run: |
         pwd
+        ls
         node dist/index.js
       shell: bash
       env:
