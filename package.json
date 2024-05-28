@@ -1,21 +1,25 @@
 {
-  "name": "typescript-action",
-  "description": "GitHub Actions TypeScript template",
-  "version": "0.0.0",
-  "author": "",
+  "name": "zenhub-report-action",
+  "description": "GitHub Actions to retrieve Zenhub issue stats",
+  "version": "1.0.1",
+  "author": "lezhumain",
   "private": true,
   "homepage": "https://github.com/actions/typescript-action",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/lezhumain/zenhub_report_action.git"
   },
   "bugs": {
-    "url": "https://github.com/actions/typescript-action/issues"
+    "url": "https://github.com/lezhumain/zenhub_report_action/issues"
   },
   "keywords": [
     "actions",
     "node",
-    "setup"
+    "zenhub",
+    "metrics",
+    "report",
+    "board",
+    "zenhub_board"
   ],
   "exports": {
     ".": "./dist/index.js"
