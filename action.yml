@@ -38,5 +38,22 @@ outputs:
 #        REPO_ID: ${{ github.event.repository.id }}
 
 runs:
-  using: node20
-  main: dist/index.js
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v4
+    - run: |
+        npm ci
+      shell: bash
+      name: NPM build
+
+    - run: |
+        node dist/index.ts
+      shell: bash
+      env:
+        GH_API_KEY: ${{ github.token }}
+        REPO_ID: ${{ github.event.repository.id }}
+      name: Node run
+
+#runs:
+#  using: node20
+#  main: dist/index.js
