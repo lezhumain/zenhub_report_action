@@ -8,10 +8,10 @@ branding:
   color: 'red'
 
 # Define your inputs here.
-inputs:
-  WORKSPACE_ID:
-    description: "Your zenhub workspace's ID"
-    required: true
+#inputs:
+#  WORKSPACE_ID:
+#    description: "Your zenhub workspace's ID"
+#    required: true
 
 # Define your outputs here.
 outputs:
