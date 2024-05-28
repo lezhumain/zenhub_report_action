@@ -47,7 +47,7 @@ runs:
       name: NPM build
 
     - run: |
-        node dist/index.ts
+        node dist/index.js
       shell: bash
       env:
         GH_API_KEY: ${{ github.token }}
