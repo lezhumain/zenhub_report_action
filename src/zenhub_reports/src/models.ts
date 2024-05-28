@@ -121,6 +121,11 @@ export class Utils {
     )
     return mark
   }
+
+  static isHex(str: string): boolean {
+    const hexRegex = /^[0-9A-Fa-f]+$/
+    return hexRegex.test(str)
+  }
 }
 
 export class ControlChartItem implements IControlChartItem {

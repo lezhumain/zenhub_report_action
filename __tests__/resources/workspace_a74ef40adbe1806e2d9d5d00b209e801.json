@@ -1,0 +1,9 @@
+{
+  "totalIssues": 67,
+  "name": "Whitespace Automation",
+  "id": "5e3018c2d1715f5725d0b8c7",
+  "displayName": "Whitespace Automation",
+  "pipelinesConnection": [],
+  "__typename": "Workspace",
+  "configHash": "a74ef40adbe1806e2d9d5d00b209e801"
+}

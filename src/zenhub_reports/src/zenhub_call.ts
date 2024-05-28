@@ -63,6 +63,7 @@ interface IAVGItemMap {
 }
 
 export interface IMainConfig {
+  inputJsonFilename?: string
   releaseID?: string
   pullRequest?: boolean
   maxCount: number
@@ -118,6 +119,11 @@ interface IPrSummary {
   author: string
   commentators: string[]
   url: string
+}
+
+export interface IProgramResult {
+  mark: string
+  allResult: IReport
 }
 
 export class Program {
@@ -194,6 +200,10 @@ export class Program {
     }
     this._config = Object.assign(defaultConfig, config)
 
+    if (!Utils.isHex(this._config.workspaceId)) {
+      throw new Error('Bad workspace ID')
+    }
+
     const currentFolder = process.cwd()
 
     const outputJsonFilename = path.join(
@@ -233,10 +243,12 @@ export class Program {
     }
     this._configHash = md5(JSON.stringify(this._config))
 
-    this._file = path.join(
-      this._mainOutputFolder,
-      `${this._baseFilename}_${this._configHash}.json`
-    )
+    this._file = this._config.inputJsonFilename
+      ? this._config.inputJsonFilename
+      : path.join(
+          this._mainOutputFolder,
+          `${this._baseFilename}_${this._configHash}.json`
+        )
     console.log(`Target file: ${this._file}`)
   }
 
@@ -1327,7 +1339,7 @@ fragment currentWorkspace on Workspace {
     return Promise.resolve({
       mark,
       allResult
-    })
+    } as IProgramResult)
   }
 
   private printRemaining(i: number, length: number) {
@@ -1357,7 +1369,10 @@ fragment currentWorkspace on Workspace {
     try {
       const obj: IWorkspace = JSON.parse(content) as IWorkspace
       console.log(`Got existing`)
-      if (obj.configHash !== this._configHash) {
+      if (
+        obj.configHash !== this._configHash &&
+        !this._config.inputJsonFilename
+      ) {
         console.log(`Using existing`)
         return null
       }
