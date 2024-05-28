@@ -83,7 +83,6 @@ export interface IMainConfig {
 
 export class FileUtils {
   static fileExists(filePath: string): boolean {
-    const ff = fs
     return fs.existsSync(filePath)
   }
 }
@@ -896,7 +895,7 @@ fragment currentWorkspace on Workspace {
     return allCSV
   }
 
-  private generateHTML(outstanding: ICSVItem[]):void {
+  private generateHTML(outstanding: ICSVItem[]): void {
     const csv: string = fs.readFileSync(
       path.join(this._mainOutputFolder, 'main.csv'),
       { encoding: 'utf8' }
@@ -918,7 +917,7 @@ fragment currentWorkspace on Workspace {
     outFile = path.join(this._mainOutputFolder, 'index.html'),
     tag = '__MORE__',
     html: string
-  ):void {
+  ): void {
     const htmlContent: string = fs
       .readFileSync(baseFile, { encoding: 'utf8' })
       .replace(tag, html)
@@ -926,7 +925,7 @@ fragment currentWorkspace on Workspace {
     fs.writeFileSync(outFile, htmlContent, { encoding: 'utf8' })
   }
 
-  private writeMoreHTML():void {
+  private writeMoreHTML(): void {
     this.updateHTML(
       path.join(this._mainOutputFolder, 'index.html'),
       path.join(this._mainOutputFolder, 'index.html'),
@@ -935,7 +934,7 @@ fragment currentWorkspace on Workspace {
     )
   }
 
-  private addControlChartListHTML(chartData: IControlChartItem[]):void {
+  private addControlChartListHTML(chartData: IControlChartItem[]): void {
     const htmlTableString = this.generateTable(chartData)
     this._preparedHTML.push(
       `<div class="control-chart-list"><h3>Control Chart list</h3>${htmlTableString}</div>`
@@ -1342,7 +1341,7 @@ fragment currentWorkspace on Workspace {
     } as IProgramResult)
   }
 
-  private printRemaining(i: number, length: number):void {
+  private printRemaining(i: number, length: number): void {
     const elapsedMs: number = Date.now() - this._startTimestamp
     const remainingCount = length - i
     const timePerIssueMs: number = elapsedMs / (i + 1)
@@ -1458,7 +1457,7 @@ fragment currentWorkspace on Workspace {
     stats: IStatResult,
     statsEstimate: IStatResult,
     veloccity: IVelocity
-  ):void {
+  ): void {
     this._preparedHTML.push(`<div class="stats">
 			<h3>Stats</h3>
 			<p><b>Average per issue:</b>${stats.average.toFixed(1)}</p>
