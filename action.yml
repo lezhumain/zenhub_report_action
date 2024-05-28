@@ -47,7 +47,7 @@ runs:
       name: NPM build
 
     - run: |
-        echo pwd
+        pwd
         node dist/index.js
       shell: bash
       env:
