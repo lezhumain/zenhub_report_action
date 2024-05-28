@@ -1,5 +1,5 @@
 FROM node:20-bookworm
-RUN apt update && apt -y upgrade && apt install -y python3 pip g++ make default-jdk
+RUN aot-get update && aot-get -y upgrade && aot-get install -y python3 pip g++ make default-jdk
 #FROM node:18-alpine
 #RUN apk update && apk add bash python3
 #RUN apk add --update --no-cache \

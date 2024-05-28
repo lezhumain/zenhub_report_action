@@ -8,10 +8,10 @@ branding:
   color: 'red'
 
 # Define your inputs here.
-inputs:
-  WORKSPACE_ID:
-    description: "Your zenhub workspace's ID"
-    required: true
+#inputs:
+#  WORKSPACE_ID:
+#    description: "Your zenhub workspace's ID"
+#    required: true
 
 # Define your outputs here.
 outputs:
@@ -20,16 +20,39 @@ outputs:
   markdownFile:
     description: 'Generated markdown file'
 
+#runs:
+#  using: 'composite'
+#  steps:
+#    # Reference the major version of a release
+#    - uses: actions/checkout@v4
+#    - run: |
+#        ls -alh
+#        echo "----"
+#        pwd
+#        echo "----"
+#        ls -alh zenhub_report_action
+#        npm ci && npx -y ts-node src/index.ts
+#      shell: bash
+#      env:
+#        GH_API_KEY: ${{ github.token }}
+#        REPO_ID: ${{ github.event.repository.id }}
+
 runs:
   using: 'composite'
   steps:
-    # Reference the major version of a release
     - uses: actions/checkout@v4
-    - run: npm ci && npx -y ts-node src/index.ts
+    - run: |
+        npm ci
+      shell: bash
+      name: NPM build
+
+    - run: |
+        node dist/index.js
       shell: bash
       env:
         GH_API_KEY: ${{ github.token }}
         REPO_ID: ${{ github.event.repository.id }}
+      name: Node run
 #runs:
 #  using: node20
 #  main: dist/index.js

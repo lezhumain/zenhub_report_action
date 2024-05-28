@@ -21,9 +21,9 @@ mv dist /tmp/dist
 #which 7z
 #if [ "$?" == "0" ]; then
 if which 7z; then
-  7z a -tzip ../zenhub_reports.zip ../zenhub_reports
+    7z a -tzip ../zenhub_reports.zip ../zenhub_reports
 else
-  zip -r ../zenhub_reports.zip ../zenhub_reports
+    zip -r ../zenhub_reports.zip ../zenhub_reports
 fi
 
 #mv /tmp/main.xml ./.idea/runConfigurations/main.xml

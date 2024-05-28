@@ -1,9 +1,16 @@
 import * as core from '@actions/core'
-import { IMainConfig, Program } from './zenhub_reports/src/zenhub_call'
-import { IIssue } from './zenhub_reports/src/models'
+import {
+  IMainConfig,
+  IProgramResult,
+  Program
+} from './zenhub_reports/src/zenhub_call'
+import { IGhEvent, IIssue } from './zenhub_reports/src/models'
 import * as fs from 'node:fs'
 
-const current = new Date()
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// import html from './zenhub_reports/src/index.html';
+
+const current = new Date(new Date().toDateString()) // hours set to 0
 const minus1month = new Date(current)
 minus1month.setMonth(minus1month.getMonth() - 1)
 
@@ -13,7 +20,7 @@ if (!workspaceId || !process.env.REPO_ID) {
   process.exit(1)
 }
 
-const config: IMainConfig = {
+export const config0: IMainConfig = {
   workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
   outputJsonFilename: 'output/allEvs.json',
   outputImageFilename: `output/output_average.png`,
@@ -33,58 +40,61 @@ const config: IMainConfig = {
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
-export async function run(): Promise<void> {
+export async function run(conf?: IMainConfig): Promise<void> {
+  const config = conf || config0
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const program = new Program(config)
+    // const res = { mark: 'hii' }
     // skip ReBrowse
-    program
-      .main(
-        (issue: IIssue) => {
-          const matchesLabel: boolean =
-            config.labels !== undefined &&
-            config.labels.some(l => {
-              const low = l.toLowerCase()
-              return (
-                issue.labels !== undefined &&
-                issue.labels.map(la => la.toLowerCase()).includes(low)
-              )
-            })
-          const idShouldSkip: boolean = !!config.issuesToSkip?.includes(
-            issue.number
-          )
+    const res: IProgramResult = await program.main(
+      async (issue: IIssue) => {
+        const matchesLabel: boolean =
+          config.labels !== undefined &&
+          config.labels.some(l => {
+            const low = l.toLowerCase()
+            return (
+              issue.labels !== undefined &&
+              issue.labels.map(la => la.toLowerCase()).includes(low)
+            )
+          })
+        const idShouldSkip = !!config.issuesToSkip?.includes(issue.number)
 
-          const skip = !matchesLabel && idShouldSkip
-          return Promise.resolve(skip)
-        },
-        (event: any) => {
-          if (!config.minDate || !config.maxDate) {
-            return Promise.resolve(false)
-          }
-
-          const minDate: Date | undefined = new Date(config.minDate)
-          const maxDate: Date | undefined = new Date(config.maxDate)
-
-          const eventDate: Date = new Date(event.createdAt)
-          const skip: boolean =
-            (minDate !== undefined &&
-              eventDate.getTime() < minDate.getTime()) ||
-            (maxDate !== undefined && eventDate.getTime() > maxDate.getTime())
-
-          return Promise.resolve(skip)
+        const skip = !matchesLabel && idShouldSkip
+        return Promise.resolve(skip)
+      },
+      async (event: IGhEvent) => {
+        if (!config.minDate || !config.maxDate) {
+          return Promise.resolve(false)
         }
-      )
-      .then((res: any) => {
-        const file = 'zenhub_report.md'
-        fs.writeFileSync(file, res.mark, { encoding: 'utf8' })
-        core.setOutput('markdownContent', res.mark)
-        // core.setOutput('markdownFile', file);
-        // console.log('markdownContent', res.mark)
-      })
+
+        const minDate: Date | undefined = new Date(config.minDate)
+        const maxDate: Date | undefined = new Date(config.maxDate)
+
+        const eventDate: Date = new Date(event.createdAt)
+        const skip: boolean =
+          (minDate !== undefined && eventDate.getTime() < minDate.getTime()) ||
+          (maxDate !== undefined && eventDate.getTime() > maxDate.getTime())
+
+        return Promise.resolve(skip)
+      }
+    )
+
+    const file = 'zenhub_report.md'
+    fs.writeFileSync(file, res.mark, { encoding: 'utf8' })
+    core.setOutput('markdownContent', res.mark)
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) {
       core.setFailed(error.message)
-      // console.log(error.message)
     }
+  } finally {
+    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
+    core.debug(`Got file ${config.inputJsonFilename}`)
+
+    // // Log the current timestamp, wait, then log the new timestamp
+    // core.debug(new Date().toTimeString())
+    // await wait(parseInt(ms, 10))
+    // core.debug(new Date().toTimeString())
   }
 }

@@ -1,6 +1,8 @@
 const path = require('path')
 const webpack = require('webpack')
 
+const nodeExternals = require('webpack-node-externals')
+
 module.exports = {
   entry: './src/index.ts',
   module: {
@@ -24,5 +26,6 @@ module.exports = {
       resource.request = resource.request.replace(/^node:/, '')
     })
   ],
-  target: 'node'
+  target: 'node',
+  externals: [nodeExternals()]
 }

@@ -63,6 +63,7 @@ interface IAVGItemMap {
 }
 
 export interface IMainConfig {
+  inputJsonFilename?: string
   releaseID?: string
   pullRequest?: boolean
   maxCount: number
@@ -81,7 +82,7 @@ export interface IMainConfig {
 }
 
 export class FileUtils {
-  static fileExists(filePath: string) {
+  static fileExists(filePath: string): boolean {
     return fs.existsSync(filePath)
   }
 }
@@ -98,7 +99,6 @@ interface IHandleIssueResult {
 interface IReport {
   chartTime: IChartItem[]
   chartCount: IChartItem[]
-  // csvItems: allEvs,
   statsIssue: IStatResult
   statsEstimate: IStatResult
   controlChartList: IControlChartItem[]
@@ -117,6 +117,11 @@ interface IPrSummary {
   author: string
   commentators: string[]
   url: string
+}
+
+export interface IProgramResult {
+  mark: string
+  allResult: IReport
 }
 
 export class Program {
@@ -193,6 +198,10 @@ export class Program {
     }
     this._config = Object.assign(defaultConfig, config)
 
+    if (!Utils.isHex(this._config.workspaceId)) {
+      throw new Error('Bad workspace ID')
+    }
+
     const currentFolder = process.cwd()
 
     const outputJsonFilename = path.join(
@@ -232,10 +241,13 @@ export class Program {
     }
     this._configHash = md5(JSON.stringify(this._config))
 
-    this._file = path.join(
-      this._mainOutputFolder,
-      `${this._baseFilename}_${this._configHash}.json`
-    )
+    this._file = this._config.inputJsonFilename
+      ? this._config.inputJsonFilename
+      : path.join(
+          this._mainOutputFolder,
+          `${this._baseFilename}_${this._configHash}.json`
+        )
+    console.log(`Target file: ${this._file}`)
   }
 
   private async generateChartFromObj(
@@ -386,12 +398,16 @@ export class Program {
     )
 
     if (doGen) {
-      await this.generateChartFromObj(
-        '',
-        evs,
-        `output_issue_${issueNumber}.png`,
-        { width: 1600, height: 1200 }
-      )
+      try {
+        await this.generateChartFromObj(
+          '',
+          evs,
+          `output_issue_${issueNumber}.png`,
+          { width: 1600, height: 1200 }
+        )
+      } catch (err: any) {
+        console.error(err.message)
+      }
     }
 
     return Promise.resolve({
@@ -707,6 +723,7 @@ export class Program {
     workspaceId: string,
     last = 73
   ): Promise<IWorkspace> {
+    console.log('Getting board data')
     const base: IWorkspace = await this.getBoard(workspaceId, last)
     this._config.releaseID = await this.getReleases(workspaceId)
 
@@ -877,13 +894,13 @@ fragment currentWorkspace on Workspace {
     return allCSV
   }
 
-  private generateHTML(outstanding: ICSVItem[]) {
+  private generateHTML(outstanding: ICSVItem[]): void {
     const csv: string = fs.readFileSync(
       path.join(this._mainOutputFolder, 'main.csv'),
       { encoding: 'utf8' }
     )
     const html: string = fs
-      .readFileSync(path.join(__dirname, '..', 'resources', 'index.html'), {
+      .readFileSync(path.join(__dirname, 'index.html'), {
         encoding: 'utf8'
       })
       .replace('__DATA__', csv)
@@ -899,7 +916,7 @@ fragment currentWorkspace on Workspace {
     outFile = path.join(this._mainOutputFolder, 'index.html'),
     tag = '__MORE__',
     html: string
-  ) {
+  ): void {
     const htmlContent: string = fs
       .readFileSync(baseFile, { encoding: 'utf8' })
       .replace(tag, html)
@@ -907,7 +924,7 @@ fragment currentWorkspace on Workspace {
     fs.writeFileSync(outFile, htmlContent, { encoding: 'utf8' })
   }
 
-  private writeMoreHTML() {
+  private writeMoreHTML(): void {
     this.updateHTML(
       path.join(this._mainOutputFolder, 'index.html'),
       path.join(this._mainOutputFolder, 'index.html'),
@@ -916,14 +933,14 @@ fragment currentWorkspace on Workspace {
     )
   }
 
-  private addControlChartListHTML(chartData: IControlChartItem[]) {
+  private addControlChartListHTML(chartData: IControlChartItem[]): void {
     const htmlTableString = this.generateTable(chartData)
     this._preparedHTML.push(
       `<div class="control-chart-list"><h3>Control Chart list</h3>${htmlTableString}</div>`
     )
   }
 
-  getWorkingDays(currentDate: Date, endDate: Date) {
+  getWorkingDays(currentDate: Date, endDate: Date): number {
     let count = 0
 
     while (currentDate.getTime() <= endDate.getTime()) {
@@ -944,7 +961,7 @@ fragment currentWorkspace on Workspace {
     )
   }
 
-  private findOutstandingIssues(allEvs: ICSVItem[][]) {
+  private findOutstandingIssues(allEvs: ICSVItem[][]): ICSVItem[] {
     const flat: { data: ICSVItem[]; sum: number } = allEvs.reduce(
       (
         res: {
@@ -972,7 +989,7 @@ fragment currentWorkspace on Workspace {
   async main(
     skipIssueIfFn?: (issue: any) => Promise<boolean>,
     skipEventIfFn?: (issue: any) => Promise<boolean>
-  ) {
+  ): Promise<IProgramResult> {
     // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
     // this._pipelines = pipelines
     //
@@ -1058,6 +1075,7 @@ fragment currentWorkspace on Workspace {
         this._config.fromPipeline,
         this._config.toPipeline
       )
+
       const evs: ICSVItem[] = handleIssueResult.csvItems
       if (evs.length > 0) {
         allEvs.push(evs)
@@ -1173,9 +1191,11 @@ fragment currentWorkspace on Workspace {
         })
       }
     )
+
     fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
       encoding: 'utf8'
     })
+    console.log(`Wrote file ${this._file}`)
 
     const chartData: IControlChartItem[] = this.getControlChartData(issues)
     console.log(chartData)
@@ -1301,7 +1321,7 @@ fragment currentWorkspace on Workspace {
 					</div>
 				</section>`
     this.updateHTML(
-      path.join(__dirname, '..', 'resources', 'main_report.html'),
+      path.join(__dirname, 'main_report.html'),
       path.join(this._mainOutputFolder, 'main_index.html'),
       '__CONTROL_CHART_TABLE__',
       fullHTML
@@ -1317,10 +1337,10 @@ fragment currentWorkspace on Workspace {
     return Promise.resolve({
       mark,
       allResult
-    })
+    } as IProgramResult)
   }
 
-  private printRemaining(i: number, length: number) {
+  private printRemaining(i: number, length: number): void {
     const elapsedMs: number = Date.now() - this._startTimestamp
     const remainingCount = length - i
     const timePerIssueMs: number = elapsedMs / (i + 1)
@@ -1330,21 +1350,28 @@ fragment currentWorkspace on Workspace {
 
     const strVal =
       this._estimateRemainingMs <= this._estimateRemainingPrveiousMs
-        ? `${Math.round(this._estimateRemainingMs / 1000)}s`
+        ? `${Utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
         : 'estimating...'
 
     console.log(`Remaining: ${strVal}`)
   }
 
   private getFromFile(): IWorkspace | null {
+    console.log(`Getting from file ${this._file}`)
     if (!FileUtils.fileExists(this._file)) {
+      console.log(`File doesn't exist`)
       return null
     }
 
     const content = fs.readFileSync(this._file, { encoding: 'utf8' })
     try {
       const obj: IWorkspace = JSON.parse(content) as IWorkspace
-      if (obj.configHash !== this._configHash) {
+      console.log(`Got existing`)
+      if (
+        obj.configHash !== this._configHash &&
+        !this._config.inputJsonFilename
+      ) {
+        console.log(`Using existing`)
         return null
       }
       return obj
@@ -1387,7 +1414,7 @@ fragment currentWorkspace on Workspace {
     return res
   }
 
-  private generateTable(arr: any[]) {
+  private generateTable(arr: any[]): string {
     if (arr.length === 0) {
       return ''
     }
@@ -1429,7 +1456,7 @@ fragment currentWorkspace on Workspace {
     stats: IStatResult,
     statsEstimate: IStatResult,
     veloccity: IVelocity
-  ) {
+  ): void {
     this._preparedHTML.push(`<div class="stats">
 			<h3>Stats</h3>
 			<p><b>Average per issue:</b>${stats.average.toFixed(1)}</p>
@@ -1481,7 +1508,7 @@ fragment currentWorkspace on Workspace {
     }
   }
 
-  private getWeekOfMonth(date: Date) {
+  private getWeekOfMonth(date: Date): string {
     const firstDayOfMonth: Date = new Date(date.getTime())
     firstDayOfMonth.setDate(1)
 
@@ -1636,7 +1663,7 @@ fragment currentWorkspace on Workspace {
     }
   }
 
-  private generateTableFromCSV(csvChart: string) {
+  private generateTableFromCSV(csvChart: string): string {
     const lines = csvChart
       .trim()
       .split('\n')
@@ -1839,7 +1866,7 @@ fragment currentWorkspace on Workspace {
     imgFiles: any[],
     dataq: any[],
     sizePerc: number
-  ) {
+  ): Promise<string> {
     if (sizePerc < 0) {
       sizePerc *= 100
     }
