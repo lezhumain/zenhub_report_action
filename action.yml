@@ -41,6 +41,9 @@ runs:
   using: 'composite'
   steps:
     - uses: actions/checkout@v4
+      with:
+        repository: lezhumain/zenhub_report_action
+
     - run: |
         npm ci
       shell: bash
