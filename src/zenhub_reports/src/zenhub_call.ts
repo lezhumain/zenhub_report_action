@@ -99,7 +99,6 @@ interface IHandleIssueResult {
 interface IReport {
   chartTime: IChartItem[]
   chartCount: IChartItem[]
-  // csvItems: allEvs,
   statsIssue: IStatResult
   statsEstimate: IStatResult
   controlChartList: IControlChartItem[]
