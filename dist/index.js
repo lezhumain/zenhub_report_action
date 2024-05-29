@@ -51562,7 +51562,6 @@ class ChartHelper {
      * @param sizeObj
      */
     static async generateChartFromObj(title, chartItems, outputFile, sizeObj) {
-        // throw new Error("STOP!");
         const data0 = chartItems.map(e => e.data);
         const sum = data0.reduce((res, item) => res + item, 0);
         const labels = chartItems.map(e => `${e.label} (${((e.data * 100) / sum).toFixed(1)}%)`);
@@ -51918,7 +51917,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Program = exports.FileUtils = void 0;
-/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any,github/no-then */
 const md5_1 = __importDefault(__nccwpck_require__(7913));
 const fs = __importStar(__nccwpck_require__(7147));
 const chart_helper_1 = __nccwpck_require__(8264);
@@ -52649,6 +52648,12 @@ fragment currentWorkspace on Workspace {
         const timeChartItems = await this.generateChartFromObj(`Time spent in pipelines on ${date.toISOString()} (${handledCount} issues)`, evs, this._config.outputImageFilename, {
             width: 1600,
             height: 1200
+        }).catch(e => {
+            if (!e.message.includes("Cannot find module 'canvas'")) {
+                throw e;
+            }
+            console.warn(e.message);
+            return [];
         });
         console.log(JSON.stringify(avg, null, 2));
         const countChartItems = Object.keys(avg).map((pipeline) => {
@@ -52658,7 +52663,12 @@ fragment currentWorkspace on Workspace {
             };
         });
         console.log(`Handled ${handledCount} issues`);
-        await chart_helper_1.ChartHelper.generateChartFromObj(`Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`, countChartItems, this._config.outputImageFilename.replace('.png', '_issues.png'), { width: 1600, height: 1200 });
+        await chart_helper_1.ChartHelper.generateChartFromObj(`Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`, countChartItems, this._config.outputImageFilename.replace('.png', '_issues.png'), { width: 1600, height: 1200 }).catch(e => {
+            if (!e.message.includes("Cannot find module 'canvas'")) {
+                throw e;
+            }
+            console.warn(e.message);
+        });
         board.pipelinesConnection.forEach((pipelineConnect) => {
             pipelineConnect.issues.forEach((issue) => {
                 // if(issue.number) {
@@ -52734,16 +52744,24 @@ fragment currentWorkspace on Workspace {
         };
         const ccsv = this.generateAllCSV('', allResult);
         fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allResult, null, 2), { encoding: 'utf8' }); // done at the end
-        this.generateHTML(outs);
-        this.addStatsHTML(stats, statsEstimate, veloccity);
-        this.addControlChartListHTML(chartData);
-        this.writeMoreHTML();
         const remainingOpenedIssuesCleaned = remainingOpenedIssues.map((f) => {
             const clone = Object.assign({}, f);
             delete clone.handled;
             clone.estimateValue = clone.estimateValue || 0;
             return clone;
         });
+        this.generateHTML(outs);
+        try {
+            this.addStatsHTML(stats, statsEstimate, veloccity);
+            this.addControlChartListHTML(chartData);
+            this.writeMoreHTML();
+        }
+        catch (e) {
+            if (!e.message.includes("Cannot find module 'canvas'")) {
+                throw e;
+            }
+            console.warn(e.message);
+        }
         const fullHTML = `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
             `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
             `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2><br>` +
@@ -52755,7 +52773,12 @@ fragment currentWorkspace on Workspace {
             <h3>Control chart list</h3>
             ${this.generateTableFromCSV(ccsv.csvChart)}
             <div>
-                ${await this.getControlChartHTML(chartData)}
+                ${await this.getControlChartHTML(chartData).catch(e => {
+                if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e;
+                }
+                console.warn(e.message);
+            })}
             </div>
         </section>` +
             `<section>
@@ -52766,7 +52789,12 @@ fragment currentWorkspace on Workspace {
             <h3>Velocity list</h3>
             ${this.generateTableFromCSV(ccsv.velocityList)}
             <div>
-                ${await this.getVeloctiyChart(veloccity)}
+                ${await this.getVeloctiyChart(veloccity).catch(e => {
+                if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e;
+                }
+                console.warn(e.message);
+            })}
             </div>
         </section>` +
             `<section>
@@ -52775,14 +52803,24 @@ fragment currentWorkspace on Workspace {
                 ${this.generateTableFromCSV(ccsv.mainList)}
             </div>
             <div>
-                ${await this.getMainChartHTML(avg)}
+                ${await this.getMainChartHTML(avg).catch(e => {
+                if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e;
+                }
+                console.warn(e.message);
+            })}
             </div>
         </section>` +
             `<section>
             <h3>Commits and PRs list</h3>
             ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
             <div>
-                ${await this.getCommitsChartHTML(allResult.userReviewStats)}
+                ${await this.getCommitsChartHTML(allResult.userReviewStats).catch(e => {
+                if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e;
+                }
+                console.warn(e.message);
+            })}
             </div>
         </section>` +
             `<section>
@@ -52793,7 +52831,12 @@ fragment currentWorkspace on Workspace {
             <h3>Remaining opened issues per pipeline</h3>
             ${this.generateTable(openedPerPipeline)}
             <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline, 100)}
+                ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(e => {
+                if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e;
+                }
+                console.warn(e.message);
+            })}
             </div>
         </section>`;
         this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
