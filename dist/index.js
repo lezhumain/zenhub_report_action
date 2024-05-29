@@ -52840,7 +52840,7 @@ fragment currentWorkspace on Workspace {
             </div>
         </section>`;
         this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
-        const mark = models_1.Utils.htmlToMarkdown(fullHTML);
+        const mark = `${models_1.Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
         fs.writeFileSync(path.join(this._mainOutputFolder, 'main_report.md'), mark, { encoding: 'utf8' });
         return Promise.resolve({
             mark,
