@@ -34,7 +34,7 @@ if (!workspaceId || !process.env.REPO_ID) {
 }
 
 export const config0: IMainConfig = {
-  workspaceId: workspaceId,
+  workspaceId,
   outputJsonFilename: 'output/allEvs.json',
   outputImageFilename: `output/output_average.png`,
   minDate: fromDate.toISOString(),
