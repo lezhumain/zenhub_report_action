@@ -192,6 +192,9 @@ describe('action', () => {
     // )
     // const m = main.config0
     // Object.assign(main.config0!, newConf)
+    if (main.config0) {
+      delete main.config0.inputJsonFilename
+    }
 
     // eslint-disable-next-line github/no-then
     const hsaErr = await run().then(
