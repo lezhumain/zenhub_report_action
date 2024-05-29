@@ -1392,7 +1392,7 @@ fragment currentWorkspace on Workspace {
       fullHTML
     )
 
-    const mark = Utils.htmlToMarkdown(fullHTML)
+    const mark = `${Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`
     fs.writeFileSync(
       path.join(this._mainOutputFolder, 'main_report.md'),
       mark,
