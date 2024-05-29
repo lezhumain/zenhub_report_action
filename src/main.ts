@@ -11,11 +11,11 @@ import * as fs from 'node:fs'
 // import html from './zenhub_reports/src/index.html';
 
 let toDate = new Date(new Date().toDateString()) // hours set to 0
-if(core.getInput('TO_DATE')) {
+if (core.getInput('TO_DATE')) {
   toDate = new Date(core.getInput('TO_DATE'))
 }
-let fromDate;
-if(core.getInput('FROM_DATE')) {
+let fromDate
+if (core.getInput('FROM_DATE')) {
   fromDate = new Date(core.getInput('FROM_DATE'))
 } else {
   fromDate = new Date(toDate.toDateString())
@@ -41,7 +41,9 @@ export const config0: IMainConfig = {
   maxDate: toDate.toISOString(),
   // labels: [],
   skipRepos: [],
-  includeRepos: core.getInput('REPO_ID') ? [Number(core.getInput('REPO_ID'))] : [],
+  includeRepos: core.getInput('REPO_ID')
+    ? [Number(core.getInput('REPO_ID'))]
+    : [],
   // issuesToSkip: [],
   // fromPipeline: 'Backlog',
   // toPipeline: 'Awaiting TESS Review',
