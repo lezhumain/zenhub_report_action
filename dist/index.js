@@ -51356,26 +51356,49 @@ const zenhub_call_1 = __nccwpck_require__(5812);
 const fs = __importStar(__nccwpck_require__(7561));
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 // import html from './zenhub_reports/src/index.html';
-const current = new Date(new Date().toDateString()); // hours set to 0
-const minus1month = new Date(current);
-minus1month.setMonth(minus1month.getMonth() - 1);
-const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID');
+let toDate = new Date(new Date().toDateString()); // hours set to 0
+if (core.getInput('TO_DATE')) {
+    toDate = new Date(core.getInput('TO_DATE'));
+}
+let fromDate;
+if (core.getInput('FROM_DATE')) {
+    fromDate = new Date(core.getInput('FROM_DATE'));
+}
+else {
+    fromDate = new Date(toDate.toDateString());
+    fromDate.setMonth(fromDate.getMonth() - 1);
+}
+// const current = new Date(new Date().toDateString()) // hours set to 0
+// const minus1month = new Date(current)
+// minus1month.setMonth(minus1month.getMonth() - 1)
+// const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID')
+const workspaceId = core.getInput('WORKSPACE_ID') || process.env.WORKSPACE_ID;
 if (!workspaceId || !process.env.REPO_ID) {
     console.error('Need to export WORKSPACE_ID and REPO_ID');
     process.exit(1);
 }
 exports.config0 = {
-    workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+    workspaceId: workspaceId,
     outputJsonFilename: 'output/allEvs.json',
     outputImageFilename: `output/output_average.png`,
-    minDate: minus1month.toISOString(),
-    maxDate: current.toISOString(),
-    labels: [],
+    minDate: fromDate.toISOString(),
+    maxDate: toDate.toISOString(),
+    // labels: [],
     skipRepos: [],
-    includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
+    includeRepos: core.getInput('REPO_ID')
+        ? [Number(core.getInput('REPO_ID'))]
+        : [],
+    // issuesToSkip: [],
+    // fromPipeline: 'Backlog',
+    // toPipeline: 'Awaiting TESS Review',
+    // minDate: '2024-04-18',
+    // maxDate: '2024-05-18',
+    labels: ['regression'],
+    // skipRepos: [93615076],
+    // includeRepos: [232779486, 409231566],
     issuesToSkip: [],
-    fromPipeline: 'Backlog',
-    toPipeline: 'Awaiting TESS Review',
+    fromPipeline: core.getInput('FROM_PIPELINE'),
+    toPipeline: core.getInput('TO_PIPELINE'),
     maxCount: 5,
     release: ''
 };
@@ -51884,7 +51907,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Program = exports.FileUtils = void 0;
-/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any */
 const md5_1 = __importDefault(__nccwpck_require__(7913));
 const fs = __importStar(__nccwpck_require__(7147));
 const chart_helper_1 = __nccwpck_require__(8264);
@@ -52704,50 +52727,64 @@ fragment currentWorkspace on Workspace {
         this.addStatsHTML(stats, statsEstimate, veloccity);
         this.addControlChartListHTML(chartData);
         this.writeMoreHTML();
-        const fullHTML = `<section>
-					<h3>Cool stats</h3>
-					${this.getStatsHTML(stats, statsEstimate, veloccity)}
-				</section>` +
+        const remainingOpenedIssuesCleaned = remainingOpenedIssues.map((f) => {
+            const clone = Object.assign({}, f);
+            delete clone.handled;
+            clone.estimateValue = clone.estimateValue || 0;
+            return clone;
+        });
+        const fullHTML = `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
+            `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
+            `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2><br>` +
             `<section>
-					<h3>Control chart list</h3>
-					${this.generateTableFromCSV(ccsv.csvChart)}
-					<div>
-						${await this.getControlChartHTML(chartData)}
-					</div>
-				</section>${this.generateTableFromCSV(ccsv.csvOutstanding)}<section>
-					<h3>Velocity list</h3>
-					${this.generateTableFromCSV(ccsv.velocityList)}
-					<div>
-						${await this.getVeloctiyChart(veloccity)}
-					</div>
-				</section>` +
+          <h3>Cool stats</h3>
+              ${this.getStatsHTML(stats, statsEstimate, veloccity)}
+          </section>` +
             `<section>
-					<h3>Main list</h3>
-					<div style="overflow-x: scroll;">
-						${this.generateTableFromCSV(ccsv.mainList)}
-					</div>
-					<div>
-						${await this.getMainChartHTML(avg)}
-					</div>
-				</section>` +
+            <h3>Control chart list</h3>
+            ${this.generateTableFromCSV(ccsv.csvChart)}
+            <div>
+                ${await this.getControlChartHTML(chartData)}
+            </div>
+        </section>` +
             `<section>
-					<h3>Commits and PRs list</h3>
-					${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
-					<div>
-						${await this.getCommitsChartHTML(allResult.userReviewStats)}
-					</div>
-				</section>` +
+          <h3>Outstanding issues</h3>
+          ${this.generateTableFromCSV(ccsv.csvOutstanding)}
+        </section>` +
             `<section>
-					<h3>Remaining opened issues</h3>
-					${this.generateTable(remainingOpenedIssues)}
-				</section>` +
+            <h3>Velocity list</h3>
+            ${this.generateTableFromCSV(ccsv.velocityList)}
+            <div>
+                ${await this.getVeloctiyChart(veloccity)}
+            </div>
+        </section>` +
             `<section>
-					<h3>Remaining opened issues per pipeline</h3>
-					${this.generateTable(openedPerPipeline)}
-					<div>
-						${await this.getOpenedChartHTML(openedPerPipeline, 100)}
-					</div>
-				</section>`;
+            <h3>Main list</h3>
+            <div style="overflow-x: scroll;">
+                ${this.generateTableFromCSV(ccsv.mainList)}
+            </div>
+            <div>
+                ${await this.getMainChartHTML(avg)}
+            </div>
+        </section>` +
+            `<section>
+            <h3>Commits and PRs list</h3>
+            ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
+            <div>
+                ${await this.getCommitsChartHTML(allResult.userReviewStats)}
+            </div>
+        </section>` +
+            `<section>
+            <h3>Remaining opened issues</h3>
+            ${this.generateTable(remainingOpenedIssuesCleaned)}
+        </section>` +
+            `<section>
+            <h3>Remaining opened issues per pipeline</h3>
+            ${this.generateTable(openedPerPipeline)}
+            <div>
+                ${await this.getOpenedChartHTML(openedPerPipeline, 100)}
+            </div>
+        </section>`;
         this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
         const mark = models_1.Utils.htmlToMarkdown(fullHTML);
         fs.writeFileSync(path.join(this._mainOutputFolder, 'main_report.md'), mark, { encoding: 'utf8' });
@@ -52825,7 +52862,17 @@ fragment currentWorkspace on Workspace {
             .slice()
             .map((l) => {
             return `<tr>${Object.keys(l)
-                .map(lkey => `<td>${l[lkey]?.toString() || ''}</td>`)
+                .map(lkey => {
+                // const it = l[lkey]
+                // const isArr = Array.isArray(it)
+                // const val =
+                //   !isArr ||
+                //   it.every((r: any) => typeof r === 'string')
+                //     ? it?.toString() || ''
+                //     : this.generateTable(it)
+                // return `<td>${val}</td>`
+                return `<td>${l[lkey]?.toString() || ''}</td>`;
+            })
                 .join('')}</tr>`;
         })
             .join('')}
@@ -52961,8 +53008,31 @@ fragment currentWorkspace on Workspace {
         const lines = csvChart
             .trim()
             .split('\n')
-            .map(i => i.split(','))
-            .filter(e => !!e);
+            .map(i => i.split(','));
+        let title = '';
+        if (lines[0].length === 1) {
+            title = lines.splice(0, 1)[0][0];
+        }
+        const [headers] = lines.splice(0, 1);
+        if (!headers || headers.length === 0) {
+            return '';
+        }
+        const tableStr = `<table class="table table-striped-columns">
+                <thead>
+                    <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                </thead>
+                <tbody>
+                    ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
+                </tbody>
+            </table>`;
+        // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
+        return tableStr;
+    }
+    generateTableFromCSV0(csvChart) {
+        const lines = csvChart
+            .trim()
+            .split('\n')
+            .map(i => i.split(','));
         let title = '';
         if (lines[0].length === 1) {
             title = lines.splice(0, 1)[0][0];
