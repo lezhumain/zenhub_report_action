@@ -53,7 +53,7 @@ const runMock = jest.spyOn(main, 'run')
 // Mock the GitHub Actions core library
 let debugMock: jest.SpiedFunction<typeof core.debug>
 let errorMock: jest.SpiedFunction<typeof core.error>
-// let getInputMock: jest.SpiedFunction<typeof core.getInput>
+let getInputMock: jest.SpiedFunction<typeof core.getInput>
 let setFailedMock: jest.SpiedFunction<typeof core.setFailed>
 let setOutputMock: jest.SpiedFunction<typeof core.setOutput>
 
@@ -63,21 +63,31 @@ describe('action', () => {
 
     debugMock = jest.spyOn(core, 'debug').mockImplementation()
     errorMock = jest.spyOn(core, 'error').mockImplementation()
-    // getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
+    getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
     setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
     setOutputMock = jest.spyOn(core, 'setOutput').mockImplementation()
   })
 
   it('sets the time output', async () => {
     // Set the action's inputs as return values from core.getInput()
-    // getInputMock.mockImplementation(name => {
-    //   switch (name) {
-    //     case 'milliseconds':
-    //       return '500'
-    //     default:
-    //       return ''
-    //   }
-    // })
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'WORKSPACE_ID':
+          return '5e3018c2d1'
+        case 'REPO_ID':
+          return '500'
+        case 'FROM_PIPELINE':
+          return 'My from'
+        case 'TO_PIPELINE':
+          return 'My to'
+        case 'FROM_DATE':
+          return ''
+        case 'TO_DATE':
+          return ''
+        default:
+          return ''
+      }
+    })
 
     const myFile = main.conf.inputJsonFilename
 
@@ -90,6 +100,8 @@ describe('action', () => {
     )
     expect(hsaErr).toBeFalsy()
     expect(runMock).toHaveReturned()
+
+    // expect(getInputMock).toHaveBeenNthCalledWith(1, "WORKSPACE_ID");
 
     // Verify that all of the core library functions were called correctly
     expect(debugMock).toHaveBeenNthCalledWith(1, `Got file ${myFile}`)

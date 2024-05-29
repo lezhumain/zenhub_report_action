@@ -10,25 +10,38 @@ import * as fs from 'node:fs'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 // import html from './zenhub_reports/src/index.html';
 
-const current = new Date(new Date().toDateString()) // hours set to 0
-const minus1month = new Date(current)
-minus1month.setMonth(minus1month.getMonth() - 1)
+let toDate = new Date(new Date().toDateString()) // hours set to 0
+if(core.getInput('TO_DATE')) {
+  toDate = new Date(core.getInput('TO_DATE'))
+}
+let fromDate;
+if(core.getInput('FROM_DATE')) {
+  fromDate = new Date(core.getInput('FROM_DATE'))
+} else {
+  fromDate = new Date(toDate.toDateString())
+  fromDate.setMonth(fromDate.getMonth() - 1)
+}
 
-const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID')
+// const current = new Date(new Date().toDateString()) // hours set to 0
+// const minus1month = new Date(current)
+// minus1month.setMonth(minus1month.getMonth() - 1)
+
+// const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID')
+const workspaceId = core.getInput('WORKSPACE_ID') || process.env.WORKSPACE_ID
 if (!workspaceId || !process.env.REPO_ID) {
   console.error('Need to export WORKSPACE_ID and REPO_ID')
   process.exit(1)
 }
 
 export const config0: IMainConfig = {
-  workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+  workspaceId: workspaceId,
   outputJsonFilename: 'output/allEvs.json',
   outputImageFilename: `output/output_average.png`,
-  minDate: minus1month.toISOString(),
-  maxDate: current.toISOString(),
+  minDate: fromDate.toISOString(),
+  maxDate: toDate.toISOString(),
   // labels: [],
   skipRepos: [],
-  includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
+  includeRepos: core.getInput('REPO_ID') ? [Number(core.getInput('REPO_ID'))] : [],
   // issuesToSkip: [],
   // fromPipeline: 'Backlog',
   // toPipeline: 'Awaiting TESS Review',
@@ -39,8 +52,8 @@ export const config0: IMainConfig = {
   // skipRepos: [93615076],
   // includeRepos: [232779486, 409231566],
   issuesToSkip: [],
-  fromPipeline: 'Backlog',
-  toPipeline: 'Awaiting TESS Review',
+  fromPipeline: core.getInput('FROM_PIPELINE'),
+  toPipeline: core.getInput('TO_PIPELINE'),
 
   maxCount: 5,
   release: ''

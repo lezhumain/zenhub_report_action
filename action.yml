@@ -8,10 +8,25 @@ branding:
   color: 'red'
 
 # Define your inputs here.
-#inputs:
-#  WORKSPACE_ID:
-#    description: "Your zenhub workspace's ID"
-#    required: true
+inputs:
+  WORKSPACE_ID:
+    description: "Your zenhub workspace's ID"
+    required: true
+  REPO_ID:
+    description: "Your github repo ID"
+    required: true
+  FROM_PIPELINE:
+    description: "Zenhub start pipeline"
+    required: true
+  TO_PIPELINE:
+    description: "Zenhub completed pipeline"
+    required: true
+  FROM_DATE:
+    description: "Start date"
+    required: false
+  TO_DATE:
+    description: "End date"
+    required: false
 
 # Define your outputs here.
 outputs:
