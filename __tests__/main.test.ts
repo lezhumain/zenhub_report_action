@@ -168,14 +168,17 @@ describe('action', () => {
 
   it('missing workspace id', async () => {
     // Set the action's inputs as return values from core.getInput()
+    const WORKSPACE_ID = ''
+    const REPO_ID = '500'
+    const FROM_PIPELINE = 'My from'
     getInputMock.mockImplementation((name: string) => {
       switch (name) {
         case 'WORKSPACE_ID':
-          return ''
+          return WORKSPACE_ID
         case 'REPO_ID':
-          return '500'
+          return REPO_ID
         case 'FROM_PIPELINE':
-          return 'My from'
+          return FROM_PIPELINE
         case 'TO_PIPELINE':
           return 'My to'
         case 'FROM_DATE':
@@ -213,7 +216,7 @@ describe('action', () => {
     // Verify that all the core library functions were called correctly
     expect(setFailedMock).toHaveBeenNthCalledWith(
       1,
-      'Need to export WORKSPACE_ID () and REPO_ID (500)'
+      `Need to export WORKSPACE_ID (${WORKSPACE_ID}) and REPO_ID (${REPO_ID}) (${FROM_PIPELINE})`
     )
     expect(errorMock).not.toHaveBeenCalled()
   }, 10000)
