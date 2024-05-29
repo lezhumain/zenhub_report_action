@@ -27,8 +27,9 @@ if (core.getInput('FROM_DATE')) {
 // minus1month.setMonth(minus1month.getMonth() - 1)
 
 // const workspaceId = process.env.WORKSPACE_ID || core.getInput('WORKSPACE_ID')
+const repoId = core.getInput('REPO_ID')
 const workspaceId = core.getInput('WORKSPACE_ID') || process.env.WORKSPACE_ID
-if (!workspaceId || !process.env.REPO_ID) {
+if (!workspaceId || !repoId) {
   console.error('Need to export WORKSPACE_ID and REPO_ID')
   process.exit(1)
 }
@@ -41,9 +42,7 @@ export const config0: IMainConfig = {
   maxDate: toDate.toISOString(),
   // labels: [],
   skipRepos: [],
-  includeRepos: core.getInput('REPO_ID')
-    ? [Number(core.getInput('REPO_ID'))]
-    : [],
+  includeRepos: repoId ? [Number(repoId)] : [],
   // issuesToSkip: [],
   // fromPipeline: 'Backlog',
   // toPipeline: 'Awaiting TESS Review',

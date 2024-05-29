@@ -71,7 +71,6 @@ runs:
       shell: bash
       env:
         GH_API_KEY: ${{ github.token }}
-        REPO_ID: ${{ github.event.repository.id }}
       name: Node run
 #runs:
 #  using: node20
