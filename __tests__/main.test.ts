@@ -213,7 +213,7 @@ describe('action', () => {
     // Verify that all the core library functions were called correctly
     expect(setFailedMock).toHaveBeenNthCalledWith(
       1,
-      'Need to export WORKSPACE_ID and REPO_ID'
+      'Need to export WORKSPACE_ID () and REPO_ID (500)'
     )
     expect(errorMock).not.toHaveBeenCalled()
   }, 10000)

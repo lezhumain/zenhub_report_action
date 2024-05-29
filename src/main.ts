@@ -36,7 +36,7 @@ class Main implements IMain {
     const workspaceId =
       core.getInput('WORKSPACE_ID') || process.env.WORKSPACE_ID
     if (!workspaceId || !repoId) {
-      const errMsg = 'Need to export WORKSPACE_ID and REPO_ID'
+      const errMsg = `Need to export WORKSPACE_ID (${workspaceId}) and REPO_ID (${repoId})`
       console.error(errMsg)
       throw new Error(errMsg)
     }
