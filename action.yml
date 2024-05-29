@@ -52,26 +52,27 @@ outputs:
 #        GH_API_KEY: ${{ github.token }}
 #        REPO_ID: ${{ github.event.repository.id }}
 
-runs:
-  using: 'composite'
-  steps:
-    - uses: actions/checkout@v4
-      with:
-        repository: lezhumain/zenhub_report_action
-
-    - run: |
-        npm ci
-      shell: bash
-      name: NPM build
-
-    - run: |
-        pwd
-        ls
-        node dist/index.js
-      shell: bash
-      env:
-        GH_API_KEY: ${{ github.token }}
-      name: Node run
 #runs:
-#  using: node20
-#  main: dist/index.js
+#  using: 'composite'
+#  steps:
+#    - uses: actions/checkout@v4
+#      with:
+#        repository: lezhumain/zenhub_report_action
+#
+#    - run: |
+#        npm ci
+#      shell: bash
+#      name: NPM build
+#
+#    - run: |
+#        pwd
+#        ls
+#        node dist/index.js
+#      shell: bash
+#      env:
+#        GH_API_KEY: ${{ github.token }}
+#      name: Node run
+
+runs:
+  using: node20
+  main: dist/index.js
