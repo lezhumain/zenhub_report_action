@@ -26,12 +26,22 @@ export const config0: IMainConfig = {
   outputImageFilename: `output/output_average.png`,
   minDate: minus1month.toISOString(),
   maxDate: current.toISOString(),
-  labels: [],
+  // labels: [],
   skipRepos: [],
   includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
+  // issuesToSkip: [],
+  // fromPipeline: 'Backlog',
+  // toPipeline: 'Awaiting TESS Review',
+
+  // minDate: '2024-04-18',
+  // maxDate: '2024-05-18',
+  labels: ['regression'],
+  // skipRepos: [93615076],
+  // includeRepos: [232779486, 409231566],
   issuesToSkip: [],
   fromPipeline: 'Backlog',
   toPipeline: 'Awaiting TESS Review',
+
   maxCount: 5,
   release: ''
 }

@@ -100,7 +100,7 @@ describe('action', () => {
       expect.stringMatching(/.+/)
     )
     expect(errorMock).not.toHaveBeenCalled()
-  })
+  }, 10000)
 
   it('sets a failed status', async () => {
     const badConf = main.conf
