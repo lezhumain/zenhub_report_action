@@ -8,10 +8,25 @@ branding:
   color: 'red'
 
 # Define your inputs here.
-#inputs:
-#  WORKSPACE_ID:
-#    description: "Your zenhub workspace's ID"
-#    required: true
+inputs:
+  WORKSPACE_ID:
+    description: "Your zenhub workspace's ID"
+    required: true
+  REPO_ID:
+    description: 'Your github repo ID'
+    required: true
+  FROM_PIPELINE:
+    description: 'Zenhub start pipeline'
+    required: true
+  TO_PIPELINE:
+    description: 'Zenhub completed pipeline'
+    required: true
+  FROM_DATE:
+    description: 'Start date'
+    required: false
+  TO_DATE:
+    description: 'End date'
+    required: false
 
 # Define your outputs here.
 outputs:
@@ -37,27 +52,27 @@ outputs:
 #        GH_API_KEY: ${{ github.token }}
 #        REPO_ID: ${{ github.event.repository.id }}
 
-runs:
-  using: 'composite'
-  steps:
-    - uses: actions/checkout@v4
-      with:
-        repository: lezhumain/zenhub_report_action
-
-    - run: |
-        npm ci
-      shell: bash
-      name: NPM build
-
-    - run: |
-        pwd
-        ls
-        node dist/index.js
-      shell: bash
-      env:
-        GH_API_KEY: ${{ github.token }}
-        REPO_ID: ${{ github.event.repository.id }}
-      name: Node run
 #runs:
-#  using: node20
-#  main: dist/index.js
+#  using: 'composite'
+#  steps:
+#    - uses: actions/checkout@v4
+#      with:
+#        repository: lezhumain/zenhub_report_action
+#
+#    - run: |
+#        npm ci
+#      shell: bash
+#      name: NPM build
+#
+#    - run: |
+#        pwd
+#        ls
+#        node dist/index.js
+#      shell: bash
+#      env:
+#        GH_API_KEY: ${{ github.token }}
+#      name: Node run
+
+runs:
+  using: node20
+  main: dist/index.js

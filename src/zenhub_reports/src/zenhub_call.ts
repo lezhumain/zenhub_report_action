@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any,github/no-then */
 import md5 from 'md5'
 import * as fs from 'fs'
 import { ChartHelper, IChartItem, ISizeObj } from './chart_helper'
@@ -1148,7 +1148,13 @@ fragment currentWorkspace on Workspace {
         width: 1600,
         height: 1200
       }
-    )
+    ).catch(e => {
+      if (!e.message.includes("Cannot find module 'canvas'")) {
+        throw e
+      }
+      console.warn(e.message)
+      return []
+    })
     console.log(JSON.stringify(avg, null, 2))
 
     const countChartItems: IChartItem[] = Object.keys(avg).map(
@@ -1166,7 +1172,12 @@ fragment currentWorkspace on Workspace {
       countChartItems,
       this._config.outputImageFilename.replace('.png', '_issues.png'),
       { width: 1600, height: 1200 }
-    )
+    ).catch(e => {
+      if (!e.message.includes("Cannot find module 'canvas'")) {
+        throw e
+      }
+      console.warn(e.message)
+    })
 
     board.pipelinesConnection.forEach(
       (pipelineConnect: IPipelinesConnection) => {
@@ -1269,57 +1280,111 @@ fragment currentWorkspace on Workspace {
       { encoding: 'utf8' }
     ) // done at the end
 
+    const remainingOpenedIssuesCleaned: IIssue[] = remainingOpenedIssues.map(
+      (f: IIssue) => {
+        const clone = Object.assign({}, f)
+        delete clone.handled
+        clone.estimateValue = clone.estimateValue || 0
+        return clone
+      }
+    )
+
     this.generateHTML(outs)
 
-    this.addStatsHTML(stats, statsEstimate, veloccity)
-    this.addControlChartListHTML(chartData)
-    this.writeMoreHTML()
+    try {
+      this.addStatsHTML(stats, statsEstimate, veloccity)
+      this.addControlChartListHTML(chartData)
+      this.writeMoreHTML()
+    } catch (e: any) {
+      if (!e.message.includes("Cannot find module 'canvas'")) {
+        throw e
+      }
+      console.warn(e.message)
+    }
 
     const fullHTML =
+      `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
+      `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
+      `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2><br>` +
       `<section>
-					<h3>Cool stats</h3>
-					${this.getStatsHTML(stats, statsEstimate, veloccity)}
-				</section>` +
+          <h3>Cool stats</h3>
+              ${this.getStatsHTML(stats, statsEstimate, veloccity)}
+          </section>` +
       `<section>
-					<h3>Control chart list</h3>
-					${this.generateTableFromCSV(ccsv.csvChart)}
-					<div>
-						${await this.getControlChartHTML(chartData)}
-					</div>
-				</section>${this.generateTableFromCSV(ccsv.csvOutstanding)}<section>
-					<h3>Velocity list</h3>
-					${this.generateTableFromCSV(ccsv.velocityList)}
-					<div>
-						${await this.getVeloctiyChart(veloccity)}
-					</div>
-				</section>` +
+            <h3>Control chart list</h3>
+            ${this.generateTableFromCSV(ccsv.csvChart)}
+            <div>
+                ${await this.getControlChartHTML(chartData).catch(e => {
+                  if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e
+                  }
+                  console.warn(e.message)
+                })}
+            </div>
+        </section>` +
       `<section>
-					<h3>Main list</h3>
-					<div style="overflow-x: scroll;">
-						${this.generateTableFromCSV(ccsv.mainList)}
-					</div>
-					<div>
-						${await this.getMainChartHTML(avg)}
-					</div>
-				</section>` +
+          <h3>Outstanding issues</h3>
+          ${this.generateTableFromCSV(ccsv.csvOutstanding)}
+        </section>` +
       `<section>
-					<h3>Commits and PRs list</h3>
-					${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
-					<div>
-						${await this.getCommitsChartHTML(allResult.userReviewStats)}
-					</div>
-				</section>` +
+            <h3>Velocity list</h3>
+            ${this.generateTableFromCSV(ccsv.velocityList)}
+            <div>
+                ${await this.getVeloctiyChart(veloccity).catch(e => {
+                  if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e
+                  }
+                  console.warn(e.message)
+                })}
+            </div>
+        </section>` +
       `<section>
-					<h3>Remaining opened issues</h3>
-					${this.generateTable(remainingOpenedIssues)}
-				</section>` +
+            <h3>Main list</h3>
+            <div style="overflow-x: scroll;">
+                ${this.generateTableFromCSV(ccsv.mainList)}
+            </div>
+            <div>
+                ${await this.getMainChartHTML(avg).catch(e => {
+                  if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e
+                  }
+                  console.warn(e.message)
+                })}
+            </div>
+        </section>` +
       `<section>
-					<h3>Remaining opened issues per pipeline</h3>
-					${this.generateTable(openedPerPipeline)}
-					<div>
-						${await this.getOpenedChartHTML(openedPerPipeline, 100)}
-					</div>
-				</section>`
+            <h3>Commits and PRs list</h3>
+            ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
+            <div>
+                ${await this.getCommitsChartHTML(
+                  allResult.userReviewStats
+                ).catch(e => {
+                  if (!e.message.includes("Cannot find module 'canvas'")) {
+                    throw e
+                  }
+                  console.warn(e.message)
+                })}
+            </div>
+        </section>` +
+      `<section>
+            <h3>Remaining opened issues</h3>
+            ${this.generateTable(remainingOpenedIssuesCleaned)}
+        </section>` +
+      `<section>
+            <h3>Remaining opened issues per pipeline</h3>
+            ${this.generateTable(openedPerPipeline)}
+            <div>
+                ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(
+                  e => {
+                    if (!e.message.includes("Cannot find module 'canvas'")) {
+                      throw e
+                    }
+                    console.warn(e.message)
+                  }
+                )}
+            </div>
+        </section>`
+
     this.updateHTML(
       path.join(__dirname, 'main_report.html'),
       path.join(this._mainOutputFolder, 'main_index.html'),
@@ -1428,7 +1493,17 @@ fragment currentWorkspace on Workspace {
                       .slice()
                       .map((l: any) => {
                         return `<tr>${Object.keys(l)
-                          .map(lkey => `<td>${l[lkey]?.toString() || ''}</td>`)
+                          .map(lkey => {
+                            // const it = l[lkey]
+                            // const isArr = Array.isArray(it)
+                            // const val =
+                            //   !isArr ||
+                            //   it.every((r: any) => typeof r === 'string')
+                            //     ? it?.toString() || ''
+                            //     : this.generateTable(it)
+                            // return `<td>${val}</td>`
+                            return `<td>${l[lkey]?.toString() || ''}</td>`
+                          })
                           .join('')}</tr>`
                       })
                       .join('')}
@@ -1668,7 +1743,31 @@ fragment currentWorkspace on Workspace {
       .trim()
       .split('\n')
       .map(i => i.split(','))
-      .filter(e => !!e)
+    let title = ''
+    if (lines[0].length === 1) {
+      title = lines.splice(0, 1)[0][0]
+    }
+    const [headers] = lines.splice(0, 1)
+    if (!headers || headers.length === 0) {
+      return ''
+    }
+    const tableStr = `<table class="table table-striped-columns">
+                <thead>
+                    <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                </thead>
+                <tbody>
+                    ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
+                </tbody>
+            </table>`
+    // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
+    return tableStr
+  }
+
+  private generateTableFromCSV0(csvChart: string): string {
+    const lines = csvChart
+      .trim()
+      .split('\n')
+      .map(i => i.split(','))
     let title = ''
     if (lines[0].length === 1) {
       title = lines.splice(0, 1)[0][0]
