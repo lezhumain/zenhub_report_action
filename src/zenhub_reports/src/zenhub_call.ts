@@ -1179,6 +1179,7 @@ fragment currentWorkspace on Workspace {
       console.warn(e.message)
     })
 
+    let issueWithEventCount = 0
     board.pipelinesConnection.forEach(
       (pipelineConnect: IPipelinesConnection) => {
         pipelineConnect.issues.forEach((issue: Issue) => {
@@ -1196,9 +1197,14 @@ fragment currentWorkspace on Workspace {
             const issueNumberBits = issue.htmlUrl?.split('/') || [undefined]
             issueNumber = issueNumberBits[issueNumberBits.length - 1]
           }
-          issue.events = issueNumber
+          const issueEvents = issueNumber
             ? this._eventsPerIssue[issueNumber] || []
             : []
+          issue.events = issueEvents
+
+          if (issueEvents.length > 0) {
+            issueWithEventCount++
+          }
         })
       }
     )
@@ -1399,6 +1405,9 @@ fragment currentWorkspace on Workspace {
       { encoding: 'utf8' }
     )
 
+    console.log(
+      `${allEvs.length} ${issues.filter(iu => !iu.filtered).length} ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`
+    )
     return Promise.resolve({
       mark,
       allResult

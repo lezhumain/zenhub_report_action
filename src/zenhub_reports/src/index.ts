@@ -1,19 +1,21 @@
 import { IMainConfig, Program } from './zenhub_call'
 import { IIssue } from './models'
 
-const current = new Date()
+const current = new Date(new Date().toDateString())
 const minus1month = new Date(current)
-minus1month.setMonth(minus1month.getMonth() - 1)
+minus1month.setMonth(minus1month.getMonth() - 3)
 
 const config: IMainConfig = {
-  workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+  // workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+  // includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
+  workspaceId: process.env.WORKSPACE_ID!,
+  includeRepos: [Number(process.env.REPO_ID)],
   outputJsonFilename: 'output/allEvs.json',
   outputImageFilename: `output/output_average.png`,
   minDate: minus1month.toISOString(),
   maxDate: current.toISOString(),
-  labels: [],
+  labels: ['regression'],
   skipRepos: [],
-  includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
   issuesToSkip: [],
   fromPipeline: 'Backlog',
   toPipeline: 'Awaiting TESS Review',
