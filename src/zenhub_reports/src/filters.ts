@@ -14,10 +14,10 @@ export class IssueFilter {
           issue.labels.map((la: string) => la.toLowerCase()).includes(low)
         )
       })
+
     const idShouldSkip = !!this._config.issuesToSkip?.includes(
       Utils.issueNumberAsNumber(issue.number)
     )
-
     const skip = !matchesLabel && idShouldSkip
     return Promise.resolve(skip)
   }

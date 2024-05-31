@@ -142,6 +142,9 @@ export class Program {
   private readonly _file: string
 
   private _config: IMainConfig
+  get config(): IMainConfig {
+    return this._config
+  }
 
   private _errorMessages: string[] = []
   /**
@@ -1289,6 +1292,7 @@ fragment currentWorkspace on Workspace {
       `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
       `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
       `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2>` +
+      `<h2>Releases: ${this._config.release || ''}</h2>` +
       `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
       `<section>
           <h3>Cool stats</h3>

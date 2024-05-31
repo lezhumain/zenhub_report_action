@@ -79,11 +79,10 @@ class Main implements IMain {
       if (config0 === undefined) {
         throw new Error('No config specified')
       }
-      const config: IMainConfig = config0
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const program = new Program(config)
-      const mainFilter = new IssueFilter(config)
+      const program = new Program(config0)
+      const mainFilter = new IssueFilter(program.config)
       // const res = { mark: 'hii' }
       // skip ReBrowse
       const res: IProgramResult = await program.main(
