@@ -64,7 +64,7 @@ export interface ISarchIssuesByPipeline {
 export interface Issue {
   releases: { nodes: { title: string; id: string }[] }
   labels: { nodes: { name: string }[] }
-  repository: { ghId: number; name: string, ownerName: string }
+  repository: { ghId: number; name: string; ownerName: string }
   estimate?: { value: string } | null
   number: number
   events?: IGhEvent[]
