@@ -1,7 +1,7 @@
 // const core = require('@actions/core');
 // const github = require('@actions/github');
 import { IMainConfig, Program } from './zenhub_call'
-import { IIssue } from './models'
+import { IIssue, Utils } from './models'
 
 const config: IMainConfig = {
   workspaceId: '5e3018c2d1715f5725d0b8c7',
@@ -23,7 +23,7 @@ const program = new Program(config)
 // skip ReBrowse
 program
   .main(
-    (issue: IIssue) => {
+    async (issue: IIssue) => {
       const matchesLabel: boolean =
         config.labels !== undefined &&
         config.labels.some((l: string) => {
@@ -33,14 +33,14 @@ program
             issue.labels.map((la: string) => la.toLowerCase()).includes(low)
           )
         })
-      const idShouldSkip: boolean = !!config.issuesToSkip?.includes(
-        issue.number
+      const idShouldSkip = !!config.issuesToSkip?.includes(
+        Utils.issueNumberAsNumber(issue.number)
       )
 
       const skip = !matchesLabel && idShouldSkip
       return Promise.resolve(skip)
     },
-    (event: any) => {
+    async (event: any) => {
       if (!config.minDate || !config.maxDate) {
         return Promise.resolve(false)
       }

@@ -1,5 +1,5 @@
 import { IMainConfig, Program } from './zenhub_call'
-import { IIssue } from './models'
+import { IIssue, Utils } from './models'
 
 const current = new Date(new Date().toDateString())
 const minus1month = new Date(current)
@@ -60,9 +60,10 @@ if (args.length > 0) {
 }
 
 const program = new Program(config)
+// const mainFilter = new IssueFilter(config)
 // skip ReBrowse
 program.main(
-  (issue: IIssue) => {
+  async (issue: IIssue) => {
     const matchesLabel: boolean =
       config.labels !== undefined &&
       config.labels.some((l: string) => {
@@ -72,12 +73,13 @@ program.main(
           issue.labels.map((la: string) => la.toLowerCase()).includes(low)
         )
       })
-    const idShouldSkip: boolean = !!config.issuesToSkip?.includes(issue.number)
-
+    const idShouldSkip = !!config.issuesToSkip?.includes(
+      Utils.issueNumberAsNumber(issue.number)
+    )
     const skip = !matchesLabel && idShouldSkip
     return Promise.resolve(skip)
   },
-  (event: any) => {
+  async (event: any) => {
     if (!config.minDate || !config.maxDate) {
       return Promise.resolve(false)
     }

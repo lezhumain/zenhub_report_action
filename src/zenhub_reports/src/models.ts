@@ -1,4 +1,4 @@
-import { NodeHtmlMarkdown, NodeHtmlMarkdownOptions } from 'node-html-markdown'
+import { NodeHtmlMarkdown } from 'node-html-markdown'
 
 export interface IGhEvent {
   type: string
@@ -7,7 +7,7 @@ export interface IGhEvent {
 }
 
 export interface IIssueEvent {
-  number: number
+  number: string
   estimateValue: { value: number }
   repositoryGhId: number
   createdAt: string
@@ -22,13 +22,14 @@ export interface IIssue {
   handled?: boolean
   // events?: IIssueEvent[];
   events?: IGhEvent[]
-  number: number
+  number: string
   estimateValue?: number
   repositoryGhId: number
   pipelineName: string
   labels?: string[]
   releases?: string[]
   pullRequest: boolean
+  htmlUrl: string
 }
 
 export interface IWorkspace {
@@ -63,12 +64,12 @@ export interface ISarchIssuesByPipeline {
 export interface Issue {
   releases: { nodes: { title: string; id: string }[] }
   labels: { nodes: { name: string }[] }
-  repository: { ghId: number; name: string }
+  repository: { ghId: number; name: string, ownerName: string }
   estimate?: { value: string } | null
-  number: string
+  number: number
   events?: IGhEvent[]
   htmlUrl: string
-  pullRequest: boolean
+  pullRequest?: boolean
 }
 
 export interface IControlChartItem {
@@ -77,11 +78,12 @@ export interface IControlChartItem {
   completionTime: number // ms timespan
   completionTimeStr: string // ms timespan
   estimate: number
-  number: number
+  number: string
+  htmlUrl: string
 }
 
 export class Utils {
-  static millisecondsToHumanReadableTime(milliseconds: number) {
+  static millisecondsToHumanReadableTime(milliseconds: number): string {
     const seconds = Math.floor((milliseconds / 1000) % 60)
     const minutes = Math.floor((milliseconds / (1000 * 60)) % 60)
     const hours = Math.floor((milliseconds / (1000 * 60 * 60)) % 24)
@@ -89,12 +91,12 @@ export class Utils {
     const weeks = Math.floor((milliseconds / (1000 * 60 * 60 * 24 * 7)) % 4)
     const months = Math.floor(milliseconds / (1000 * 60 * 60 * 24 * 30))
 
-    const monthsStr = months > 0 ? months + 'm ' : ''
-    const weeksStr = weeks > 0 ? weeks + 'w ' : ''
-    const daysStr = days > 0 ? days + 'd ' : ''
-    const hoursStr = hours < 10 ? '0' + hours : hours
-    const minutesStr = minutes < 10 ? '0' + minutes : minutes
-    const secondsStr = seconds < 10 ? '0' + seconds : seconds
+    const monthsStr = months > 0 ? `${months}m ` : ''
+    const weeksStr = weeks > 0 ? `${weeks}w ` : ''
+    const daysStr = days > 0 ? `${days}d ` : ''
+    const hoursStr = hours < 10 ? `0${hours}` : hours
+    const minutesStr = minutes < 10 ? `0${minutes}` : minutes
+    const secondsStr = seconds < 10 ? `0${seconds}` : seconds
 
     return `${monthsStr}${weeksStr}${daysStr}${hoursStr}:${minutesStr}:${secondsStr}`
   }
@@ -126,6 +128,18 @@ export class Utils {
     const hexRegex = /^[0-9A-Fa-f]+$/
     return hexRegex.test(str)
   }
+
+  static issueNumberAsNumber(issueNumber: string): number {
+    try {
+      return Number(issueNumber.replace('#', ''))
+    } catch (e) {
+      return -1
+    }
+  }
+
+  static issueNumberAsString(issueNumber: number): string {
+    return `#${issueNumber.toFixed(0)}`
+  }
 }
 
 export class ControlChartItem implements IControlChartItem {
@@ -154,8 +168,12 @@ export class ControlChartItem implements IControlChartItem {
     return (this.completionTime / 1000 / 60 / 60 / 24).toFixed(0)
   }
 
-  get number(): number {
+  get number(): string {
     return this._number
+  }
+
+  get htmlUrl(): string {
+    return this._htmlUrl
   }
 
   // constructor(started: number, comppleted: number, estimate: number) {
@@ -168,7 +186,8 @@ export class ControlChartItem implements IControlChartItem {
     started: Date,
     comppleted: Date,
     estimate: number,
-    private readonly _number: number
+    private readonly _number: string,
+    private readonly _htmlUrl: string
   ) {
     this._started = started
     this._comppleted = comppleted
@@ -182,7 +201,8 @@ export class ControlChartItem implements IControlChartItem {
       comppleted: this._comppleted,
       completionTime: this.completionTime,
       completionTimeStr: this.completionTimeStr,
-      estimate: this._estimate
+      estimate: this._estimate,
+      htmlUrl: this.htmlUrl
     }
   }
 }

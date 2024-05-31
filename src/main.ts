@@ -4,8 +4,8 @@ import {
   IProgramResult,
   Program
 } from './zenhub_reports/src/zenhub_call'
-import { IGhEvent, IIssue } from './zenhub_reports/src/models'
 import * as fs from 'fs'
+import { IssueFilter } from './zenhub_reports/src/filters'
 
 export interface IMain {
   config0: IMainConfig | undefined
@@ -83,40 +83,12 @@ class Main implements IMain {
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const program = new Program(config)
+      const mainFilter = new IssueFilter(config)
       // const res = { mark: 'hii' }
       // skip ReBrowse
       const res: IProgramResult = await program.main(
-        async (issue: IIssue) => {
-          const matchesLabel: boolean =
-            config.labels !== undefined &&
-            config.labels.some(l => {
-              const low = l.toLowerCase()
-              return (
-                issue.labels !== undefined &&
-                issue.labels.map(la => la.toLowerCase()).includes(low)
-              )
-            })
-          const idShouldSkip = !!config.issuesToSkip?.includes(issue.number)
-
-          const skip = !matchesLabel && idShouldSkip
-          return Promise.resolve(skip)
-        },
-        async (event: IGhEvent) => {
-          if (!config.minDate || !config.maxDate) {
-            return Promise.resolve(false)
-          }
-
-          const minDate: Date | undefined = new Date(config.minDate)
-          const maxDate: Date | undefined = new Date(config.maxDate)
-
-          const eventDate: Date = new Date(event.createdAt)
-          const skip: boolean =
-            (minDate !== undefined &&
-              eventDate.getTime() < minDate.getTime()) ||
-            (maxDate !== undefined && eventDate.getTime() > maxDate.getTime())
-
-          return Promise.resolve(skip)
-        }
+        mainFilter.filterIssues,
+        mainFilter.filterEvents
       )
 
       const file = 'zenhub_report.md'
