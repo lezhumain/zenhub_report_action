@@ -6,8 +6,6 @@ const minus1month = new Date(current)
 minus1month.setMonth(minus1month.getMonth() - 3)
 
 const config0: IMainConfig = {
-  // workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
-  // includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
   workspaceId: process.env.WORKSPACE_ID!,
   includeRepos: [Number(process.env.REPO_ID)],
   outputJsonFilename: 'output/allEvs.json',
@@ -25,7 +23,7 @@ const config0: IMainConfig = {
 
 // TODO: fix PR and commits data
 // const config: IMainConfig = {
-// 	workspaceId: "582ffb92abc60d5d34359ef4",
+// 	workspaceId: "",
 // 	outputJsonFilename: "output/allEvs.json",
 // 	outputImageFilename: `output/output_average.png`,
 // 	minDate: undefined,
