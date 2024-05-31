@@ -1,19 +1,21 @@
 import { IMainConfig, Program } from './zenhub_call'
-import { IIssue } from './models'
+import { IssueFilter } from './filters'
 
-const current = new Date()
+const current = new Date(new Date().toDateString())
 const minus1month = new Date(current)
-minus1month.setMonth(minus1month.getMonth() - 1)
+minus1month.setMonth(minus1month.getMonth() - 3)
 
-const config: IMainConfig = {
-  workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+const config0: IMainConfig = {
+  // workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
+  // includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
+  workspaceId: process.env.WORKSPACE_ID!,
+  includeRepos: [Number(process.env.REPO_ID)],
   outputJsonFilename: 'output/allEvs.json',
   outputImageFilename: `output/output_average.png`,
   minDate: minus1month.toISOString(),
   maxDate: current.toISOString(),
-  labels: [],
+  labels: ['regression'],
   skipRepos: [],
-  includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
   issuesToSkip: [],
   fromPipeline: 'Backlog',
   toPipeline: 'Awaiting TESS Review',
@@ -54,40 +56,11 @@ const argConfig: Partial<IMainConfig> = {
 }
 
 if (args.length > 0) {
-  Object.assign(config, argConfig) // source's `undefined` properties will not be skipped, need to delete
+  Object.assign(config0, argConfig) // source's `undefined` properties will not be skipped, need to delete
 }
 
-const program = new Program(config)
+const program = new Program(config0)
+const mainFilter = new IssueFilter(program.config)
+
 // skip ReBrowse
-program.main(
-  (issue: IIssue) => {
-    const matchesLabel: boolean =
-      config.labels !== undefined &&
-      config.labels.some((l: string) => {
-        const low = l.toLowerCase()
-        return (
-          issue.labels !== undefined &&
-          issue.labels.map((la: string) => la.toLowerCase()).includes(low)
-        )
-      })
-    const idShouldSkip: boolean = !!config.issuesToSkip?.includes(issue.number)
-
-    const skip = !matchesLabel && idShouldSkip
-    return Promise.resolve(skip)
-  },
-  (event: any) => {
-    if (!config.minDate || !config.maxDate) {
-      return Promise.resolve(false)
-    }
-
-    const minDate: Date | undefined = new Date(config.minDate)
-    const maxDate: Date | undefined = new Date(config.maxDate)
-
-    const eventDate: Date = new Date(event.createdAt)
-    const skip: boolean =
-      (minDate !== undefined && eventDate.getTime() < minDate.getTime()) ||
-      (maxDate !== undefined && eventDate.getTime() > maxDate.getTime())
-
-    return Promise.resolve(skip)
-  }
-)
+program.main(mainFilter.filterIssues, mainFilter.filterEvents)

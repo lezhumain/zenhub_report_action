@@ -46,7 +46,7 @@
     "build_single": "npx tsc && npm run cp_extra_files",
     "rep": "cp node_modules/chartjs-node-canvas/src/index.ts /tmp/index.ts && sed 's/chartJs(context, configuration/chartJs(context as any, configuration as any/g' /tmp/index.ts > node_modules/chartjs-node-canvas/src/index.ts",
     "prepFiles": "./prepareFiles.sh",
-    "loca_run": "npx ts-node src/zenhub_reports/src/index.ts"
+    "local_run": "npx ts-node src/zenhub_reports/src/index.ts"
   },
   "license": "MIT",
   "jest": {

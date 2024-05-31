@@ -51354,6 +51354,7 @@ exports.run = exports.main = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const zenhub_call_1 = __nccwpck_require__(5812);
 const fs = __importStar(__nccwpck_require__(7147));
+const filters_1 = __nccwpck_require__(9377);
 class Main {
     _config0;
     get config0() {
@@ -51413,33 +51414,12 @@ class Main {
             if (config0 === undefined) {
                 throw new Error('No config specified');
             }
-            const config = config0;
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const program = new zenhub_call_1.Program(config);
+            const program = new zenhub_call_1.Program(config0);
+            const mainFilter = new filters_1.IssueFilter(program.config);
             // const res = { mark: 'hii' }
             // skip ReBrowse
-            const res = await program.main(async (issue) => {
-                const matchesLabel = config.labels !== undefined &&
-                    config.labels.some(l => {
-                        const low = l.toLowerCase();
-                        return (issue.labels !== undefined &&
-                            issue.labels.map(la => la.toLowerCase()).includes(low));
-                    });
-                const idShouldSkip = !!config.issuesToSkip?.includes(issue.number);
-                const skip = !matchesLabel && idShouldSkip;
-                return Promise.resolve(skip);
-            }, async (event) => {
-                if (!config.minDate || !config.maxDate) {
-                    return Promise.resolve(false);
-                }
-                const minDate = new Date(config.minDate);
-                const maxDate = new Date(config.maxDate);
-                const eventDate = new Date(event.createdAt);
-                const skip = (minDate !== undefined &&
-                    eventDate.getTime() < minDate.getTime()) ||
-                    (maxDate !== undefined && eventDate.getTime() > maxDate.getTime());
-                return Promise.resolve(skip);
-            });
+            const res = await program.main(mainFilter.filterIssues, mainFilter.filterEvents);
             const file = 'zenhub_report.md';
             fs.writeFileSync(file, res.mark, { encoding: 'utf8' });
             core.setOutput('markdownContent', res.mark);
@@ -51765,6 +51745,47 @@ exports.ChartHelper = ChartHelper;
 
 /***/ }),
 
+/***/ 9377:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.IssueFilter = void 0;
+const models_1 = __nccwpck_require__(5927);
+class IssueFilter {
+    _config;
+    constructor(_config) {
+        this._config = _config;
+    }
+    filterIssues = async (issue) => {
+        const matchesLabel = this._config.labels !== undefined &&
+            this._config.labels.some((l) => {
+                const low = l.toLowerCase();
+                return (issue.labels !== undefined &&
+                    issue.labels.map((la) => la.toLowerCase()).includes(low));
+            });
+        const idShouldSkip = !!this._config.issuesToSkip?.includes(models_1.Utils.issueNumberAsNumber(issue.number));
+        const skip = !matchesLabel && idShouldSkip;
+        return Promise.resolve(skip);
+    };
+    filterEvents = async (event) => {
+        if (!this._config.minDate || !this._config.maxDate) {
+            return Promise.resolve(false);
+        }
+        const minDate = new Date(this._config.minDate);
+        const maxDate = new Date(this._config.maxDate);
+        const eventDate = new Date(event.createdAt);
+        const skip = (minDate !== undefined && eventDate.getTime() < minDate.getTime()) ||
+            (maxDate !== undefined && eventDate.getTime() > maxDate.getTime());
+        return Promise.resolve(skip);
+    };
+}
+exports.IssueFilter = IssueFilter;
+
+
+/***/ }),
+
 /***/ 5927:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -51781,12 +51802,12 @@ class Utils {
         const days = Math.floor((milliseconds / (1000 * 60 * 60 * 24)) % 30);
         const weeks = Math.floor((milliseconds / (1000 * 60 * 60 * 24 * 7)) % 4);
         const months = Math.floor(milliseconds / (1000 * 60 * 60 * 24 * 30));
-        const monthsStr = months > 0 ? months + 'm ' : '';
-        const weeksStr = weeks > 0 ? weeks + 'w ' : '';
-        const daysStr = days > 0 ? days + 'd ' : '';
-        const hoursStr = hours < 10 ? '0' + hours : hours;
-        const minutesStr = minutes < 10 ? '0' + minutes : minutes;
-        const secondsStr = seconds < 10 ? '0' + seconds : seconds;
+        const monthsStr = months > 0 ? `${months}m ` : '';
+        const weeksStr = weeks > 0 ? `${weeks}w ` : '';
+        const daysStr = days > 0 ? `${days}d ` : '';
+        const hoursStr = hours < 10 ? `0${hours}` : hours;
+        const minutesStr = minutes < 10 ? `0${minutes}` : minutes;
+        const secondsStr = seconds < 10 ? `0${seconds}` : seconds;
         return `${monthsStr}${weeksStr}${daysStr}${hoursStr}:${minutesStr}:${secondsStr}`;
     }
     static addDay(firstDayOfMonth, number) {
@@ -51811,10 +51832,22 @@ class Utils {
         const hexRegex = /^[0-9A-Fa-f]+$/;
         return hexRegex.test(str);
     }
+    static issueNumberAsNumber(issueNumber) {
+        try {
+            return Number(issueNumber.replace('#', ''));
+        }
+        catch (e) {
+            return -1;
+        }
+    }
+    static issueNumberAsString(issueNumber) {
+        return `#${issueNumber.toFixed(0)}`;
+    }
 }
 exports.Utils = Utils;
 class ControlChartItem {
     _number;
+    _htmlUrl;
     _started;
     _comppleted;
     _estimate;
@@ -51837,13 +51870,17 @@ class ControlChartItem {
     get number() {
         return this._number;
     }
+    get htmlUrl() {
+        return this._htmlUrl;
+    }
     // constructor(started: number, comppleted: number, estimate: number) {
     // 	this._started = started;
     // 	this._comppleted = comppleted;
     // 	this._estimate = estimate;
     // }
-    constructor(started, comppleted, estimate, _number) {
+    constructor(started, comppleted, estimate, _number, _htmlUrl) {
         this._number = _number;
+        this._htmlUrl = _htmlUrl;
         this._started = started;
         this._comppleted = comppleted;
         this._estimate = estimate;
@@ -51855,7 +51892,8 @@ class ControlChartItem {
             comppleted: this._comppleted,
             completionTime: this.completionTime,
             completionTimeStr: this.completionTimeStr,
-            estimate: this._estimate
+            estimate: this._estimate,
+            htmlUrl: this.htmlUrl
         };
     }
 }
@@ -51923,11 +51961,13 @@ const fs = __importStar(__nccwpck_require__(7147));
 const chart_helper_1 = __nccwpck_require__(8264);
 const models_1 = __nccwpck_require__(5927);
 const path = __importStar(__nccwpck_require__(9411));
+// eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 const reviewer_call = __nccwpck_require__(2074);
 /*
     Takes issues that moved during a timespan
  */
 const apiKey = process.env.API_KEY;
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class FileUtils {
     static fileExists(filePath) {
         return fs.existsSync(filePath);
@@ -51940,6 +51980,9 @@ class Program {
     _baseFilename = 'workspace';
     _file;
     _config;
+    get config() {
+        return this._config;
+    }
     _errorMessages = [];
     /**
      * Started and completed with option date range
@@ -51958,11 +52001,10 @@ class Program {
           endCursor
         }
           nodes {
-            number
             repository {
               ghId
-              name
             }
+            htmlUrl
             estimate {
               value
             }
@@ -52026,7 +52068,8 @@ class Program {
                 delete this._config[key];
             }
         }
-        this._configHash = (0, md5_1.default)(JSON.stringify(this._config));
+        const str = JSON.stringify(this._config);
+        this._configHash = (0, md5_1.default)(str);
         this._file = this._config.inputJsonFilename
             ? this._config.inputJsonFilename
             : path.join(this._mainOutputFolder, `${this._baseFilename}_${this._configHash}.json`);
@@ -52073,7 +52116,7 @@ class Program {
     async handleIssue(issueObj, skipEventIfFn, doGen = false, fromPipeline = 'New Issues', toPipeline = 'Awaiting TESS Review') {
         const issueNumber = issueObj.number;
         const events = issueObj.events ||
-            (await this.getEvents(issueObj.repositoryGhId, issueNumber).catch(err => {
+            (await this.getEvents(issueObj.repositoryGhId, models_1.Utils.issueNumberAsNumber(issueNumber)).catch(err => {
                 this._errorMessages.push(err.message);
                 return [];
             }));
@@ -52114,7 +52157,7 @@ class Program {
             };
         }
         // await print_timings(filteredEvents);
-        const evs = this.mapToUsefull(filteredEvents, issueObj?.estimateValue, issueObj.number);
+        const evs = this.mapToUsefull(filteredEvents, issueObj?.estimateValue, issueObj);
         if (doGen) {
             try {
                 await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, { width: 1600, height: 1200 });
@@ -52159,7 +52202,7 @@ class Program {
         }
         return avgObj;
     }
-    mapToUsefull(move_events, estimateValue = 0, issueNumber) {
+    mapToUsefull(move_events, estimateValue, issueObj) {
         // return move_events.map((mo) => {
         // 	return {
         // 		duration:
@@ -52171,7 +52214,7 @@ class Program {
             const prevEv = move_events[i];
             // const ev = move_events[i];
             const diff = new Date(ev.createdAt).getTime() - new Date(prevEv.createdAt).getTime();
-            const diffPerEstimate = estimateValue > 0
+            const diffPerEstimate = estimateValue !== undefined && estimateValue > 0
                 ? Number((diff / estimateValue).toFixed(1))
                 : undefined;
             return {
@@ -52183,7 +52226,8 @@ class Program {
                     : undefined,
                 pipeline: prevEv.data.to_pipeline.name,
                 event: `${prevEv.data.to_pipeline.name} to ${ev.data.to_pipeline.name}`,
-                issueNumber
+                number: issueObj?.number,
+                htmlUrl: issueObj?.htmlUrl
             };
         });
         // }
@@ -52253,7 +52297,7 @@ class Program {
 }`;
         const variables = { workspaceId };
         const res1 = await this.callZenhub(query, variables);
-        const res = res1.data.workspace.pipelinesConnection.nodes.map((res) => res.name);
+        const res = res1.data.workspace.pipelinesConnection.nodes.map((res0) => res0.name);
         return Promise.resolve(res);
     }
     async getPipelinesFromBoard(board) {
@@ -52290,63 +52334,15 @@ class Program {
         // 		labels: ee.labels?.nodes?.map((n: any) => n.name) || undefined
         // 	} as IIssue]);
         // }, []);
-        return Promise.resolve(res1.data.searchIssuesByPipeline);
-    }
-    async getIssues(workspaceId, last = 100) {
-        const query = `query getBoardInfoForWorkspace($workspaceId: ID!) {
-  workspace(id: $workspaceId) {
-    id
-    pipelinesConnection(first: 25) {
-      nodes {
-        id
-        name
-        issues(last: ${last}) {
-          nodes {
-            number
-            estimate {
-              value
-            }
-            repository {
-              ghId
-            }
-            labels(first: 3) {
-              nodes {
-                name
-              }
-            }
-          }
-		  pageInfo {
-			hasNextPage
-			endCursor
-		  }
-        }
-      }
-    }
-  }
-}`;
-        const variables = { workspaceId };
-        const res1 = await this.callZenhub(query, variables);
-        const issues = res1.data.workspace.pipelinesConnection.nodes.reduce((res, item) => {
-            const eventsTmp = item.issues.nodes;
-            const issues0 = eventsTmp.map((ee) => {
-                return {
-                    number: Number(ee.number),
-                    estimateValue: ee.estimate !== null ? Number(ee.estimate.value) : undefined,
-                    repositoryGhId: Number(ee.repository.ghId),
-                    pipelineName: item.name,
-                    labels: ee.labels?.nodes?.map((n) => n.name) || undefined
-                };
-            });
-            return res.concat(issues0);
-        }, []);
-        return Promise.resolve(issues);
+        const pipelines = this.addRepoProps(res1.data.searchIssuesByPipeline);
+        return Promise.resolve(pipelines);
     }
     async getIssuesFromBoard(board) {
         const issues = board.pipelinesConnection.reduce((res, item) => {
             const eventsTmp = item.issues;
             const issues0 = eventsTmp.map((ee) => {
                 const o = {
-                    number: Number(ee.number),
+                    number: models_1.Utils.issueNumberAsString(ee.number),
                     estimateValue: ee.estimate !== null && ee.estimate !== undefined
                         ? Number(ee.estimate.value)
                         : undefined,
@@ -52355,7 +52351,8 @@ class Program {
                     labels: ee.labels?.nodes?.map((n) => n.name) || undefined,
                     releases: ee.releases?.nodes?.map((n) => n.title) || undefined,
                     events: ee.events,
-                    pullRequest: ee.pullRequest
+                    pullRequest: !!ee.pullRequest,
+                    htmlUrl: ee.htmlUrl
                 };
                 return o;
             });
@@ -52606,7 +52603,7 @@ fragment currentWorkspace on Workspace {
                 issue.handled = true;
                 handledCount++;
             }
-            this._eventsPerIssue[issue.number.toString()] = handleIssueResult.events;
+            this._eventsPerIssue[issue.number] = handleIssueResult.events;
         }
         // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
         const remainingOpenedIssues = issues.filter(iu => !iu.completed && !iu.filtered);
@@ -52641,7 +52638,7 @@ fragment currentWorkspace on Workspace {
                 durationStringPerEstimate: undefined,
                 pipeline,
                 event: '',
-                issueNumber: -1
+                number: ''
             };
         });
         const date = new Date();
@@ -52669,6 +52666,7 @@ fragment currentWorkspace on Workspace {
             }
             console.warn(e.message);
         });
+        let issueWithEventCount = 0;
         board.pipelinesConnection.forEach((pipelineConnect) => {
             pipelineConnect.issues.forEach((issue) => {
                 // if(issue.number) {
@@ -52684,11 +52682,15 @@ fragment currentWorkspace on Workspace {
                 }
                 else {
                     const issueNumberBits = issue.htmlUrl?.split('/') || [undefined];
-                    issueNumber = issueNumberBits[issueNumberBits.length - 1];
+                    issueNumber = Number(issueNumberBits[issueNumberBits.length - 1]);
                 }
-                issue.events = issueNumber
-                    ? this._eventsPerIssue[issueNumber] || []
+                const issueEvents = issueNumber
+                    ? this._eventsPerIssue[models_1.Utils.issueNumberAsString(issueNumber)] || []
                     : [];
+                issue.events = issueEvents;
+                if (issueEvents.length > 0) {
+                    issueWithEventCount++;
+                }
             });
         });
         fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
@@ -52762,16 +52764,31 @@ fragment currentWorkspace on Workspace {
             }
             console.warn(e.message);
         }
+        const baseTableFn = (issueNumberKey) => {
+            return (key, item) => {
+                const itemStr = item[key];
+                if (key === issueNumberKey && itemStr.startsWith('#')) {
+                    const url = item.htmlUrl;
+                    return `<a href="${url}">${itemStr}</a>`;
+                }
+                else if (key === 'htmlUrl') {
+                    return '';
+                }
+                return null;
+            };
+        };
         const fullHTML = `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
             `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
-            `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2><br>` +
+            `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2>` +
+            `<h2>Releases: ${this._config.release || ''}</h2>` +
+            `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
             `<section>
           <h3>Cool stats</h3>
               ${this.getStatsHTML(stats, statsEstimate, veloccity)}
           </section>` +
             `<section>
             <h3>Control chart list</h3>
-            ${this.generateTableFromCSV(ccsv.csvChart)}
+              ${this.generateTable(chartData, baseTableFn('number'))}
             <div>
                 ${await this.getControlChartHTML(chartData).catch(e => {
                 if (!e.message.includes("Cannot find module 'canvas'")) {
@@ -52783,7 +52800,7 @@ fragment currentWorkspace on Workspace {
         </section>` +
             `<section>
           <h3>Outstanding issues</h3>
-          ${this.generateTableFromCSV(ccsv.csvOutstanding)}
+          ${this.generateTable(outs, baseTableFn('number'))}
         </section>` +
             `<section>
             <h3>Velocity list</h3>
@@ -52825,11 +52842,11 @@ fragment currentWorkspace on Workspace {
         </section>` +
             `<section>
             <h3>Remaining opened issues</h3>
-            ${this.generateTable(remainingOpenedIssuesCleaned)}
+            ${this.generateTable(remainingOpenedIssuesCleaned, baseTableFn('number'))}
         </section>` +
             `<section>
             <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(openedPerPipeline)}
+            ${this.generateTable(openedPerPipeline, undefined, '25%')}
             <div>
                 ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(e => {
                 if (!e.message.includes("Cannot find module 'canvas'")) {
@@ -52842,6 +52859,7 @@ fragment currentWorkspace on Workspace {
         this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
         const mark = `${models_1.Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
         fs.writeFileSync(path.join(this._mainOutputFolder, 'main_report.md'), mark, { encoding: 'utf8' });
+        console.log(`${allEvs.length} ${issues.filter(iu => !iu.filtered).length} ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`);
         return Promise.resolve({
             mark,
             allResult
@@ -52892,7 +52910,7 @@ fragment currentWorkspace on Workspace {
         });
         const tmp = filteered.map((i) => {
             return i.completed?.start
-                ? new models_1.ControlChartItem(i.completed?.start, i.completed?.end, i.estimateValue || 0, i.number)
+                ? new models_1.ControlChartItem(i.completed?.start, i.completed?.end, i.estimateValue || 0, i.number, i.htmlUrl)
                 : null;
         });
         const res = tmp
@@ -52903,19 +52921,19 @@ fragment currentWorkspace on Workspace {
         });
         return res;
     }
-    generateTable(arr) {
+    generateTable(arr, specFn, tableWidth) {
         if (arr.length === 0) {
             return '';
         }
-        const headers = Object.keys(arr[0]);
-        const html = `<table class="table table-striped-columns"><thead>
+        const headers = this.getHeadersSorted(Object.keys(arr[0]));
+        const html = `<table class="table table-striped-columns" ${tableWidth !== undefined ? `style="width: ${tableWidth}"` : ''}><thead>
                     <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
                 </thead>
                 <tbody>
                     ${arr
             .slice()
             .map((l) => {
-            return `<tr>${Object.keys(l)
+            return `<tr>${headers
                 .map(lkey => {
                 // const it = l[lkey]
                 // const isArr = Array.isArray(it)
@@ -52925,7 +52943,10 @@ fragment currentWorkspace on Workspace {
                 //     ? it?.toString() || ''
                 //     : this.generateTable(it)
                 // return `<td>${val}</td>`
-                return `<td>${l[lkey]?.toString() || ''}</td>`;
+                const specRes = specFn && specFn(lkey, l);
+                return `<td>${specRes !== undefined && specRes !== null
+                    ? specRes
+                    : l[lkey]?.toString() || ''}</td>`;
             })
                 .join('')}</tr>`;
         })
@@ -53004,7 +53025,7 @@ fragment currentWorkspace on Workspace {
     mapPipelineConnec(finalRes) {
         return finalRes.pipelinesConnection.nodes.map((pipelineConnectionItem) => {
             const tempRes = Object.assign({}, pipelineConnectionItem);
-            tempRes.issues = pipelineConnectionItem.issues.nodes;
+            tempRes.issues = this.addRepoPropsToIssues(pipelineConnectionItem.issues.nodes);
             tempRes.issueEndCursor = pipelineConnectionItem.issues.pageInfo
                 ?.hasNextPage
                 ? pipelineConnectionItem.issues.pageInfo.endCursor
@@ -53063,39 +53084,11 @@ fragment currentWorkspace on Workspace {
             .trim()
             .split('\n')
             .map(i => i.split(','));
-        let title = '';
-        if (lines[0].length === 1) {
-            title = lines.splice(0, 1)[0][0];
-        }
         const [headers] = lines.splice(0, 1);
         if (!headers || headers.length === 0) {
             return '';
         }
-        const tableStr = `<table class="table table-striped-columns">
-                <thead>
-                    <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
-                </thead>
-                <tbody>
-                    ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
-                </tbody>
-            </table>`;
-        // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
-        return tableStr;
-    }
-    generateTableFromCSV0(csvChart) {
-        const lines = csvChart
-            .trim()
-            .split('\n')
-            .map(i => i.split(','));
-        let title = '';
-        if (lines[0].length === 1) {
-            title = lines.splice(0, 1)[0][0];
-        }
-        const [headers] = lines.splice(0, 1);
-        if (!headers || headers.length === 0) {
-            return '';
-        }
-        const tableStr = `<table class="table table-striped-columns">
+        const tableStr = `<table class="table table-striped-columns" style="width: 50%">
                 <thead>
                     <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
                 </thead>
@@ -53271,12 +53264,12 @@ fragment currentWorkspace on Workspace {
         return result;
     }
     getStatsHTML(stats, statsEstimate, veloccity) {
-        return `<table>
-			<thead><tr><th></th><th></th></tr></thead>
+        return `<table class="table table-striped-columns" style="width: 25%">
+			<thead></thead>
 			<tbody>
 				<tr>
 					<td>Velocity: </td>
-					<td>${veloccity.velocityIssue}</td>
+					<td>${veloccity.velocityIssue.toFixed(2)}</td>
 				</tr>
 				<tr>
 					<td>Velocity estimate: </td>
@@ -53378,6 +53371,37 @@ fragment currentWorkspace on Workspace {
         // // const tb = this.averageOBjects(d.users, ["reviewedPerc", "createdPerc"]);
         // const dUsers: IPrUser[] = this.averageUsers(d.users);
         return Promise.resolve({ allD, newAllD });
+    }
+    addRepoProps(item) {
+        const clone = Object.assign({}, item);
+        clone.nodes = this.addRepoPropsToIssues(clone.nodes);
+        return clone;
+    }
+    getRepoAndOwnerFromURL(htmlUrl) {
+        if (!htmlUrl) {
+            return null;
+        }
+        const bits = htmlUrl.split('/');
+        if (bits.length !== 7) {
+            return null;
+        }
+        return [bits[4], bits[3], bits[6]];
+    }
+    addRepoPropsToIssues(nodes) {
+        return nodes.map((issue) => {
+            const res = this.getRepoAndOwnerFromURL(issue.htmlUrl);
+            issue.repository.name = res ? res[0] : '';
+            issue.repository.ownerName = res ? res[1] : '';
+            issue.number = res ? Number(res[2]) : 0;
+            return issue;
+        });
+    }
+    getHeadersSorted(strings) {
+        const target = strings.find((str) => str === 'number');
+        if (target === undefined) {
+            return strings;
+        }
+        return [target].concat(strings.filter(s => s !== target));
     }
 }
 exports.Program = Program;

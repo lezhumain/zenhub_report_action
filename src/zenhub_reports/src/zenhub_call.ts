@@ -24,6 +24,7 @@ import {
 import * as path from 'node:path'
 import { BubbleDataPoint } from 'chart.js'
 
+// eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 const reviewer_call = require('./check_pr_reviewers.js')
 
 /*
@@ -40,7 +41,8 @@ interface ICSVItem {
   durationStringPerEstimate?: string
   pipeline: string
   event: string
-  issueNumber: number
+  number: string
+  htmlUrl: string
 }
 
 interface IAVGItem {
@@ -81,6 +83,7 @@ export interface IMainConfig {
   release: string
 }
 
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class FileUtils {
   static fileExists(filePath: string): boolean {
     return fs.existsSync(filePath)
@@ -124,6 +127,14 @@ export interface IProgramResult {
   allResult: IReport
 }
 
+interface ICSVResult {
+  csvChart: string
+  csvOutstanding: string
+  velocityList: string
+  mainList: string
+  csvPrAndCommits: string
+}
+
 export class Program {
   private readonly _delim: string
   private readonly _configHash: string
@@ -131,6 +142,9 @@ export class Program {
   private readonly _file: string
 
   private _config: IMainConfig
+  get config(): IMainConfig {
+    return this._config
+  }
 
   private _errorMessages: string[] = []
   /**
@@ -152,11 +166,10 @@ export class Program {
           endCursor
         }
           nodes {
-            number
             repository {
               ghId
-              name
             }
+            htmlUrl
             estimate {
               value
             }
@@ -239,7 +252,9 @@ export class Program {
         delete this._config[key]
       }
     }
-    this._configHash = md5(JSON.stringify(this._config))
+
+    const str = JSON.stringify(this._config)
+    this._configHash = md5(str)
 
     this._file = this._config.inputJsonFilename
       ? this._config.inputJsonFilename
@@ -293,10 +308,10 @@ export class Program {
     return `${title?.replace(/,/g, '_') || ''}\n${csvHeaders}${csvData}`
   }
 
-  private generateAllCSV(title: string, report: IReport) {
+  private generateAllCSV(title: string, report: IReport): ICSVResult {
     const date = new Date()
 
-    const all = this.getAllCSV(report, date)
+    const all: ICSVResult = this.getAllCSV(report, date)
 
     const mainCSV = `${all.csvChart}\n\n${all.csvOutstanding}\n\n${all.velocityList}\n\n${all.mainList}\n\n${all.csvPrAndCommits}`
     fs.writeFileSync(
@@ -322,15 +337,18 @@ export class Program {
 
   private async handleIssue(
     issueObj: IIssue,
-    skipEventIfFn?: (issue: any) => Promise<boolean>,
+    skipEventIfFn?: (issue: IGhEvent) => Promise<boolean>,
     doGen = false,
     fromPipeline = 'New Issues',
     toPipeline = 'Awaiting TESS Review'
   ): Promise<IHandleIssueResult> {
-    const issueNumber = issueObj.number
+    const issueNumber: string = issueObj.number
     const events: IGhEvent[] =
       issueObj.events ||
-      (await this.getEvents(issueObj.repositoryGhId, issueNumber).catch(err => {
+      (await this.getEvents(
+        issueObj.repositoryGhId,
+        Utils.issueNumberAsNumber(issueNumber)
+      ).catch(err => {
         this._errorMessages.push(err.message)
         return []
       }))
@@ -394,7 +412,7 @@ export class Program {
     const evs: ICSVItem[] = this.mapToUsefull(
       filteredEvents,
       issueObj?.estimateValue,
-      issueObj.number
+      issueObj
     )
 
     if (doGen) {
@@ -456,8 +474,8 @@ export class Program {
 
   private mapToUsefull(
     move_events: any[],
-    estimateValue = 0,
-    issueNumber: number
+    estimateValue: number | undefined,
+    issueObj: IIssue
   ): ICSVItem[] {
     // return move_events.map((mo) => {
     // 	return {
@@ -473,7 +491,7 @@ export class Program {
       const diff =
         new Date(ev.createdAt).getTime() - new Date(prevEv.createdAt).getTime()
       const diffPerEstimate =
-        estimateValue > 0
+        estimateValue !== undefined && estimateValue > 0
           ? Number((diff / estimateValue).toFixed(1))
           : undefined
 
@@ -487,7 +505,8 @@ export class Program {
             : undefined,
         pipeline: prevEv.data.to_pipeline.name,
         event: `${prevEv.data.to_pipeline.name} to ${ev.data.to_pipeline.name}`,
-        issueNumber
+        number: issueObj?.number,
+        htmlUrl: issueObj?.htmlUrl
       } as ICSVItem
     })
     // }
@@ -575,7 +594,7 @@ export class Program {
     const variables = { workspaceId }
     const res1 = await this.callZenhub(query, variables)
     const res: any[] = res1.data.workspace.pipelinesConnection.nodes.map(
-      (res: any) => res.name
+      (res0: any) => res0.name
     )
     return Promise.resolve(res)
   }
@@ -626,68 +645,10 @@ export class Program {
     // 	} as IIssue]);
     // }, []);
 
-    return Promise.resolve(
+    const pipelines: ISarchIssuesByPipeline = this.addRepoProps(
       res1.data.searchIssuesByPipeline as ISarchIssuesByPipeline
     )
-  }
-
-  private async getIssues(workspaceId: string, last = 100): Promise<IIssue[]> {
-    const query = `query getBoardInfoForWorkspace($workspaceId: ID!) {
-  workspace(id: $workspaceId) {
-    id
-    pipelinesConnection(first: 25) {
-      nodes {
-        id
-        name
-        issues(last: ${last}) {
-          nodes {
-            number
-            estimate {
-              value
-            }
-            repository {
-              ghId
-            }
-            labels(first: 3) {
-              nodes {
-                name
-              }
-            }
-          }
-		  pageInfo {
-			hasNextPage
-			endCursor
-		  }
-        }
-      }
-    }
-  }
-}`
-
-    const variables = { workspaceId }
-
-    const res1 = await this.callZenhub(query, variables)
-    const issues: IIssue[] =
-      res1.data.workspace.pipelinesConnection.nodes.reduce(
-        (res: IIssue[], item: any) => {
-          const eventsTmp = item.issues.nodes
-          const issues0: IIssue[] = eventsTmp.map((ee: any) => {
-            return {
-              number: Number(ee.number),
-              estimateValue:
-                ee.estimate !== null ? Number(ee.estimate.value) : undefined,
-              repositoryGhId: Number(ee.repository.ghId),
-              pipelineName: item.name,
-              labels: ee.labels?.nodes?.map((n: any) => n.name) || undefined
-            } as IIssue
-          })
-
-          return res.concat(issues0)
-        },
-        []
-      )
-
-    return Promise.resolve(issues)
+    return Promise.resolve(pipelines)
   }
 
   private async getIssuesFromBoard(board: IWorkspace): Promise<IIssue[]> {
@@ -695,8 +656,8 @@ export class Program {
       (res: IIssue[], item: IPipelinesConnection) => {
         const eventsTmp: Issue[] = item.issues
         const issues0: IIssue[] = eventsTmp.map((ee: Issue) => {
-          const o = {
-            number: Number(ee.number),
+          const o: IIssue = {
+            number: Utils.issueNumberAsString(ee.number),
             estimateValue:
               ee.estimate !== null && ee.estimate !== undefined
                 ? Number(ee.estimate.value)
@@ -706,7 +667,8 @@ export class Program {
             labels: ee.labels?.nodes?.map((n: any) => n.name) || undefined,
             releases: ee.releases?.nodes?.map((n: any) => n.title) || undefined,
             events: ee.events,
-            pullRequest: ee.pullRequest
+            pullRequest: !!ee.pullRequest,
+            htmlUrl: ee.htmlUrl
           } as IIssue
           return o
         })
@@ -752,7 +714,7 @@ export class Program {
     return Promise.resolve(base)
   }
 
-  private async getReleases(workspaceId: string) {
+  private async getReleases(workspaceId: string): Promise<string | undefined> {
     // TODO last
     const query = `query getCurrentWorkspace($workspaceId: ID!) {
   workspace: workspace(id: $workspaceId) {
@@ -844,10 +806,13 @@ fragment currentWorkspace on Workspace {
       return Promise.reject(new Error(err.join('\n')))
     }
 
-    const finalRes = Object.assign({ totalIssues: 0 }, res1.data.workspace)
+    const finalRes: IWorkspace = Object.assign(
+      { totalIssues: 0 },
+      res1.data.workspace
+    )
     finalRes.pipelinesConnection = this.mapPipelineConnec(finalRes)
 
-    return Promise.resolve(finalRes as IWorkspace)
+    return Promise.resolve(finalRes)
   }
 
   private generateMainCSV(
@@ -987,8 +952,8 @@ fragment currentWorkspace on Workspace {
   }
 
   async main(
-    skipIssueIfFn?: (issue: any) => Promise<boolean>,
-    skipEventIfFn?: (issue: any) => Promise<boolean>
+    skipIssueIfFn?: (issue: IIssue) => Promise<boolean>,
+    skipEventIfFn?: (issue: IGhEvent) => Promise<boolean>
   ): Promise<IProgramResult> {
     // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
     // this._pipelines = pipelines
@@ -1083,7 +1048,7 @@ fragment currentWorkspace on Workspace {
         handledCount++
       }
 
-      this._eventsPerIssue[issue.number.toString()] = handleIssueResult.events
+      this._eventsPerIssue[issue.number] = handleIssueResult.events
     }
     // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
 
@@ -1134,7 +1099,7 @@ fragment currentWorkspace on Workspace {
         durationStringPerEstimate: undefined,
         pipeline,
         event: '',
-        issueNumber: -1
+        number: ''
       } as ICSVItem
     })
 
@@ -1179,6 +1144,7 @@ fragment currentWorkspace on Workspace {
       console.warn(e.message)
     })
 
+    let issueWithEventCount = 0
     board.pipelinesConnection.forEach(
       (pipelineConnect: IPipelinesConnection) => {
         pipelineConnect.issues.forEach((issue: Issue) => {
@@ -1189,16 +1155,21 @@ fragment currentWorkspace on Workspace {
           // 	const issueNumber = issueNumberBits[issueNumberBits.length - 1];
           // 	issue.events = this._eventsPerIssue[issueNumber] || [];
           // }
-          let issueNumber
+          let issueNumber: number
           if (issue.number) {
             issueNumber = issue.number
           } else {
             const issueNumberBits = issue.htmlUrl?.split('/') || [undefined]
-            issueNumber = issueNumberBits[issueNumberBits.length - 1]
+            issueNumber = Number(issueNumberBits[issueNumberBits.length - 1])
           }
-          issue.events = issueNumber
-            ? this._eventsPerIssue[issueNumber] || []
+          const issueEvents = issueNumber
+            ? this._eventsPerIssue[Utils.issueNumberAsString(issueNumber)] || []
             : []
+          issue.events = issueEvents
+
+          if (issueEvents.length > 0) {
+            issueWithEventCount++
+          }
         })
       }
     )
@@ -1302,17 +1273,34 @@ fragment currentWorkspace on Workspace {
       console.warn(e.message)
     }
 
+    const baseTableFn = (
+      issueNumberKey: string
+    ): ((key: string, item: any) => string | null) => {
+      return (key: string, item: any): string | null => {
+        const itemStr = item[key] as string
+        if (key === issueNumberKey && itemStr.startsWith('#')) {
+          const url = (item as IControlChartItem).htmlUrl
+          return `<a href="${url}">${itemStr}</a>`
+        } else if (key === 'htmlUrl') {
+          return ''
+        }
+        return null
+      }
+    }
+
     const fullHTML =
       `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
       `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
-      `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2><br>` +
+      `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2>` +
+      `<h2>Releases: ${this._config.release || ''}</h2>` +
+      `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
       `<section>
           <h3>Cool stats</h3>
               ${this.getStatsHTML(stats, statsEstimate, veloccity)}
           </section>` +
       `<section>
             <h3>Control chart list</h3>
-            ${this.generateTableFromCSV(ccsv.csvChart)}
+              ${this.generateTable(chartData, baseTableFn('number'))}
             <div>
                 ${await this.getControlChartHTML(chartData).catch(e => {
                   if (!e.message.includes("Cannot find module 'canvas'")) {
@@ -1324,7 +1312,7 @@ fragment currentWorkspace on Workspace {
         </section>` +
       `<section>
           <h3>Outstanding issues</h3>
-          ${this.generateTableFromCSV(ccsv.csvOutstanding)}
+          ${this.generateTable(outs, baseTableFn('number'))}
         </section>` +
       `<section>
             <h3>Velocity list</h3>
@@ -1368,11 +1356,11 @@ fragment currentWorkspace on Workspace {
         </section>` +
       `<section>
             <h3>Remaining opened issues</h3>
-            ${this.generateTable(remainingOpenedIssuesCleaned)}
+            ${this.generateTable(remainingOpenedIssuesCleaned, baseTableFn('number'))}
         </section>` +
       `<section>
             <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(openedPerPipeline)}
+            ${this.generateTable(openedPerPipeline, undefined, '25%')}
             <div>
                 ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(
                   e => {
@@ -1399,6 +1387,9 @@ fragment currentWorkspace on Workspace {
       { encoding: 'utf8' }
     )
 
+    console.log(
+      `${allEvs.length} ${issues.filter(iu => !iu.filtered).length} ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`
+    )
     return Promise.resolve({
       mark,
       allResult
@@ -1465,7 +1456,8 @@ fragment currentWorkspace on Workspace {
             i.completed?.start,
             i.completed?.end,
             i.estimateValue || 0,
-            i.number
+            i.number,
+            i.htmlUrl
           )
         : null
     })
@@ -1479,20 +1471,25 @@ fragment currentWorkspace on Workspace {
     return res
   }
 
-  private generateTable(arr: any[]): string {
+  private generateTable(
+    arr: any[],
+    specFn?: (key: string, item: any) => string | null,
+    tableWidth?: string
+  ): string {
     if (arr.length === 0) {
       return ''
     }
 
-    const headers = Object.keys(arr[0])
-    const html = `<table class="table table-striped-columns"><thead>
+    const headers = this.getHeadersSorted(Object.keys(arr[0]))
+
+    const html = `<table class="table table-striped-columns" ${tableWidth !== undefined ? `style="width: ${tableWidth}"` : ''}><thead>
                     <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
                 </thead>
                 <tbody>
                     ${arr
                       .slice()
                       .map((l: any) => {
-                        return `<tr>${Object.keys(l)
+                        return `<tr>${headers
                           .map(lkey => {
                             // const it = l[lkey]
                             // const isArr = Array.isArray(it)
@@ -1502,7 +1499,14 @@ fragment currentWorkspace on Workspace {
                             //     ? it?.toString() || ''
                             //     : this.generateTable(it)
                             // return `<td>${val}</td>`
-                            return `<td>${l[lkey]?.toString() || ''}</td>`
+
+                            const specRes: string | undefined | null =
+                              specFn && specFn(lkey, l)
+                            return `<td>${
+                              specRes !== undefined && specRes !== null
+                                ? specRes
+                                : l[lkey]?.toString() || ''
+                            }</td>`
                           })
                           .join('')}</tr>`
                       })
@@ -1604,18 +1608,20 @@ fragment currentWorkspace on Workspace {
     return `${date.getMonth()}${res}`
   }
 
-  private mapPipelineConnec(finalRes: any) {
+  private mapPipelineConnec(finalRes: any): IPipelinesConnection[] {
     return finalRes.pipelinesConnection.nodes.map(
       (pipelineConnectionItem: any) => {
         const tempRes = Object.assign({}, pipelineConnectionItem)
-        tempRes.issues = pipelineConnectionItem.issues.nodes
+        tempRes.issues = this.addRepoPropsToIssues(
+          pipelineConnectionItem.issues.nodes
+        )
         tempRes.issueEndCursor = pipelineConnectionItem.issues.pageInfo
           ?.hasNextPage
           ? pipelineConnectionItem.issues.pageInfo.endCursor
           : undefined
 
         finalRes.totalIssues += tempRes.issues.length
-        return tempRes
+        return tempRes as IPipelinesConnection
       }
     )
   }
@@ -1632,7 +1638,7 @@ fragment currentWorkspace on Workspace {
   // 	}
   // }
 
-  private getAllCSV(report: IReport, date: Date) {
+  private getAllCSV(report: IReport, date: Date): ICSVResult {
     const reportVelocityList = report.velocity.data
 
     const csvChart = this.toCSV(
@@ -1735,7 +1741,7 @@ fragment currentWorkspace on Workspace {
       velocityList,
       mainList,
       csvPrAndCommits
-    }
+    } as ICSVResult
   }
 
   private generateTableFromCSV(csvChart: string): string {
@@ -1743,40 +1749,11 @@ fragment currentWorkspace on Workspace {
       .trim()
       .split('\n')
       .map(i => i.split(','))
-    let title = ''
-    if (lines[0].length === 1) {
-      title = lines.splice(0, 1)[0][0]
-    }
     const [headers] = lines.splice(0, 1)
     if (!headers || headers.length === 0) {
       return ''
     }
-    const tableStr = `<table class="table table-striped-columns">
-                <thead>
-                    <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
-                </thead>
-                <tbody>
-                    ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
-                </tbody>
-            </table>`
-    // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
-    return tableStr
-  }
-
-  private generateTableFromCSV0(csvChart: string): string {
-    const lines = csvChart
-      .trim()
-      .split('\n')
-      .map(i => i.split(','))
-    let title = ''
-    if (lines[0].length === 1) {
-      title = lines.splice(0, 1)[0][0]
-    }
-    const [headers] = lines.splice(0, 1)
-    if (!headers || headers.length === 0) {
-      return ''
-    }
-    const tableStr = `<table class="table table-striped-columns">
+    const tableStr = `<table class="table table-striped-columns" style="width: 50%">
                 <thead>
                     <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
                 </thead>
@@ -2020,12 +1997,12 @@ fragment currentWorkspace on Workspace {
     statsEstimate: IStatResult,
     veloccity: IVelocity
   ): string {
-    return `<table>
-			<thead><tr><th></th><th></th></tr></thead>
+    return `<table class="table table-striped-columns" style="width: 25%">
+			<thead></thead>
 			<tbody>
 				<tr>
 					<td>Velocity: </td>
-					<td>${veloccity.velocityIssue}</td>
+					<td>${veloccity.velocityIssue.toFixed(2)}</td>
 				</tr>
 				<tr>
 					<td>Velocity estimate: </td>
@@ -2083,7 +2060,7 @@ fragment currentWorkspace on Workspace {
     return uu
   }
 
-  private async getGithubData(repos: string[]) {
+  private async getGithubData(repos: string[]): Promise<any> {
     const allD: ICheckPr[] = []
     for (const repo of repos) {
       const d = (await reviewer_call
@@ -2152,5 +2129,46 @@ fragment currentWorkspace on Workspace {
     // const dUsers: IPrUser[] = this.averageUsers(d.users);
 
     return Promise.resolve({ allD, newAllD })
+  }
+
+  private addRepoProps(item: ISarchIssuesByPipeline): ISarchIssuesByPipeline {
+    const clone = Object.assign({}, item)
+    clone.nodes = this.addRepoPropsToIssues(clone.nodes)
+    return clone
+  }
+
+  private getRepoAndOwnerFromURL(
+    htmlUrl: string
+  ): [string, string, string] | null {
+    if (!htmlUrl) {
+      return null
+    }
+    const bits = htmlUrl.split('/')
+    if (bits.length !== 7) {
+      return null
+    }
+    return [bits[4], bits[3], bits[6]]
+  }
+
+  private addRepoPropsToIssues(nodes: Issue[]): Issue[] {
+    return nodes.map((issue: Issue) => {
+      const res: [string, string, string] | null = this.getRepoAndOwnerFromURL(
+        issue.htmlUrl
+      )
+      issue.repository.name = res ? res[0] : ''
+      issue.repository.ownerName = res ? res[1] : ''
+      issue.number = res ? Number(res[2]) : 0
+
+      return issue
+    })
+  }
+
+  private getHeadersSorted(strings: string[]): string[] {
+    const target = strings.find((str: string) => str === 'number')
+    if (target === undefined) {
+      return strings
+    }
+
+    return [target].concat(strings.filter(s => s !== target))
   }
 }
