@@ -4,7 +4,7 @@ const axios = require('axios')
 // GitHub repository owner and name
 const repo = 'BrowserPuppeteerTests'
 
-const callGithubAPIByURL = async (apiUrl) => {
+const callGithubAPIByURL = async apiUrl => {
   return new Promise((resolve, reject) => {
     // Make a GET request to the GitHub API for pull requests with API key in headers
     axios

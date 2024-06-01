@@ -17,6 +17,9 @@ WORKDIR /app
 
 COPY . .
 
+#RUN cp .github/linters/.*.yml /app/
+#RUN cp .github/linters/* /app/
+
 RUN npm ci
 RUN npm run bundle
 #RUN npx tsc
