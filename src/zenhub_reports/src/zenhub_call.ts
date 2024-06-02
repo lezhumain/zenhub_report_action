@@ -2191,7 +2191,7 @@ fragment currentWorkspace on Workspace {
     pipelineIndex: number,
     toPipelineIndex: number
   ): number {
-    if(daysSum === 0) {
+    if (daysSum === 0) {
       return 0
     }
     let days = 0
@@ -2224,7 +2224,12 @@ fragment currentWorkspace on Workspace {
     )
     const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline!)
 
-    const totalMsAverageFromPipelineToPipeline = this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex)
+    const totalMsAverageFromPipelineToPipeline =
+      this.getTotalMsAverageFromPipelineToPipeline(
+        avg,
+        fromPipelineIndex,
+        toPipelineIndex
+      )
     console.log('')
 
     let openedTotals = 0

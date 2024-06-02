@@ -7,7 +7,7 @@
 [![Coverage](./badges/coverage.svg)](./badges/coverage.svg)
 
 Based on#; https://github.com/actions/typescript-action
-Inspired by: 
+Inspired by: https://github.com/github/issue-metrics
 
 This is a GitHub Action that searches for issues/pull requests in a zenhub
 board, measures several metrics, and generates a report in form of a GitHub
