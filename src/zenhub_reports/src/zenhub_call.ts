@@ -23,6 +23,7 @@ import {
 } from './models'
 import * as path from 'node:path'
 import { BubbleDataPoint } from 'chart.js'
+import { IMainConfig } from './main_conf'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 const reviewer_call = require('./check_pr_reviewers.js')
@@ -45,13 +46,13 @@ interface ICSVItem {
   htmlUrl: string
 }
 
-interface IAVGItem {
+export interface IAVGItem {
   data: IAVGData
   issueCount: number
   openedIssueCount: number // FIXME should be the same as issueCount ?
 }
 
-interface IAVGData {
+export interface IAVGData {
   count: number
   duration: number
   durationDays: number
@@ -60,27 +61,8 @@ interface IAVGData {
   durationAverageString: string
 }
 
-interface IAVGItemMap {
+export interface IAVGItemMap {
   [pipeline: string]: IAVGItem
-}
-
-export interface IMainConfig {
-  inputJsonFilename?: string
-  releaseID?: string
-  pullRequest?: boolean
-  maxCount: number
-  workspaceId: string
-  outputJsonFilename: string
-  outputImageFilename: string
-  minDate?: string
-  maxDate?: string
-  labels?: string[]
-  skipRepos: number[]
-  includeRepos: number[]
-  issuesToSkip?: number[]
-  fromPipeline?: string
-  toPipeline?: string
-  release: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
@@ -135,7 +117,7 @@ interface ICSVResult {
   csvPrAndCommits: string
 }
 
-interface IOpenedPerPipeline {
+export interface IOpenedPerPipeline {
   pipeline: string
   opened: number
   estimatedCompletionDays: number
@@ -147,7 +129,7 @@ export class Program {
   private readonly _baseFilename = 'workspace'
   private readonly _file: string
 
-  private _config: IMainConfig
+  protected _config: IMainConfig
   get config(): IMainConfig {
     return this._config
   }
@@ -158,7 +140,7 @@ export class Program {
    * @private
    */
   private _completed: IIssue[] = []
-  private _pipelines: string[] = []
+  protected _pipelines: string[] = []
   private _startTimestamp = 0
 
   private _estimateRemainingMs = 0
@@ -2203,12 +2185,15 @@ fragment currentWorkspace on Workspace {
     return [target].concat(strings.filter(s => s !== target))
   }
 
-  private getSumPerc(
+  protected getSumPerc(
     avg: IAVGItemMap,
     daysSum: number,
     pipelineIndex: number,
     toPipelineIndex: number
   ): number {
+    if(daysSum === 0) {
+      return 0
+    }
     let days = 0
     for (
       let pipelineI = pipelineIndex;
@@ -2228,7 +2213,7 @@ fragment currentWorkspace on Workspace {
     return days / daysSum
   }
 
-  private getOpenedPerPipeline(
+  protected getOpenedPerPipeline(
     avg: IAVGItemMap,
     openedPipelines: string[],
     remainingOpenedIssues: IIssue[],
@@ -2239,14 +2224,7 @@ fragment currentWorkspace on Workspace {
     )
     const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline!)
 
-    const daysSum = Object.keys(avg).reduce((res: number, ke: string) => {
-      const currentIndex = this._pipelines.indexOf(ke)
-      if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
-        console.log(`Adding pipeline ${ke}`)
-        res += avg[ke].data.durationAverage
-      }
-      return res
-    }, 0)
+    const totalMsAverageFromPipelineToPipeline = this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex)
     console.log('')
 
     let openedTotals = 0
@@ -2258,7 +2236,7 @@ fragment currentWorkspace on Workspace {
 
         const estimatedMsAvg = this.getSumPerc(
           avg,
-          daysSum,
+          totalMsAverageFromPipelineToPipeline,
           currentFromPipelineIndex,
           toPipelineIndex
         )
@@ -2290,5 +2268,27 @@ fragment currentWorkspace on Workspace {
       ])
 
     return openedPerPipeline
+  }
+
+  /**
+   * Gets total ms needed to go from pipeline to pipeline
+   * @param avg
+   * @param fromPipelineIndex
+   * @param toPipelineIndex
+   * @protected
+   */
+  protected getTotalMsAverageFromPipelineToPipeline(
+    avg: IAVGItemMap,
+    fromPipelineIndex: number,
+    toPipelineIndex: number
+  ): number {
+    return Object.keys(avg).reduce((res: number, ke: string) => {
+      const currentIndex = this._pipelines.indexOf(ke)
+      if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
+        console.log(`Adding pipeline ${ke}`)
+        res += avg[ke].data.durationAverage
+      }
+      return res
+    }, 0)
   }
 }

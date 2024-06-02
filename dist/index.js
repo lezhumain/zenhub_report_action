@@ -53413,6 +53413,9 @@ fragment currentWorkspace on Workspace {
         return [target].concat(strings.filter(s => s !== target));
     }
     getSumPerc(avg, daysSum, pipelineIndex, toPipelineIndex) {
+        if (daysSum === 0) {
+            return 0;
+        }
         let days = 0;
         for (let pipelineI = pipelineIndex; pipelineI < toPipelineIndex; ++pipelineI) {
             const currentPipeline = this._pipelines[pipelineI];
@@ -53430,21 +53433,14 @@ fragment currentWorkspace on Workspace {
     getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats) {
         const fromPipelineIndex = this._pipelines.indexOf(this._config.fromPipeline);
         const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline);
-        const daysSum = Object.keys(avg).reduce((res, ke) => {
-            const currentIndex = this._pipelines.indexOf(ke);
-            if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
-                console.log(`Adding pipeline ${ke}`);
-                res += avg[ke].data.durationAverage;
-            }
-            return res;
-        }, 0);
+        const totalMsAverageFromPipelineToPipeline = this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
         console.log('');
         let openedTotals = 0;
         let estimatedDays = 0;
         const openedPerPipeline = openedPipelines
             .map((pipeline) => {
             const currentFromPipelineIndex = this._pipelines.indexOf(pipeline);
-            const estimatedMsAvg = this.getSumPerc(avg, daysSum, currentFromPipelineIndex, toPipelineIndex);
+            const estimatedMsAvg = this.getSumPerc(avg, totalMsAverageFromPipelineToPipeline, currentFromPipelineIndex, toPipelineIndex);
             const openedCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length;
             const estimatedCompletionDaysVal = openedCount * estimatedMsAvg * stats.average;
             const estimatedCompletionDays = Number(estimatedCompletionDaysVal.toFixed(2));
@@ -53464,6 +53460,23 @@ fragment currentWorkspace on Workspace {
             }
         ]);
         return openedPerPipeline;
+    }
+    /**
+     * Gets total ms needed to go from pipeline to pipeline
+     * @param avg
+     * @param fromPipelineIndex
+     * @param toPipelineIndex
+     * @protected
+     */
+    getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex) {
+        return Object.keys(avg).reduce((res, ke) => {
+            const currentIndex = this._pipelines.indexOf(ke);
+            if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
+                console.log(`Adding pipeline ${ke}`);
+                res += avg[ke].data.durationAverage;
+            }
+            return res;
+        }, 0);
     }
 }
 exports.Program = Program;

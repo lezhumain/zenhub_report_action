@@ -7,34 +7,15 @@
  */
 
 import * as core from '@actions/core'
-import { IMainConfig } from '../src/zenhub_reports/src/zenhub_call'
 import * as path from 'node:path'
 import { main, run } from '../src/main'
+import { IMainConfig } from '../src/zenhub_reports/src/main_conf'
 
 class MockMain {
   private _conf?: IMainConfig
   get conf(): IMainConfig | undefined {
     return this._conf
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // constructor(private readonly _obj: IMain) {
-  //   // const content = fs.readFileSync(this._conf.inputJsonFilename, { encoding: "utf8" });
-  //   // const obj = JSON.parse(content);
-  //   // obj.pipelinesConnection = [];
-  //   // fs.writeFileSync(this._conf.inputJsonFilename, JSON.stringify(obj, null, 2), { encoding: "utf8" })
-  //   // debugger
-  // }
-  //
-  // async init() {
-  //   // const config0 = await this._obj.
-  //   const cconf = MockMain.getTestConf(conf0)
-  //   this._conf = cconf
-  // }
-  //
-  // async run(conf?: IMainConfig): Promise<object> {
-  //   return this._obj.run(conf || this._conf)
-  // }
 
   static getTestConf(conf0: IMainConfig): IMainConfig {
     const cconf = Object.assign({}, conf0)
