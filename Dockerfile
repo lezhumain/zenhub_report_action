@@ -13,6 +13,8 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y python3 pip g++ m
 #    autoconf \
 #    automake
 
+RUN npm install -g npm@9.8.1
+
 WORKDIR /app
 
 COPY . .
@@ -22,6 +24,7 @@ COPY . .
 
 RUN npm ci
 RUN npm run bundle
+RUN echo "$(node -v && npm -v && npx tsc -v && npx ncc -v)" > /app/dist/version.txt
 #RUN npx tsc
 
 ARG ARG_API_KEY=abc

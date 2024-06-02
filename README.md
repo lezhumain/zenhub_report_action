@@ -6,6 +6,9 @@
 [![CodeQL](https://github.com/lezhumain/zenhub_report_action/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/lezhumain/zenhub_report_action/actions/workflows/codeql-analysis.yml)
 [![Coverage](./badges/coverage.svg)](./badges/coverage.svg)
 
+Based on#; https://github.com/actions/typescript-action
+Inspired by: 
+
 This is a GitHub Action that searches for issues/pull requests in a zenhub
 board, measures several metrics, and generates a report in form of a GitHub
 issue.

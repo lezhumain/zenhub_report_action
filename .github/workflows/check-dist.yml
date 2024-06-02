@@ -43,7 +43,7 @@ jobs:
 
       - name: Check env
         id: check_env
-        run: node -v && npm -v && npm tsc -v && npx ncc -v
+        run: node -v && npm -v && npx tsc -v && npx ncc -v
 
       - name: Build dist/ Directory
         id: build
