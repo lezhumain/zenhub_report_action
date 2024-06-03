@@ -929,7 +929,7 @@ fragment currentWorkspace on Workspace {
     return count
   }
 
-  private comparePipelines(firstFrom: any, fromPipeline: string): number {
+  private comparePipelines(firstFrom: string, fromPipeline: string): number {
     // return firstFrom === fromPipeline;
     return (
       this._pipelines.indexOf(firstFrom) - this._pipelines.indexOf(fromPipeline)
@@ -1275,6 +1275,19 @@ fragment currentWorkspace on Workspace {
 
     this.generateHTML(outs)
 
+    const remainingEstimatedDays: any[] = this.getRemainingEstimatedDays(
+      avg,
+      openedPerPipeline,
+      stats
+    )
+    const openedPerPipeline0: { pipeline: string; opened: number }[] =
+      remainingEstimatedDays.slice(0, -1).map((e: any) => {
+        return {
+          pipeline: e.pipeline,
+          opened: e.count
+        }
+      })
+
     try {
       this.addStatsHTML(stats, statsEstimate, veloccity)
       this.addControlChartListHTML(chartData)
@@ -1309,7 +1322,7 @@ fragment currentWorkspace on Workspace {
       `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
       `<section>
           <h3>Cool stats</h3>
-              ${this.getStatsHTML(stats, statsEstimate, veloccity)}
+              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
           </section>` +
       `<section>
             <h3>Control chart list</h3>
@@ -1373,9 +1386,9 @@ fragment currentWorkspace on Workspace {
         </section>` +
       `<section>
             <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(openedPerPipeline, undefined, '25%')}
+            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
             <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(
+                ${await this.getOpenedChartHTML(openedPerPipeline0, 100).catch(
                   e => {
                     if (!e.message.includes("Cannot find module 'canvas'")) {
                       throw e
@@ -2008,7 +2021,8 @@ fragment currentWorkspace on Workspace {
   private getStatsHTML(
     stats: IStatResult,
     statsEstimate: IStatResult,
-    veloccity: IVelocity
+    veloccity: IVelocity,
+    remainingDays?: number
   ): string {
     return `<table class="table table-striped-columns" style="width: 25%">
 			<thead></thead>
@@ -2036,6 +2050,10 @@ fragment currentWorkspace on Workspace {
 				<tr>
 					<td>Median day per estimate: </td>
 					<td>${statsEstimate.median}</td>
+				</tr>
+				<tr>
+					<td>Estimated remaining days: </td>
+					<td>${remainingDays || ''}</td>
 				</tr>
 			</tbody>
 		</table>`
@@ -2295,5 +2313,109 @@ fragment currentWorkspace on Workspace {
       }
       return res
     }, 0)
+  }
+
+  protected getTotalMsAverageFromPipelineToPipelineStr(
+    avg: IAVGItemMap,
+    fromPipeline: string,
+    toPipeline: string
+  ): number {
+    const fromPipelineIndex = this._pipelines.indexOf(fromPipeline)
+    const toPipelineIndex = this._pipelines.indexOf(toPipeline)
+
+    return this.getTotalMsAverageFromPipelineToPipeline(
+      avg,
+      fromPipelineIndex,
+      toPipelineIndex
+    )
+  }
+
+  protected getTotalMsAverageFromPipelineToPipelineConfig(
+    avg: IAVGItemMap
+  ): number {
+    const fromPipelineIndex = this._config.fromPipeline
+      ? this._pipelines.indexOf(this._config.fromPipeline)
+      : 0
+    const toPipelineIndex = this._config.toPipeline
+      ? this._pipelines.indexOf(this._config.toPipeline)
+      : this._pipelines.length - 1
+
+    return this.getTotalMsAverageFromPipelineToPipeline(
+      avg,
+      fromPipelineIndex,
+      toPipelineIndex
+    )
+  }
+
+  private isPipelineBetweenFromTo(l: string): boolean {
+    const fromPipeline = this._config.fromPipeline || this._pipelines[0]
+    const toPipeline =
+      this._config.toPipeline || this._pipelines[this._pipelines.length - 1]
+
+    return (
+      this.comparePipelines(l, fromPipeline) >= 0 &&
+      this.comparePipelines(l, toPipeline) < 0
+    )
+  }
+
+  private getRemainingEstimatedDays(
+    avg: IAVGItemMap,
+    openedPerPipeline: IOpenedPerPipeline[],
+    stats: IStatResult
+  ): any[] {
+    const remainingEstimatedDays: NonNullable<any[]> = Object.keys(avg)
+      .map(l => {
+        const openedItem = openedPerPipeline.find(
+          (opp: IOpenedPerPipeline) => opp.pipeline === l
+        )
+        return this.isPipelineBetweenFromTo(l)
+          ? {
+              pipeline: l,
+              durationAverage: avg[l].data.durationAverage,
+              count: openedItem?.opened || 0
+            }
+          : null
+      })
+      .filter(r => !!r)
+    const tot = remainingEstimatedDays.reduce(
+      (res0: number, item: any) => res0 + item.durationAverage,
+      0
+    )
+    for (const item of remainingEstimatedDays) {
+      item.durationAveragePerc = item.durationAverage / tot
+    }
+    const sum = this.getTotalMsAverageFromPipelineToPipelineConfig(avg)
+    let percSum = 0
+    let countTotal = 0
+    let remainingTotal = 0
+    for (let i = remainingEstimatedDays.length - 1; i >= 0; --i) {
+      const iItem = remainingEstimatedDays[i]
+      countTotal += iItem.count
+
+      iItem.durationAveragePercSum =
+        this.getTotalMsAverageFromPipelineToPipelineStr(
+          avg,
+          iItem.pipeline,
+          this._config.toPipeline || this._pipelines[this._pipelines.length - 1]
+        ) / sum
+
+      percSum += iItem.durationAveragePerc
+
+      iItem.estimatedRemainingDays = Number(
+        (iItem.durationAveragePercSum * stats.average * iItem.count).toFixed(1)
+      )
+
+      remainingTotal += iItem.estimatedRemainingDays
+    }
+    remainingEstimatedDays.push({
+      pipeline: '',
+      durationAverage: '',
+      count: countTotal,
+      durationAveragePerc: percSum,
+      durationAveragePercSum: '',
+      estimatedRemainingDays: remainingTotal.toFixed(1)
+    } as any)
+
+    return remainingEstimatedDays
   }
 }
