@@ -52762,6 +52762,13 @@ fragment currentWorkspace on Workspace {
             return clone;
         });
         this.generateHTML(outs);
+        const remainingEstimatedDays = this.getRemainingEstimatedDays(avg, openedPerPipeline, stats);
+        const openedPerPipeline0 = remainingEstimatedDays.slice(0, -1).map((e) => {
+            return {
+                pipeline: e.pipeline,
+                opened: e.count
+            };
+        });
         try {
             this.addStatsHTML(stats, statsEstimate, veloccity);
             this.addControlChartListHTML(chartData);
@@ -52793,7 +52800,7 @@ fragment currentWorkspace on Workspace {
             `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
             `<section>
           <h3>Cool stats</h3>
-              ${this.getStatsHTML(stats, statsEstimate, veloccity)}
+              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
           </section>` +
             `<section>
             <h3>Control chart list</h3>
@@ -52855,9 +52862,9 @@ fragment currentWorkspace on Workspace {
         </section>` +
             `<section>
             <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(openedPerPipeline, undefined, '25%')}
+            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
             <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(e => {
+                ${await this.getOpenedChartHTML(openedPerPipeline0, 100).catch(e => {
                 if (!e.message.includes("Cannot find module 'canvas'")) {
                     throw e;
                 }
@@ -53272,7 +53279,7 @@ fragment currentWorkspace on Workspace {
         });
         return result;
     }
-    getStatsHTML(stats, statsEstimate, veloccity) {
+    getStatsHTML(stats, statsEstimate, veloccity, remainingDays) {
         return `<table class="table table-striped-columns" style="width: 25%">
 			<thead></thead>
 			<tbody>
@@ -53299,6 +53306,10 @@ fragment currentWorkspace on Workspace {
 				<tr>
 					<td>Median day per estimate: </td>
 					<td>${statsEstimate.median}</td>
+				</tr>
+				<tr>
+					<td>Estimated remaining days: </td>
+					<td>${remainingDays || ''}</td>
 				</tr>
 			</tbody>
 		</table>`;
@@ -53477,6 +53488,66 @@ fragment currentWorkspace on Workspace {
             }
             return res;
         }, 0);
+    }
+    getTotalMsAverageFromPipelineToPipelineStr(avg, fromPipeline, toPipeline) {
+        const fromPipelineIndex = this._pipelines.indexOf(fromPipeline);
+        const toPipelineIndex = this._pipelines.indexOf(toPipeline);
+        return this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
+    }
+    getTotalMsAverageFromPipelineToPipelineConfig(avg) {
+        const fromPipelineIndex = this._config.fromPipeline
+            ? this._pipelines.indexOf(this._config.fromPipeline)
+            : 0;
+        const toPipelineIndex = this._config.toPipeline
+            ? this._pipelines.indexOf(this._config.toPipeline)
+            : this._pipelines.length - 1;
+        return this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
+    }
+    isPipelineBetweenFromTo(l) {
+        const fromPipeline = this._config.fromPipeline || this._pipelines[0];
+        const toPipeline = this._config.toPipeline || this._pipelines[this._pipelines.length - 1];
+        return (this.comparePipelines(l, fromPipeline) >= 0 &&
+            this.comparePipelines(l, toPipeline) < 0);
+    }
+    getRemainingEstimatedDays(avg, openedPerPipeline, stats) {
+        const remainingEstimatedDays = Object.keys(avg)
+            .map(l => {
+            const openedItem = openedPerPipeline.find((opp) => opp.pipeline === l);
+            return this.isPipelineBetweenFromTo(l)
+                ? {
+                    pipeline: l,
+                    durationAverage: avg[l].data.durationAverage,
+                    count: openedItem?.opened || 0
+                }
+                : null;
+        })
+            .filter(r => !!r);
+        const tot = remainingEstimatedDays.reduce((res0, item) => res0 + item.durationAverage, 0);
+        for (const item of remainingEstimatedDays) {
+            item.durationAveragePerc = item.durationAverage / tot;
+        }
+        const sum = this.getTotalMsAverageFromPipelineToPipelineConfig(avg);
+        let percSum = 0;
+        let countTotal = 0;
+        let remainingTotal = 0;
+        for (let i = remainingEstimatedDays.length - 1; i >= 0; --i) {
+            const iItem = remainingEstimatedDays[i];
+            countTotal += iItem.count;
+            iItem.durationAveragePercSum =
+                this.getTotalMsAverageFromPipelineToPipelineStr(avg, iItem.pipeline, this._config.toPipeline || this._pipelines[this._pipelines.length - 1]) / sum;
+            percSum += iItem.durationAveragePerc;
+            iItem.estimatedRemainingDays = Number((iItem.durationAveragePercSum * stats.average * iItem.count).toFixed(1));
+            remainingTotal += iItem.estimatedRemainingDays;
+        }
+        remainingEstimatedDays.push({
+            pipeline: '',
+            durationAverage: '',
+            count: countTotal,
+            durationAveragePerc: percSum,
+            durationAveragePercSum: '',
+            estimatedRemainingDays: remainingTotal.toFixed(1)
+        });
+        return remainingEstimatedDays;
     }
 }
 exports.Program = Program;
