@@ -1,11 +1,8 @@
 import * as core from '@actions/core'
-import {
-  IMainConfig,
-  IProgramResult,
-  Program
-} from './zenhub_reports/src/zenhub_call'
+import { IProgramResult, Program } from './zenhub_reports/src/zenhub_call'
 import * as fs from 'fs'
 import { IssueFilter } from './zenhub_reports/src/filters'
+import { IMainConfig } from './zenhub_reports/src/main_conf'
 
 export interface IMain {
   config0: IMainConfig | undefined

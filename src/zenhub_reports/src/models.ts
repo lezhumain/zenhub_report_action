@@ -30,6 +30,7 @@ export interface IIssue {
   releases?: string[]
   pullRequest: boolean
   htmlUrl: string
+  createdAt: Date
 }
 
 export interface IWorkspace {
@@ -70,6 +71,7 @@ export interface Issue {
   events?: IGhEvent[]
   htmlUrl: string
   pullRequest?: boolean
+  createdAt: string
 }
 
 export interface IControlChartItem {

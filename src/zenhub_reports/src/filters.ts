@@ -1,5 +1,5 @@
 import { IGhEvent, IIssue, Utils } from './models'
-import { IMainConfig } from './zenhub_call'
+import { IMainConfig } from './main_conf'
 
 export class IssueFilter {
   constructor(private readonly _config: IMainConfig) {}

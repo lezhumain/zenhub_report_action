@@ -41,6 +41,10 @@ jobs:
         id: install
         run: npm ci
 
+      - name: Check env
+        id: check_env
+        run: node -v && npm -v && npx tsc -v && npx ncc -v
+
       - name: Build dist/ Directory
         id: build
         run: npm run bundle

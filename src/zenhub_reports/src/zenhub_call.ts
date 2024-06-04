@@ -23,6 +23,7 @@ import {
 } from './models'
 import * as path from 'node:path'
 import { BubbleDataPoint } from 'chart.js'
+import { IMainConfig } from './main_conf'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 const reviewer_call = require('./check_pr_reviewers.js')
@@ -45,13 +46,13 @@ interface ICSVItem {
   htmlUrl: string
 }
 
-interface IAVGItem {
+export interface IAVGItem {
   data: IAVGData
   issueCount: number
   openedIssueCount: number // FIXME should be the same as issueCount ?
 }
 
-interface IAVGData {
+export interface IAVGData {
   count: number
   duration: number
   durationDays: number
@@ -60,27 +61,8 @@ interface IAVGData {
   durationAverageString: string
 }
 
-interface IAVGItemMap {
+export interface IAVGItemMap {
   [pipeline: string]: IAVGItem
-}
-
-export interface IMainConfig {
-  inputJsonFilename?: string
-  releaseID?: string
-  pullRequest?: boolean
-  maxCount: number
-  workspaceId: string
-  outputJsonFilename: string
-  outputImageFilename: string
-  minDate?: string
-  maxDate?: string
-  labels?: string[]
-  skipRepos: number[]
-  includeRepos: number[]
-  issuesToSkip?: number[]
-  fromPipeline?: string
-  toPipeline?: string
-  release: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
@@ -135,13 +117,19 @@ interface ICSVResult {
   csvPrAndCommits: string
 }
 
+export interface IOpenedPerPipeline {
+  pipeline: string
+  opened: number
+  estimatedCompletionDays: number
+}
+
 export class Program {
   private readonly _delim: string
   private readonly _configHash: string
   private readonly _baseFilename = 'workspace'
   private readonly _file: string
 
-  private _config: IMainConfig
+  protected _config: IMainConfig
   get config(): IMainConfig {
     return this._config
   }
@@ -152,7 +140,7 @@ export class Program {
    * @private
    */
   private _completed: IIssue[] = []
-  private _pipelines: string[] = []
+  protected _pipelines: string[] = []
   private _startTimestamp = 0
 
   private _estimateRemainingMs = 0
@@ -184,6 +172,8 @@ export class Program {
                 id
               }
             }
+            createdAt
+            pullRequest
           }
         }`
 
@@ -357,9 +347,22 @@ export class Program {
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     )
 
-    const move_events: IGhEvent[] = events.filter(
+    const move_events0: IGhEvent[] = events.filter(
       (e: any) => e.type === 'issue.change_pipeline'
     )
+
+    const createdEventArr: IGhEvent[] = []
+
+    if (move_events0.length > 0) {
+      const created_event: IGhEvent = Object.assign({}, move_events0[0])
+      created_event.createdAt = issueObj.createdAt.toISOString()
+      delete created_event.data.github_user
+      created_event.data.to_pipeline = created_event.data.from_pipeline
+      // delete created_event.data.from_pipeline
+      createdEventArr.push(created_event)
+    }
+
+    const move_events: IGhEvent[] = createdEventArr.concat(move_events0)
     // console.log(move_events);
 
     const filteredEvents: IGhEvent[] = []
@@ -458,15 +461,21 @@ export class Program {
     for (const pipelineKey of Object.keys(avgObj)) {
       avgObj[pipelineKey].data.durationString =
         Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration)
+
       avgObj[pipelineKey].data.durationAverage = Number(
         (
           avgObj[pipelineKey].data.duration / avgObj[pipelineKey].data.count
         ).toFixed(0)
       )
+
       avgObj[pipelineKey].data.durationAverageString =
         Utils.millisecondsToHumanReadableTime(
           avgObj[pipelineKey].data.durationAverage
         )
+
+      avgObj[pipelineKey].data.durationDays = Utils.getMsAsDays(
+        avgObj[pipelineKey].data.duration
+      )
     }
 
     return avgObj
@@ -668,7 +677,8 @@ export class Program {
             releases: ee.releases?.nodes?.map((n: any) => n.title) || undefined,
             events: ee.events,
             pullRequest: !!ee.pullRequest,
-            htmlUrl: ee.htmlUrl
+            htmlUrl: ee.htmlUrl,
+            createdAt: new Date(ee.createdAt)
           } as IIssue
           return o
         })
@@ -919,7 +929,7 @@ fragment currentWorkspace on Workspace {
     return count
   }
 
-  private comparePipelines(firstFrom: any, fromPipeline: string): number {
+  private comparePipelines(firstFrom: string, fromPipeline: string): number {
     // return firstFrom === fromPipeline;
     return (
       this._pipelines.indexOf(firstFrom) - this._pipelines.indexOf(fromPipeline)
@@ -1069,13 +1079,6 @@ fragment currentWorkspace on Workspace {
     const openedPipelines = Array.from(
       new Set(remainingOpenedIssues.map(r => r.pipelineName))
     )
-    const openedPerPipeline = openedPipelines.map((pipeline: string) => {
-      return {
-        pipeline,
-        opened: remainingOpenedIssues.filter(r => r.pipelineName === pipeline)
-          .length
-      }
-    })
 
     // const remainingPerPipeline = Object.keys(avg).map((pipeline: string) => {
     // 	return {
@@ -1187,6 +1190,13 @@ fragment currentWorkspace on Workspace {
     )
     const stats: IStatResult = StatHelper.getStats(completinList)
 
+    const openedPerPipeline = this.getOpenedPerPipeline(
+      avg,
+      openedPipelines,
+      remainingOpenedIssues,
+      stats
+    )
+
     // const chartWithEstimate: IControlChartItem[] = chartData.filter((cd: IControlChartItem) => cd.estimate > 0);
     // const completinListEstimate: number[] = chartWithEstimate.map((c: IControlChartItem) => Number(c.completionTimeStr));
     // const completionTot: number = completinListEstimate.reduce((res: number, item: number) => res + item, 0);
@@ -1207,11 +1217,14 @@ fragment currentWorkspace on Workspace {
     const outs: ICSVItem[] = this.findOutstandingIssues(allEvs).slice(0, 5)
     // console.log(JSON.stringify(outs, null, 2));
 
-    const stuff: string[][] = board.pipelinesConnection.map(
-      (pc: IPipelinesConnection) =>
-        pc.issues.map((pci: Issue) => pci.repository.name)
+    const allRepos: string[] = issues
+      .filter((ii: IIssue) => ii.handled)
+      .map((ii: IIssue) => ii.htmlUrl.split('/')[4])
+
+    const repos: string[] = Array.from(
+      new Set([].concat(...(allRepos as any[])))
     )
-    const repos: string[] = Array.from(new Set([].concat(...(stuff as any[]))))
+
     // const allD: ICheckPr[] = await Promise.all(
     // 	repos.map(repo => {
     // 		return reviewer_call.check_prs(repo, this._config).catch((err: Error) => {
@@ -1262,6 +1275,19 @@ fragment currentWorkspace on Workspace {
 
     this.generateHTML(outs)
 
+    const remainingEstimatedDays: any[] = this.getRemainingEstimatedDays(
+      avg,
+      openedPerPipeline,
+      stats
+    )
+    const openedPerPipeline0: { pipeline: string; opened: number }[] =
+      remainingEstimatedDays.slice(0, -1).map((e: any) => {
+        return {
+          pipeline: e.pipeline,
+          opened: e.count
+        }
+      })
+
     try {
       this.addStatsHTML(stats, statsEstimate, veloccity)
       this.addControlChartListHTML(chartData)
@@ -1296,7 +1322,7 @@ fragment currentWorkspace on Workspace {
       `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
       `<section>
           <h3>Cool stats</h3>
-              ${this.getStatsHTML(stats, statsEstimate, veloccity)}
+              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
           </section>` +
       `<section>
             <h3>Control chart list</h3>
@@ -1360,9 +1386,9 @@ fragment currentWorkspace on Workspace {
         </section>` +
       `<section>
             <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(openedPerPipeline, undefined, '25%')}
+            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
             <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(
+                ${await this.getOpenedChartHTML(openedPerPipeline0, 100).catch(
                   e => {
                     if (!e.message.includes("Cannot find module 'canvas'")) {
                       throw e
@@ -1995,7 +2021,8 @@ fragment currentWorkspace on Workspace {
   private getStatsHTML(
     stats: IStatResult,
     statsEstimate: IStatResult,
-    veloccity: IVelocity
+    veloccity: IVelocity,
+    remainingDays?: number
   ): string {
     return `<table class="table table-striped-columns" style="width: 25%">
 			<thead></thead>
@@ -2023,6 +2050,10 @@ fragment currentWorkspace on Workspace {
 				<tr>
 					<td>Median day per estimate: </td>
 					<td>${statsEstimate.median}</td>
+				</tr>
+				<tr>
+					<td>Estimated remaining days: </td>
+					<td>${remainingDays || ''}</td>
 				</tr>
 			</tbody>
 		</table>`
@@ -2170,5 +2201,221 @@ fragment currentWorkspace on Workspace {
     }
 
     return [target].concat(strings.filter(s => s !== target))
+  }
+
+  protected getSumPerc(
+    avg: IAVGItemMap,
+    daysSum: number,
+    pipelineIndex: number,
+    toPipelineIndex: number
+  ): number {
+    if (daysSum === 0) {
+      return 0
+    }
+    let days = 0
+    for (
+      let pipelineI = pipelineIndex;
+      pipelineI < toPipelineIndex;
+      ++pipelineI
+    ) {
+      const currentPipeline = this._pipelines[pipelineI]
+      const vals = avg[currentPipeline]
+      if (vals) {
+        console.log(`1 - Adding pipeline ${currentPipeline}`)
+        days += vals.data.durationAverage
+      } else {
+        console.log(`2 - Adding pipeline ${currentPipeline}`)
+      }
+    }
+
+    return days / daysSum
+  }
+
+  protected getOpenedPerPipeline(
+    avg: IAVGItemMap,
+    openedPipelines: string[],
+    remainingOpenedIssues: IIssue[],
+    stats: IStatResult
+  ): IOpenedPerPipeline[] {
+    const fromPipelineIndex = this._pipelines.indexOf(
+      this._config.fromPipeline!
+    )
+    const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline!)
+
+    const totalMsAverageFromPipelineToPipeline =
+      this.getTotalMsAverageFromPipelineToPipeline(
+        avg,
+        fromPipelineIndex,
+        toPipelineIndex
+      )
+    console.log('')
+
+    let openedTotals = 0
+    let estimatedDays = 0
+
+    const openedPerPipeline = openedPipelines
+      .map((pipeline: string) => {
+        const currentFromPipelineIndex = this._pipelines.indexOf(pipeline)
+
+        const estimatedMsAvg = this.getSumPerc(
+          avg,
+          totalMsAverageFromPipelineToPipeline,
+          currentFromPipelineIndex,
+          toPipelineIndex
+        )
+        const openedCount = remainingOpenedIssues.filter(
+          r => r.pipelineName === pipeline
+        ).length
+
+        const estimatedCompletionDaysVal =
+          openedCount * estimatedMsAvg * stats.average
+        const estimatedCompletionDays = Number(
+          estimatedCompletionDaysVal.toFixed(2)
+        )
+
+        openedTotals += openedCount
+        estimatedDays += estimatedCompletionDaysVal
+
+        return {
+          pipeline,
+          opened: openedCount,
+          estimatedCompletionDays
+        }
+      })
+      .concat([
+        {
+          pipeline: '',
+          opened: openedTotals,
+          estimatedCompletionDays: Number(estimatedDays.toFixed(2))
+        }
+      ])
+
+    return openedPerPipeline
+  }
+
+  /**
+   * Gets total ms needed to go from pipeline to pipeline
+   * @param avg
+   * @param fromPipelineIndex
+   * @param toPipelineIndex
+   * @protected
+   */
+  protected getTotalMsAverageFromPipelineToPipeline(
+    avg: IAVGItemMap,
+    fromPipelineIndex: number,
+    toPipelineIndex: number
+  ): number {
+    return Object.keys(avg).reduce((res: number, ke: string) => {
+      const currentIndex = this._pipelines.indexOf(ke)
+      if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
+        console.log(`Adding pipeline ${ke}`)
+        res += avg[ke].data.durationAverage
+      }
+      return res
+    }, 0)
+  }
+
+  protected getTotalMsAverageFromPipelineToPipelineStr(
+    avg: IAVGItemMap,
+    fromPipeline: string,
+    toPipeline: string
+  ): number {
+    const fromPipelineIndex = this._pipelines.indexOf(fromPipeline)
+    const toPipelineIndex = this._pipelines.indexOf(toPipeline)
+
+    return this.getTotalMsAverageFromPipelineToPipeline(
+      avg,
+      fromPipelineIndex,
+      toPipelineIndex
+    )
+  }
+
+  protected getTotalMsAverageFromPipelineToPipelineConfig(
+    avg: IAVGItemMap
+  ): number {
+    const fromPipelineIndex = this._config.fromPipeline
+      ? this._pipelines.indexOf(this._config.fromPipeline)
+      : 0
+    const toPipelineIndex = this._config.toPipeline
+      ? this._pipelines.indexOf(this._config.toPipeline)
+      : this._pipelines.length - 1
+
+    return this.getTotalMsAverageFromPipelineToPipeline(
+      avg,
+      fromPipelineIndex,
+      toPipelineIndex
+    )
+  }
+
+  private isPipelineBetweenFromTo(l: string): boolean {
+    const fromPipeline = this._config.fromPipeline || this._pipelines[0]
+    const toPipeline =
+      this._config.toPipeline || this._pipelines[this._pipelines.length - 1]
+
+    return (
+      this.comparePipelines(l, fromPipeline) >= 0 &&
+      this.comparePipelines(l, toPipeline) < 0
+    )
+  }
+
+  private getRemainingEstimatedDays(
+    avg: IAVGItemMap,
+    openedPerPipeline: IOpenedPerPipeline[],
+    stats: IStatResult
+  ): any[] {
+    const remainingEstimatedDays: NonNullable<any[]> = Object.keys(avg)
+      .map(l => {
+        const openedItem = openedPerPipeline.find(
+          (opp: IOpenedPerPipeline) => opp.pipeline === l
+        )
+        return this.isPipelineBetweenFromTo(l)
+          ? {
+              pipeline: l,
+              durationAverage: avg[l].data.durationAverage,
+              count: openedItem?.opened || 0
+            }
+          : null
+      })
+      .filter(r => !!r)
+    const tot = remainingEstimatedDays.reduce(
+      (res0: number, item: any) => res0 + item.durationAverage,
+      0
+    )
+    for (const item of remainingEstimatedDays) {
+      item.durationAveragePerc = item.durationAverage / tot
+    }
+    const sum = this.getTotalMsAverageFromPipelineToPipelineConfig(avg)
+    let percSum = 0
+    let countTotal = 0
+    let remainingTotal = 0
+    for (let i = remainingEstimatedDays.length - 1; i >= 0; --i) {
+      const iItem = remainingEstimatedDays[i]
+      countTotal += iItem.count
+
+      iItem.durationAveragePercSum =
+        this.getTotalMsAverageFromPipelineToPipelineStr(
+          avg,
+          iItem.pipeline,
+          this._config.toPipeline || this._pipelines[this._pipelines.length - 1]
+        ) / sum
+
+      percSum += iItem.durationAveragePerc
+
+      iItem.estimatedRemainingDays = Number(
+        (iItem.durationAveragePercSum * stats.average * iItem.count).toFixed(1)
+      )
+
+      remainingTotal += iItem.estimatedRemainingDays
+    }
+    remainingEstimatedDays.push({
+      pipeline: '',
+      durationAverage: '',
+      count: countTotal,
+      durationAveragePerc: percSum,
+      durationAveragePercSum: '',
+      estimatedRemainingDays: remainingTotal.toFixed(1)
+    } as any)
+
+    return remainingEstimatedDays
   }
 }
