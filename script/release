@@ -49,6 +49,11 @@ else
 	exit 1
 fi
 
+sed -E "s|version\": \"[^\"]+|version\": \"$new_tag|" package.json > package_bk.json
+mv package_bk.json package.json
+git add package.json
+git commit -m "update version"
+
 # Tag the new release
 git tag -a "$new_tag" -m "$new_tag Release"
 echo -e "${GREEN}Tagged: $new_tag${OFF}"
