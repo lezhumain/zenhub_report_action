@@ -51090,9 +51090,7 @@ exports["default"] = _default;
 const axios = __nccwpck_require__(8757)
 
 // GitHub repository owner and name
-const owner = 'whitespace-software'
 const repo = 'BrowserPuppeteerTests'
-const apiKey = process.env.GH_API_KEY
 
 const callGithubAPIByURL = async apiUrl => {
   return new Promise((resolve, reject) => {
@@ -51100,7 +51098,7 @@ const callGithubAPIByURL = async apiUrl => {
     axios
       .get(apiUrl, {
         headers: {
-          Authorization: `token ${apiKey}`
+          Authorization: `token ${process.env.GH_API_KEY}`
         }
       })
       .then(response => {
@@ -51115,9 +51113,10 @@ const callGithubAPIByURL = async apiUrl => {
 const callGithubAPIByEndpoint = async (endpoint, repoId) => {
   // GitHub API endpoint for pull requests
   if (!endpoint.startsWith('/')) {
-    endpoint = '/' + endpoint
+    endpoint = `/${endpoint}`
   }
-  const url = `https://api.github.com/repos/${owner}/${repoId}` + endpoint // pulls
+  const owner = 'whitespace-software'
+  const url = `https://api.github.com/repos/${owner}/${repoId}${endpoint}` // pulls
   return callGithubAPIByURL(url)
 }
 
@@ -51155,7 +51154,7 @@ async function getPContributorsData(repoId) {
     const res = Object.assign({}, e)
 
     if (!Array.isArray(res.data) && Object.keys(res.data).length > 0) {
-      throw new Error('Unknown data:\n' + JSON.stringify(res.data))
+      throw new Error(`Unknown data:\n${JSON.stringify(res.data)}`)
     }
 
     Array.isArray(res.data)
@@ -52019,6 +52018,8 @@ class Program {
                 id
               }
             }
+            createdAt
+            pullRequest
           }
         }`;
     _bubbleBaseWith = 10;
@@ -52121,7 +52122,17 @@ class Program {
                 return [];
             }));
         events.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        const move_events = events.filter((e) => e.type === 'issue.change_pipeline');
+        const move_events0 = events.filter((e) => e.type === 'issue.change_pipeline');
+        const createdEventArr = [];
+        if (move_events0.length > 0) {
+            const created_event = Object.assign({}, move_events0[0]);
+            created_event.createdAt = issueObj.createdAt.toISOString();
+            delete created_event.data.github_user;
+            created_event.data.to_pipeline = created_event.data.from_pipeline;
+            // delete created_event.data.from_pipeline
+            createdEventArr.push(created_event);
+        }
+        const move_events = createdEventArr.concat(move_events0);
         // console.log(move_events);
         const filteredEvents = [];
         for (const event of move_events) {
@@ -52199,6 +52210,7 @@ class Program {
             avgObj[pipelineKey].data.durationAverage = Number((avgObj[pipelineKey].data.duration / avgObj[pipelineKey].data.count).toFixed(0));
             avgObj[pipelineKey].data.durationAverageString =
                 models_1.Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.durationAverage);
+            avgObj[pipelineKey].data.durationDays = models_1.Utils.getMsAsDays(avgObj[pipelineKey].data.duration);
         }
         return avgObj;
     }
@@ -52352,7 +52364,8 @@ class Program {
                     releases: ee.releases?.nodes?.map((n) => n.title) || undefined,
                     events: ee.events,
                     pullRequest: !!ee.pullRequest,
-                    htmlUrl: ee.htmlUrl
+                    htmlUrl: ee.htmlUrl,
+                    createdAt: new Date(ee.createdAt)
                 };
                 return o;
             });
@@ -52615,13 +52628,6 @@ fragment currentWorkspace on Workspace {
             // avg[pipeline].openedIssueCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length
         }
         const openedPipelines = Array.from(new Set(remainingOpenedIssues.map(r => r.pipelineName)));
-        const openedPerPipeline = openedPipelines.map((pipeline) => {
-            return {
-                pipeline,
-                opened: remainingOpenedIssues.filter(r => r.pipelineName === pipeline)
-                    .length
-            };
-        });
         // const remainingPerPipeline = Object.keys(avg).map((pipeline: string) => {
         // 	return {
         // 		pipeline,
@@ -52701,6 +52707,7 @@ fragment currentWorkspace on Workspace {
         console.log(chartData);
         const completinList = chartData.map(c => Number(c.completionTimeStr));
         const stats = models_1.StatHelper.getStats(completinList);
+        const openedPerPipeline = this.getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats);
         // const chartWithEstimate: IControlChartItem[] = chartData.filter((cd: IControlChartItem) => cd.estimate > 0);
         // const completinListEstimate: number[] = chartWithEstimate.map((c: IControlChartItem) => Number(c.completionTimeStr));
         // const completionTot: number = completinListEstimate.reduce((res: number, item: number) => res + item, 0);
@@ -52714,8 +52721,10 @@ fragment currentWorkspace on Workspace {
         // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
         const outs = this.findOutstandingIssues(allEvs).slice(0, 5);
         // console.log(JSON.stringify(outs, null, 2));
-        const stuff = board.pipelinesConnection.map((pc) => pc.issues.map((pci) => pci.repository.name));
-        const repos = Array.from(new Set([].concat(...stuff)));
+        const allRepos = issues
+            .filter((ii) => ii.handled)
+            .map((ii) => ii.htmlUrl.split('/')[4]);
+        const repos = Array.from(new Set([].concat(...allRepos)));
         // const allD: ICheckPr[] = await Promise.all(
         // 	repos.map(repo => {
         // 		return reviewer_call.check_prs(repo, this._config).catch((err: Error) => {
@@ -52753,6 +52762,13 @@ fragment currentWorkspace on Workspace {
             return clone;
         });
         this.generateHTML(outs);
+        const remainingEstimatedDays = this.getRemainingEstimatedDays(avg, openedPerPipeline, stats);
+        const openedPerPipeline0 = remainingEstimatedDays.slice(0, -1).map((e) => {
+            return {
+                pipeline: e.pipeline,
+                opened: e.count
+            };
+        });
         try {
             this.addStatsHTML(stats, statsEstimate, veloccity);
             this.addControlChartListHTML(chartData);
@@ -52784,7 +52800,7 @@ fragment currentWorkspace on Workspace {
             `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
             `<section>
           <h3>Cool stats</h3>
-              ${this.getStatsHTML(stats, statsEstimate, veloccity)}
+              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
           </section>` +
             `<section>
             <h3>Control chart list</h3>
@@ -52846,9 +52862,9 @@ fragment currentWorkspace on Workspace {
         </section>` +
             `<section>
             <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(openedPerPipeline, undefined, '25%')}
+            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
             <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline, 100).catch(e => {
+                ${await this.getOpenedChartHTML(openedPerPipeline0, 100).catch(e => {
                 if (!e.message.includes("Cannot find module 'canvas'")) {
                     throw e;
                 }
@@ -53263,7 +53279,7 @@ fragment currentWorkspace on Workspace {
         });
         return result;
     }
-    getStatsHTML(stats, statsEstimate, veloccity) {
+    getStatsHTML(stats, statsEstimate, veloccity, remainingDays) {
         return `<table class="table table-striped-columns" style="width: 25%">
 			<thead></thead>
 			<tbody>
@@ -53290,6 +53306,10 @@ fragment currentWorkspace on Workspace {
 				<tr>
 					<td>Median day per estimate: </td>
 					<td>${statsEstimate.median}</td>
+				</tr>
+				<tr>
+					<td>Estimated remaining days: </td>
+					<td>${remainingDays || ''}</td>
 				</tr>
 			</tbody>
 		</table>`;
@@ -53402,6 +53422,132 @@ fragment currentWorkspace on Workspace {
             return strings;
         }
         return [target].concat(strings.filter(s => s !== target));
+    }
+    getSumPerc(avg, daysSum, pipelineIndex, toPipelineIndex) {
+        if (daysSum === 0) {
+            return 0;
+        }
+        let days = 0;
+        for (let pipelineI = pipelineIndex; pipelineI < toPipelineIndex; ++pipelineI) {
+            const currentPipeline = this._pipelines[pipelineI];
+            const vals = avg[currentPipeline];
+            if (vals) {
+                console.log(`1 - Adding pipeline ${currentPipeline}`);
+                days += vals.data.durationAverage;
+            }
+            else {
+                console.log(`2 - Adding pipeline ${currentPipeline}`);
+            }
+        }
+        return days / daysSum;
+    }
+    getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats) {
+        const fromPipelineIndex = this._pipelines.indexOf(this._config.fromPipeline);
+        const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline);
+        const totalMsAverageFromPipelineToPipeline = this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
+        console.log('');
+        let openedTotals = 0;
+        let estimatedDays = 0;
+        const openedPerPipeline = openedPipelines
+            .map((pipeline) => {
+            const currentFromPipelineIndex = this._pipelines.indexOf(pipeline);
+            const estimatedMsAvg = this.getSumPerc(avg, totalMsAverageFromPipelineToPipeline, currentFromPipelineIndex, toPipelineIndex);
+            const openedCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length;
+            const estimatedCompletionDaysVal = openedCount * estimatedMsAvg * stats.average;
+            const estimatedCompletionDays = Number(estimatedCompletionDaysVal.toFixed(2));
+            openedTotals += openedCount;
+            estimatedDays += estimatedCompletionDaysVal;
+            return {
+                pipeline,
+                opened: openedCount,
+                estimatedCompletionDays
+            };
+        })
+            .concat([
+            {
+                pipeline: '',
+                opened: openedTotals,
+                estimatedCompletionDays: Number(estimatedDays.toFixed(2))
+            }
+        ]);
+        return openedPerPipeline;
+    }
+    /**
+     * Gets total ms needed to go from pipeline to pipeline
+     * @param avg
+     * @param fromPipelineIndex
+     * @param toPipelineIndex
+     * @protected
+     */
+    getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex) {
+        return Object.keys(avg).reduce((res, ke) => {
+            const currentIndex = this._pipelines.indexOf(ke);
+            if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
+                console.log(`Adding pipeline ${ke}`);
+                res += avg[ke].data.durationAverage;
+            }
+            return res;
+        }, 0);
+    }
+    getTotalMsAverageFromPipelineToPipelineStr(avg, fromPipeline, toPipeline) {
+        const fromPipelineIndex = this._pipelines.indexOf(fromPipeline);
+        const toPipelineIndex = this._pipelines.indexOf(toPipeline);
+        return this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
+    }
+    getTotalMsAverageFromPipelineToPipelineConfig(avg) {
+        const fromPipelineIndex = this._config.fromPipeline
+            ? this._pipelines.indexOf(this._config.fromPipeline)
+            : 0;
+        const toPipelineIndex = this._config.toPipeline
+            ? this._pipelines.indexOf(this._config.toPipeline)
+            : this._pipelines.length - 1;
+        return this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
+    }
+    isPipelineBetweenFromTo(l) {
+        const fromPipeline = this._config.fromPipeline || this._pipelines[0];
+        const toPipeline = this._config.toPipeline || this._pipelines[this._pipelines.length - 1];
+        return (this.comparePipelines(l, fromPipeline) >= 0 &&
+            this.comparePipelines(l, toPipeline) < 0);
+    }
+    getRemainingEstimatedDays(avg, openedPerPipeline, stats) {
+        const remainingEstimatedDays = Object.keys(avg)
+            .map(l => {
+            const openedItem = openedPerPipeline.find((opp) => opp.pipeline === l);
+            return this.isPipelineBetweenFromTo(l)
+                ? {
+                    pipeline: l,
+                    durationAverage: avg[l].data.durationAverage,
+                    count: openedItem?.opened || 0
+                }
+                : null;
+        })
+            .filter(r => !!r);
+        const tot = remainingEstimatedDays.reduce((res0, item) => res0 + item.durationAverage, 0);
+        for (const item of remainingEstimatedDays) {
+            item.durationAveragePerc = item.durationAverage / tot;
+        }
+        const sum = this.getTotalMsAverageFromPipelineToPipelineConfig(avg);
+        let percSum = 0;
+        let countTotal = 0;
+        let remainingTotal = 0;
+        for (let i = remainingEstimatedDays.length - 1; i >= 0; --i) {
+            const iItem = remainingEstimatedDays[i];
+            countTotal += iItem.count;
+            iItem.durationAveragePercSum =
+                this.getTotalMsAverageFromPipelineToPipelineStr(avg, iItem.pipeline, this._config.toPipeline || this._pipelines[this._pipelines.length - 1]) / sum;
+            percSum += iItem.durationAveragePerc;
+            iItem.estimatedRemainingDays = Number((iItem.durationAveragePercSum * stats.average * iItem.count).toFixed(1));
+            remainingTotal += iItem.estimatedRemainingDays;
+        }
+        remainingEstimatedDays.push({
+            pipeline: '',
+            durationAverage: '',
+            count: countTotal,
+            durationAveragePerc: percSum,
+            durationAveragePercSum: '',
+            estimatedRemainingDays: remainingTotal.toFixed(1)
+        });
+        return remainingEstimatedDays;
     }
 }
 exports.Program = Program;

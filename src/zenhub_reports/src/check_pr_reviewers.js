@@ -2,9 +2,7 @@
 const axios = require('axios')
 
 // GitHub repository owner and name
-const owner = 'whitespace-software'
 const repo = 'BrowserPuppeteerTests'
-const apiKey = process.env.GH_API_KEY
 
 const callGithubAPIByURL = async apiUrl => {
   return new Promise((resolve, reject) => {
@@ -12,7 +10,7 @@ const callGithubAPIByURL = async apiUrl => {
     axios
       .get(apiUrl, {
         headers: {
-          Authorization: `token ${apiKey}`
+          Authorization: `token ${process.env.GH_API_KEY}`
         }
       })
       .then(response => {
@@ -27,9 +25,10 @@ const callGithubAPIByURL = async apiUrl => {
 const callGithubAPIByEndpoint = async (endpoint, repoId) => {
   // GitHub API endpoint for pull requests
   if (!endpoint.startsWith('/')) {
-    endpoint = '/' + endpoint
+    endpoint = `/${endpoint}`
   }
-  const url = `https://api.github.com/repos/${owner}/${repoId}` + endpoint // pulls
+  const owner = 'whitespace-software'
+  const url = `https://api.github.com/repos/${owner}/${repoId}${endpoint}` // pulls
   return callGithubAPIByURL(url)
 }
 
@@ -67,7 +66,7 @@ async function getPContributorsData(repoId) {
     const res = Object.assign({}, e)
 
     if (!Array.isArray(res.data) && Object.keys(res.data).length > 0) {
-      throw new Error('Unknown data:\n' + JSON.stringify(res.data))
+      throw new Error(`Unknown data:\n${JSON.stringify(res.data)}`)
     }
 
     Array.isArray(res.data)

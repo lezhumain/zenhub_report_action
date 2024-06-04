@@ -1,44 +1,16 @@
-import { IMainConfig, Program } from './zenhub_call'
+import { Program } from './zenhub_call'
 import { IssueFilter } from './filters'
+import { IMainConfig, mainConfig } from './main_conf'
 
 const current = new Date(new Date().toDateString())
 const minus1month = new Date(current)
 minus1month.setMonth(minus1month.getMonth() - 3)
 
-const config0: IMainConfig = {
-  // workspaceId: process.env.WORKSPACE_ID || '5e3018c2d1715f5725d0b8c7',
-  // includeRepos: process.env.REPO_ID ? [Number(process.env.REPO_ID)] : [],
-  workspaceId: process.env.WORKSPACE_ID!,
-  includeRepos: [Number(process.env.REPO_ID)],
-  outputJsonFilename: 'output/allEvs.json',
-  outputImageFilename: `output/output_average.png`,
-  minDate: minus1month.toISOString(),
-  maxDate: current.toISOString(),
-  labels: ['regression'],
-  skipRepos: [],
-  issuesToSkip: [],
-  fromPipeline: 'Backlog',
-  toPipeline: 'Awaiting TESS Review',
-  maxCount: 5,
-  release: ''
-}
-
-// TODO: fix PR and commits data
-// const config: IMainConfig = {
-// 	workspaceId: "582ffb92abc60d5d34359ef4",
-// 	outputJsonFilename: "output/allEvs.json",
-// 	outputImageFilename: `output/output_average.png`,
-// 	minDate: undefined,
-// 	maxDate: undefined,
-// 	labels: [],
-// 	skipRepos: [],
-// 	includeRepos: [],
-// 	issuesToSkip: [],
-// 	fromPipeline: undefined,
-// 	toPipeline: "Awaiting PRODUCTION Release",
-// 	maxCount: 5,
-// 	release: "2.19"
-// }
+export const config0: IMainConfig = Object.assign({}, mainConfig)
+config0.workspaceId = process.env.WORKSPACE_ID!
+config0.includeRepos = [Number(process.env.REPO_ID)]
+config0.minDate = minus1month.toISOString()
+config0.maxDate = current.toISOString()
 
 const args = process.argv.slice(2)
 const argConfig: Partial<IMainConfig> = {
