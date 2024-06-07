@@ -51177,7 +51177,7 @@ async function main(
 ) {
   let prsResponse
   try {
-    prsResponse = await callGithubAPIByEndpoint('pulls', repoId)
+    prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId)
   } catch (e) {
     throw e
   }
@@ -51191,7 +51191,8 @@ async function main(
   const maxEpoch = new Date(config.maxDate).getTime()
 
   const summary = []
-  for (const pr of openedPrs) {
+  // for (const pr of openedPrs) {
+  for (const pr of prs) {
     try {
       const created = new Date(pr.created_at).getTime()
       if (created < minEpoch || created > maxEpoch) {
@@ -53071,7 +53072,7 @@ fragment currentWorkspace on Workspace {
             return `${delim}${delim}${delim}${newObj.completionTime}${delim}${newObj.completionTimeStr}${delim}${newObj.estimate}\n`;
         });
         const csvOutstanding = this.toCSV(report.outstandingItems, false, 'Outstanding issues');
-        const velocityList = this.toCSV(report.velocity.data, false, 'Velocity List', (delim) => {
+        const velocityList = this.toCSV(report.velocity.data, false, '', (delim) => {
             const newObj = Object.assign({}, reportVelocityList[0]);
             delete newObj.key;
             newObj.estimate = Number((reportVelocityList.reduce((res, item) => res + item.estimate, 0) / reportVelocityList.length).toFixed(2));
