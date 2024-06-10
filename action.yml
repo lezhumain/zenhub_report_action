@@ -27,6 +27,12 @@ inputs:
   TO_DATE:
     description: 'End date'
     required: false
+  RELEASE:
+    description: 'Target release'
+    required: false
+  LABEL:
+    description: 'Target label'
+    required: false
 
 # Define your outputs here.
 outputs:
