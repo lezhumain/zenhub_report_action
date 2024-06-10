@@ -89,7 +89,7 @@ async function main(
 ) {
   let prsResponse
   try {
-    prsResponse = await callGithubAPIByEndpoint('pulls', repoId)
+    prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId)
   } catch (e) {
     throw e
   }
@@ -103,7 +103,8 @@ async function main(
   const maxEpoch = new Date(config.maxDate).getTime()
 
   const summary = []
-  for (const pr of openedPrs) {
+  // for (const pr of openedPrs) {
+  for (const pr of prs) {
     try {
       const created = new Date(pr.created_at).getTime()
       if (created < minEpoch || created > maxEpoch) {

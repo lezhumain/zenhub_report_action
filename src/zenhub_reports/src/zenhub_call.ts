@@ -1713,7 +1713,7 @@ fragment currentWorkspace on Workspace {
     const velocityList = this.toCSV(
       report.velocity.data,
       false,
-      'Velocity List',
+      '',
       (delim: string) => {
         const newObj: IVelocityItem = Object.assign({}, reportVelocityList[0])
         delete newObj.key
