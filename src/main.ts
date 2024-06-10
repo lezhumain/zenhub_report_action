@@ -53,7 +53,7 @@ class Main implements IMain {
 
       // minDate: '2024-04-18',
       // maxDate: '2024-05-18',
-      labels: ['regression'],
+      labels: [core.getInput('LABEL') || 'regression'],
       // skipRepos: [93615076],
       // includeRepos: [232779486, 409231566],
       issuesToSkip: [],
@@ -61,7 +61,7 @@ class Main implements IMain {
       toPipeline: core.getInput('TO_PIPELINE'),
 
       maxCount: 5,
-      release: ''
+      release: core.getInput('RELEASE') || ''
     }
   }
 
