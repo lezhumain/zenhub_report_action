@@ -51812,13 +51812,16 @@ class Utils {
     }
     static addDay(firstDayOfMonth, number) {
         const epoch = firstDayOfMonth.getTime();
-        return new Date(epoch + number * 24 * 60 * 60 * 1000);
+        return new Date(epoch + Utils.getDaysAsMs(number));
     }
-    static getMsAsDays(duration) {
-        return duration / 1000 / 60 / 60 / 24;
+    static getMsAsDays(ms) {
+        const trunced = Math.trunc(ms);
+        const sigDigits = trunced.toString().length;
+        const res = ms / 1000 / 60 / 60 / 24;
+        return Number(res.toPrecision(sigDigits));
     }
-    static getDaysAsMs(duration) {
-        return duration * 1000 * 60 * 60 * 24;
+    static getDaysAsMs(days) {
+        return days * 1000 * 60 * 60 * 24;
     }
     static htmlToMarkdown(fullHTML) {
         const mark = node_html_markdown_1.NodeHtmlMarkdown.translate(
@@ -51833,12 +51836,7 @@ class Utils {
         return hexRegex.test(str);
     }
     static issueNumberAsNumber(issueNumber) {
-        try {
-            return Number(issueNumber.replace('#', ''));
-        }
-        catch (e) {
-            return -1;
-        }
+        return Number(issueNumber.replace('#', ''));
     }
     static issueNumberAsString(issueNumber) {
         return `#${issueNumber.toFixed(0)}`;
