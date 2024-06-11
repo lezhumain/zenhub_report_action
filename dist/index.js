@@ -53087,7 +53087,7 @@ fragment currentWorkspace on Workspace {
             return clone;
         });
         report.userReviewStats = userReviewStatsAnon;
-        const csvPrAndCommits = this.toCSV(userReviewStatsAnon, false, 'PR and commit stats');
+        const csvPrAndCommits = this.toCSV(userReviewStatsAnon, false);
         return {
             csvChart,
             csvOutstanding,
