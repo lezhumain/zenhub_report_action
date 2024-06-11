@@ -1755,11 +1755,7 @@ fragment currentWorkspace on Workspace {
       }
     )
     report.userReviewStats = userReviewStatsAnon as any
-    const csvPrAndCommits = this.toCSV(
-      userReviewStatsAnon,
-      false,
-      'PR and commit stats'
-    )
+    const csvPrAndCommits = this.toCSV(userReviewStatsAnon, false)
 
     return {
       csvChart,

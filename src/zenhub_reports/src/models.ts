@@ -105,15 +105,19 @@ export class Utils {
 
   static addDay(firstDayOfMonth: Date, number: number): Date {
     const epoch = firstDayOfMonth.getTime()
-    return new Date(epoch + number * 24 * 60 * 60 * 1000)
+    return new Date(epoch + Utils.getDaysAsMs(number))
   }
 
-  static getMsAsDays(duration: number): number {
-    return duration / 1000 / 60 / 60 / 24
+  static getMsAsDays(ms: number): number {
+    const trunced: number = Math.trunc(ms)
+    const sigDigits: number = trunced.toString().length
+    const res = ms / 1000 / 60 / 60 / 24
+
+    return Number(res.toPrecision(sigDigits))
   }
 
-  static getDaysAsMs(duration: number): number {
-    return duration * 1000 * 60 * 60 * 24
+  static getDaysAsMs(days: number): number {
+    return days * 1000 * 60 * 60 * 24
   }
 
   static htmlToMarkdown(fullHTML: string): string {
@@ -132,11 +136,7 @@ export class Utils {
   }
 
   static issueNumberAsNumber(issueNumber: string): number {
-    try {
-      return Number(issueNumber.replace('#', ''))
-    } catch (e) {
-      return -1
-    }
+    return Number(issueNumber.replace('#', ''))
   }
 
   static issueNumberAsString(issueNumber: number): string {

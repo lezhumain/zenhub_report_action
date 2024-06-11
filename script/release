@@ -54,6 +54,8 @@ sed -E "s/version\": \"[^\"]+/version\": \"$(echo "$new_tag" | sed 's|v||')/" pa
 mv package.json.tmp package.json
 git add package.json
 git commit -m "new version"
+git push
+echo "Updated version in package.json"
 
 # Tag the new release
 git tag -a "$new_tag" -m "$new_tag Release"
