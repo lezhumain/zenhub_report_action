@@ -47,8 +47,8 @@ interface ICSVItem {
 }
 
 export interface IAVGItem {
-  movedBackTo: number;
-  movedTo: number;
+  movedBackTo: number
+  movedTo: number
   data: IAVGData
   issueCount: number
   openedIssueCount: number // FIXME should be the same as issueCount ?
