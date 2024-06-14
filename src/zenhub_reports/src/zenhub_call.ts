@@ -47,6 +47,8 @@ interface ICSVItem {
 }
 
 export interface IAVGItem {
+  movedBackTo: number;
+  movedTo: number;
   data: IAVGData
   issueCount: number
   openedIssueCount: number // FIXME should be the same as issueCount ?
@@ -437,7 +439,7 @@ export class Program {
     })
   }
 
-  private getAverages(allEvs: ICSVItem[]): IAVGItemMap {
+  private getAverages(allEvs: ICSVItem[], openedIssues: IIssue[]): IAVGItemMap {
     const avgObj: IAVGItemMap = {}
     for (const ev of allEvs) {
       if (!avgObj[ev.pipeline]) {
@@ -450,8 +452,45 @@ export class Program {
             durationString: '',
             durationAverageString: ''
           },
-          issueCount: 0, // will be done at the end
-          openedIssueCount: 0
+          // will be done at the end
+          issueCount: 0,
+          openedIssueCount: 0,
+          movedTo: 0,
+          movedBackTo: 0
+        }
+
+        if (ev.pipeline !== this._config.fromPipeline) {
+          const ossues: IIssue[] = openedIssues.filter(
+            (oi: IIssue) =>
+              oi.pipelineName === ev.pipeline && (oi.events?.length || 0) > 2
+          )
+          if (ossues.length > 0) {
+            const backAndForth: { back: number; forth: number } = ossues.reduce(
+              (res: { back: number; forth: number }, item: IIssue) => {
+                const itemEvents: IGhEvent[] = item.events?.slice() || []
+                const movedToEvs: IGhEvent[] = [
+                  itemEvents[itemEvents.length - 1]
+                ].filter(er => er.data.to_pipeline.name === ev.pipeline)
+
+                if (movedToEvs.length > 0 && movedToEvs[0].data.from_pipeline) {
+                  if (
+                    this.comparePipelines(
+                      movedToEvs[0].data.to_pipeline,
+                      movedToEvs[0].data.from_pipeline
+                    )
+                  ) {
+                    res.back++
+                  } else {
+                    res.forth++
+                  }
+                }
+                return res
+              },
+              { back: 0, forth: 0 }
+            )
+            avgObj[ev.pipeline].movedTo = backAndForth.forth
+            avgObj[ev.pipeline].movedBackTo = backAndForth.back
+          }
         }
       } else {
         avgObj[ev.pipeline].data.count++
@@ -1067,7 +1106,10 @@ fragment currentWorkspace on Workspace {
     )
 
     // @ts-ignore
-    const avg: IAVGItemMap = this.getAverages([].concat(...allEvs))
+    const avg: IAVGItemMap = this.getAverages(
+      [].concat(...(allEvs as any)),
+      remainingOpenedIssues
+    )
     for (const pipeline of Object.keys(avg)) {
       // TODO use all pipelines
       avg[pipeline].issueCount = issues.filter(
@@ -1079,13 +1121,6 @@ fragment currentWorkspace on Workspace {
     const openedPipelines = Array.from(
       new Set(remainingOpenedIssues.map(r => r.pipelineName))
     )
-
-    // const remainingPerPipeline = Object.keys(avg).map((pipeline: string) => {
-    // 	return {
-    // 		pipeline,
-    // 		remsiningCount: avg[pipeline].openedIssueCount
-    // 	}
-    // });
 
     fs.writeFileSync(
       this._config.outputJsonFilename.replace('.json', '_averages.json'),
@@ -2368,7 +2403,9 @@ fragment currentWorkspace on Workspace {
           ? {
               pipeline: l,
               durationAverage: avg[l].data.durationAverage,
-              count: openedItem?.opened || 0
+              count: openedItem?.opened || 0,
+              movedTo: avg[l].movedTo,
+              movedBackTo: avg[l].movedBackTo
             }
           : null
       })
