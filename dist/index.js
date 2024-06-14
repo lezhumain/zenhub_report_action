@@ -52181,7 +52181,7 @@ class Program {
             events: move_events
         });
     }
-    getAverages(allEvs) {
+    getAverages(allEvs, openedIssues) {
         const avgObj = {};
         for (const ev of allEvs) {
             if (!avgObj[ev.pipeline]) {
@@ -52194,9 +52194,34 @@ class Program {
                         durationString: '',
                         durationAverageString: ''
                     },
-                    issueCount: 0, // will be done at the end
-                    openedIssueCount: 0
+                    // will be done at the end
+                    issueCount: 0,
+                    openedIssueCount: 0,
+                    movedTo: 0,
+                    movedBackTo: 0
                 };
+                if (ev.pipeline !== this._config.fromPipeline) {
+                    const ossues = openedIssues.filter((oi) => oi.pipelineName === ev.pipeline && (oi.events?.length || 0) > 2);
+                    if (ossues.length > 0) {
+                        const backAndForth = ossues.reduce((res, item) => {
+                            const itemEvents = item.events?.slice() || [];
+                            const movedToEvs = [
+                                itemEvents[itemEvents.length - 1]
+                            ].filter(er => er.data.to_pipeline.name === ev.pipeline);
+                            if (movedToEvs.length > 0 && movedToEvs[0].data.from_pipeline) {
+                                if (this.comparePipelines(movedToEvs[0].data.to_pipeline, movedToEvs[0].data.from_pipeline)) {
+                                    res.back++;
+                                }
+                                else {
+                                    res.forth++;
+                                }
+                            }
+                            return res;
+                        }, { back: 0, forth: 0 });
+                        avgObj[ev.pipeline].movedTo = backAndForth.forth;
+                        avgObj[ev.pipeline].movedBackTo = backAndForth.back;
+                    }
+                }
             }
             else {
                 avgObj[ev.pipeline].data.count++;
@@ -52620,19 +52645,13 @@ fragment currentWorkspace on Workspace {
         // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
         const remainingOpenedIssues = issues.filter(iu => !iu.completed && !iu.filtered);
         // @ts-ignore
-        const avg = this.getAverages([].concat(...allEvs));
+        const avg = this.getAverages([].concat(...allEvs), remainingOpenedIssues);
         for (const pipeline of Object.keys(avg)) {
             // TODO use all pipelines
             avg[pipeline].issueCount = issues.filter(is => is.pipelineName === pipeline && !is.filtered).length;
             // avg[pipeline].openedIssueCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length
         }
         const openedPipelines = Array.from(new Set(remainingOpenedIssues.map(r => r.pipelineName)));
-        // const remainingPerPipeline = Object.keys(avg).map((pipeline: string) => {
-        // 	return {
-        // 		pipeline,
-        // 		remsiningCount: avg[pipeline].openedIssueCount
-        // 	}
-        // });
         fs.writeFileSync(this._config.outputJsonFilename.replace('.json', '_averages.json'), JSON.stringify(avg, null, 2), { encoding: 'utf8' });
         const evs = Object.keys(avg).map((pipeline) => {
             const avgPipeline = avg[pipeline];
@@ -53516,7 +53535,9 @@ fragment currentWorkspace on Workspace {
                 ? {
                     pipeline: l,
                     durationAverage: avg[l].data.durationAverage,
-                    count: openedItem?.opened || 0
+                    count: openedItem?.opened || 0,
+                    movedTo: avg[l].movedTo,
+                    movedBackTo: avg[l].movedBackTo
                 }
                 : null;
         })
