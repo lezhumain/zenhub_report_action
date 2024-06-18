@@ -52555,6 +52555,12 @@ fragment currentWorkspace on Workspace {
         }
         return count;
     }
+    /**
+     * Positive if firstFrom is higher than fromPipeline
+     * @param firstFrom
+     * @param fromPipeline
+     * @private
+     */
     comparePipelines(firstFrom, fromPipeline) {
         // return firstFrom === fromPipeline;
         return (this._pipelines.indexOf(firstFrom) - this._pipelines.indexOf(fromPipeline));
@@ -52644,6 +52650,48 @@ fragment currentWorkspace on Workspace {
         }
         // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
         const remainingOpenedIssues = issues.filter(iu => !iu.completed && !iu.filtered);
+        const userMoves = [];
+        // for (const iss of remainingOpenedIssues) {
+        for (const iss of issues.filter(iii => iii.handled)) {
+            // TODO
+            const events = this._eventsPerIssue[iss.number];
+            const last = events ? events[events.length - 1] : undefined;
+            const user = last?.data.github_user?.login;
+            if (!last || !user) {
+                continue;
+            }
+            const pipelineCompare = this.comparePipelines(iss.pipelineName, last.data.from_pipeline.name);
+            if (pipelineCompare === 0) {
+                continue;
+            }
+            userMoves.push({
+                user,
+                currentPipeline: iss.pipelineName,
+                previousPipeline: last.data.from_pipeline.name,
+                issueNumber: iss.number,
+                isForward: pipelineCompare > 0,
+                date: last.createdAt
+            });
+            // iss.lastEventData = last.createdAt
+            // iss.previousPipeline = last.data.from_pipeline.name
+            // iss.isForward = pipelineCompare < 0
+            // iss.user = user
+        }
+        const movesUsers = Array.from(new Set(userMoves.map(um => um.user)));
+        const movesAvgArr = [];
+        const movesAvg = movesUsers.reduce((res, item) => {
+            const objs = userMoves.filter(um => um.user === item);
+            const movedForward = objs.filter(oo => oo.isForward).length;
+            res[item] = {
+                movedForward,
+                movedBackward: objs.length - movedForward
+            };
+            movesAvgArr.push({
+                user: item,
+                ...res[item]
+            });
+            return res;
+        }, {});
         // @ts-ignore
         const avg = this.getAverages([].concat(...allEvs), remainingOpenedIssues);
         for (const pipeline of Object.keys(avg)) {
@@ -52769,7 +52817,8 @@ fragment currentWorkspace on Workspace {
             prList: newAllD.summary,
             // userReviewStats: d.users as IPrUser[]
             userReviewStats: newAllD.users,
-            remainingOpenedIssues
+            remainingOpenedIssues,
+            userMoves
         };
         const ccsv = this.generateAllCSV('', allResult);
         fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allResult, null, 2), { encoding: 'utf8' }); // done at the end
@@ -52889,6 +52938,14 @@ fragment currentWorkspace on Workspace {
                 console.warn(e.message);
             })}
             </div>
+        </section>` +
+            `<section>
+            <h3>Movements summary</h3>
+            ${this.generateTable(movesAvgArr, undefined)}
+        </section>` +
+            `<section>
+            <h3>Movements</h3>
+            ${this.generateTable(userMoves, undefined)}
         </section>`;
         this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
         const mark = `${models_1.Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
