@@ -1157,6 +1157,27 @@ fragment currentWorkspace on Workspace {
       // iss.user = user
     }
 
+    const movesUsers: string[] = Array.from(
+      new Set(userMoves.map(um => um.user))
+    )
+    const movesAvgArr: any[] = []
+    const movesAvg = movesUsers.reduce((res: any, item: string) => {
+      const objs = userMoves.filter(um => um.user === item)
+      const movedForward = objs.filter(oo => oo.isForward).length
+
+      res[item] = {
+        movedForward,
+        movedBackward: objs.length - movedForward
+      }
+
+      movesAvgArr.push({
+        user: item,
+        ...res[item]
+      })
+
+      return res
+    }, {})
+
     // @ts-ignore
     const avg: IAVGItemMap = this.getAverages(
       [].concat(...(allEvs as any)),
@@ -1485,6 +1506,10 @@ fragment currentWorkspace on Workspace {
                   }
                 )}
             </div>
+        </section>` +
+      `<section>
+            <h3>Movements summary</h3>
+            ${this.generateTable(movesAvgArr, undefined)}
         </section>` +
       `<section>
             <h3>Movements</h3>
