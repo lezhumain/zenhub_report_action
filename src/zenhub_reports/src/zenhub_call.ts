@@ -19,7 +19,8 @@ import {
   ICheckPr,
   ISummary,
   IPrUser,
-  IPrReviewStat
+  IPrReviewStat,
+  IOpenedIssue
 } from './models'
 import * as path from 'node:path'
 import { BubbleDataPoint } from 'chart.js'
@@ -98,6 +99,7 @@ interface IReport {
   prList: IPrSummary[]
   userReviewStats: IPrReviewStat[]
   remainingOpenedIssues: IIssue[]
+  userMoves: IUserMove[]
 }
 
 interface IPrSummary {
@@ -123,6 +125,15 @@ export interface IOpenedPerPipeline {
   pipeline: string
   opened: number
   estimatedCompletionDays: number
+}
+
+interface IUserMove {
+  user: string
+  issueNumber: string
+  currentPipeline: string
+  previousPipeline: string
+  isForward: boolean
+  date: string
 }
 
 export class Program {
@@ -968,6 +979,12 @@ fragment currentWorkspace on Workspace {
     return count
   }
 
+  /**
+   * Positive if firstFrom is higher than fromPipeline
+   * @param firstFrom
+   * @param fromPipeline
+   * @private
+   */
   private comparePipelines(firstFrom: string, fromPipeline: string): number {
     // return firstFrom === fromPipeline;
     return (
@@ -1101,9 +1118,44 @@ fragment currentWorkspace on Workspace {
     }
     // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
 
-    const remainingOpenedIssues: IIssue[] = issues.filter(
+    const remainingOpenedIssues: IOpenedIssue[] = issues.filter(
       iu => !iu.completed && !iu.filtered
-    )
+    ) as IOpenedIssue[]
+
+    const userMoves: IUserMove[] = []
+    // for (const iss of remainingOpenedIssues) {
+    for (const iss of issues.filter(iii => iii.handled)) {
+      // TODO
+      const events: IGhEvent[] | undefined = this._eventsPerIssue[iss.number]
+      const last = events ? events[events.length - 1] : undefined
+      const user = last?.data.github_user?.login
+      if (!last || !user) {
+        continue
+      }
+
+      const pipelineCompare = this.comparePipelines(
+        iss.pipelineName,
+        last.data.from_pipeline.name
+      )
+
+      if (pipelineCompare === 0) {
+        continue
+      }
+
+      userMoves.push({
+        user,
+        currentPipeline: iss.pipelineName,
+        previousPipeline: last.data.from_pipeline.name,
+        issueNumber: iss.number,
+        isForward: pipelineCompare > 0,
+        date: last.createdAt
+      } as IUserMove)
+
+      // iss.lastEventData = last.createdAt
+      // iss.previousPipeline = last.data.from_pipeline.name
+      // iss.isForward = pipelineCompare < 0
+      // iss.user = user
+    }
 
     // @ts-ignore
     const avg: IAVGItemMap = this.getAverages(
@@ -1289,7 +1341,8 @@ fragment currentWorkspace on Workspace {
       prList: newAllD.summary as IPrSummary[],
       // userReviewStats: d.users as IPrUser[]
       userReviewStats: newAllD.users as IPrReviewStat[],
-      remainingOpenedIssues
+      remainingOpenedIssues,
+      userMoves
     } as IReport
 
     const ccsv = this.generateAllCSV('', allResult)
@@ -1432,6 +1485,10 @@ fragment currentWorkspace on Workspace {
                   }
                 )}
             </div>
+        </section>` +
+      `<section>
+            <h3>Movements</h3>
+            ${this.generateTable(userMoves, undefined)}
         </section>`
 
     this.updateHTML(

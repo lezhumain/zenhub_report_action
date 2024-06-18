@@ -13,6 +13,13 @@ export interface IIssueEvent {
   createdAt: string
 }
 
+export interface IOpenedIssue extends IIssue {
+  user: string
+  previousPipeline: string
+  isForward: boolean
+  lastEventData: string
+}
+
 export interface IIssue {
   filtered?: boolean
   completed?: {
