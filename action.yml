@@ -14,7 +14,7 @@ inputs:
     required: true
   REPO_ID:
     description: 'Your github repo ID'
-    required: true
+    required: false
   FROM_PIPELINE:
     description: 'Zenhub start pipeline'
     required: true
