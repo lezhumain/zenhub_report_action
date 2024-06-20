@@ -51388,13 +51388,18 @@ class Main {
             maxDate: toDate.toISOString(),
             // labels: [],
             skipRepos: [],
-            includeRepos: repoId ? [Number(repoId)] : [],
+            includeRepos: repoId ? repoId.split(',').map(r => Number(r.trim())) : [],
             // issuesToSkip: [],
             // fromPipeline: 'Backlog',
             // toPipeline: 'Awaiting TESS Review',
             // minDate: '2024-04-18',
             // maxDate: '2024-05-18',
-            labels: [core.getInput('LABEL') || 'regression'],
+            labels: core.getInput('LABEL')
+                ? core
+                    .getInput('LABEL')
+                    .split(',')
+                    .map(r => r.trim())
+                : [],
             // skipRepos: [93615076],
             // includeRepos: [232779486, 409231566],
             issuesToSkip: [],
@@ -51977,6 +51982,7 @@ class Program {
     _configHash;
     _baseFilename = 'workspace';
     _file;
+    _estimatingCache = [];
     _config;
     get config() {
         return this._config;
@@ -52073,6 +52079,7 @@ class Program {
         this._file = this._config.inputJsonFilename
             ? this._config.inputJsonFilename
             : path.join(this._mainOutputFolder, `${this._baseFilename}_${this._configHash}.json`);
+        this._config.labels = this._config.labels?.map(l => l.toLowerCase());
         console.log(`Target file: ${this._file}`);
     }
     async generateChartFromObj(title, evs, fileName, param3) {
@@ -52115,7 +52122,10 @@ class Program {
     }
     async handleIssue(issueObj, skipEventIfFn, doGen = false, fromPipeline = 'New Issues', toPipeline = 'Awaiting TESS Review') {
         const issueNumber = issueObj.number;
-        const events = issueObj.events ||
+        const existing = issueObj.events && issueObj.events.length > 0
+            ? issueObj.events
+            : undefined;
+        const events = existing ||
             (await this.getEvents(issueObj.repositoryGhId, models_1.Utils.issueNumberAsNumber(issueNumber)).catch(err => {
                 this._errorMessages.push(err.message);
                 return [];
@@ -52960,8 +52970,14 @@ fragment currentWorkspace on Workspace {
         const elapsedMs = Date.now() - this._startTimestamp;
         const remainingCount = length - i;
         const timePerIssueMs = elapsedMs / (i + 1);
-        this._estimateRemainingPrveiousMs = this._estimateRemainingMs;
-        this._estimateRemainingMs = timePerIssueMs * remainingCount;
+        if (this._estimatingCache.length === 5) {
+            this._estimateRemainingPrveiousMs = this._estimateRemainingMs;
+            this._estimateRemainingMs = Math.trunc(this._estimatingCache.reduce((res, item) => res + item, 0) / this._estimatingCache.length);
+            this._estimatingCache = [];
+        }
+        else {
+            this._estimatingCache.push(timePerIssueMs * remainingCount);
+        }
         const strVal = this._estimateRemainingMs <= this._estimateRemainingPrveiousMs
             ? `${models_1.Utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
             : 'estimating...';
