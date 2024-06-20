@@ -8,7 +8,9 @@ minus1month.setMonth(minus1month.getMonth() - 3)
 
 export const config0: IMainConfig = Object.assign({}, mainConfig)
 config0.workspaceId = process.env.WORKSPACE_ID!
-config0.includeRepos = [Number(process.env.REPO_ID)]
+config0.includeRepos = process.env.REPO_ID
+  ? process.env.REPO_ID.split(',').map(r => Number(r.trim()))
+  : []
 config0.minDate = minus1month.toISOString()
 config0.maxDate = current.toISOString()
 
@@ -27,9 +29,10 @@ const argConfig: Partial<IMainConfig> = {
   release: args[10] || undefined
 }
 
-if (args.length > 0) {
-  Object.assign(config0, argConfig) // source's `undefined` properties will not be skipped, need to delete
-}
+// if (args.length > 0) {
+//   Object.assign(config0, argConfig) // source's `undefined` properties will not be skipped, need to delete
+// }
+Object.assign(config0, argConfig) // source's `undefined` properties will not be skipped, need to delete
 
 const program = new Program(config0)
 const mainFilter = new IssueFilter(program.config)
