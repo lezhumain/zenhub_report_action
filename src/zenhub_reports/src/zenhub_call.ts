@@ -141,6 +141,7 @@ export class Program {
   private readonly _configHash: string
   private readonly _baseFilename = 'workspace'
   private readonly _file: string
+  private _estimatingCache: number[] = []
 
   protected _config: IMainConfig
   get config(): IMainConfig {
@@ -265,6 +266,9 @@ export class Program {
           this._mainOutputFolder,
           `${this._baseFilename}_${this._configHash}.json`
         )
+
+    this._config.labels = this._config.labels?.map(l => l.toLowerCase())
+
     console.log(`Target file: ${this._file}`)
   }
 
@@ -346,8 +350,12 @@ export class Program {
     toPipeline = 'Awaiting TESS Review'
   ): Promise<IHandleIssueResult> {
     const issueNumber: string = issueObj.number
+    const existing: IGhEvent[] | undefined =
+      issueObj.events && issueObj.events.length > 0
+        ? issueObj.events
+        : undefined
     const events: IGhEvent[] =
-      issueObj.events ||
+      existing ||
       (await this.getEvents(
         issueObj.repositoryGhId,
         Utils.issueNumberAsNumber(issueNumber)
@@ -1544,8 +1552,18 @@ fragment currentWorkspace on Workspace {
     const remainingCount = length - i
     const timePerIssueMs: number = elapsedMs / (i + 1)
 
-    this._estimateRemainingPrveiousMs = this._estimateRemainingMs
-    this._estimateRemainingMs = timePerIssueMs * remainingCount
+    if (this._estimatingCache.length === 5) {
+      this._estimateRemainingPrveiousMs = this._estimateRemainingMs
+      this._estimateRemainingMs = Math.trunc(
+        this._estimatingCache.reduce(
+          (res: number, item: number) => res + item,
+          0
+        ) / this._estimatingCache.length
+      )
+      this._estimatingCache = []
+    } else {
+      this._estimatingCache.push(timePerIssueMs * remainingCount)
+    }
 
     const strVal =
       this._estimateRemainingMs <= this._estimateRemainingPrveiousMs

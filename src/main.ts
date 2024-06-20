@@ -46,14 +46,19 @@ class Main implements IMain {
       maxDate: toDate.toISOString(),
       // labels: [],
       skipRepos: [],
-      includeRepos: repoId ? [Number(repoId)] : [],
+      includeRepos: repoId ? repoId.split(',').map(r => Number(r.trim())) : [],
       // issuesToSkip: [],
       // fromPipeline: 'Backlog',
       // toPipeline: 'Awaiting TESS Review',
 
       // minDate: '2024-04-18',
       // maxDate: '2024-05-18',
-      labels: [core.getInput('LABEL') || 'regression'],
+      labels: core.getInput('LABEL')
+        ? core
+            .getInput('LABEL')
+            .split(',')
+            .map(r => r.trim())
+        : [],
       // skipRepos: [93615076],
       // includeRepos: [232779486, 409231566],
       issuesToSkip: [],
