@@ -1,5 +1,6 @@
 FROM node:20-bookworm
 
+RUN apt-get update && apt-get -y upgrade && apt-get install -y default-jdk
 #RUN apt-get update && apt-get -y upgrade && apt-get install -y python3 pip g++ make default-jdk
 
 #FROM node:18-alpine
