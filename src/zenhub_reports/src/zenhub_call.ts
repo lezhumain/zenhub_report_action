@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any,github/no-then */
 import md5 from 'md5'
 import * as fs from 'fs'
-import { ChartHelper, IChartItem, ISizeObj } from './chart_helper'
 import {
   IControlChartItem,
   IIssue,
@@ -23,7 +22,6 @@ import {
   IOpenedIssue
 } from './models'
 import * as path from 'node:path'
-import { BubbleDataPoint } from 'chart.js'
 import { IMainConfig } from './main_conf'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
@@ -85,8 +83,8 @@ interface IHandleIssueResult {
 }
 
 interface IReport {
-  chartTime: IChartItem[]
-  chartCount: IChartItem[]
+  chartTime: any[]
+  chartCount: any[]
   statsIssue: IStatResult
   statsEstimate: IStatResult
   controlChartList: IControlChartItem[]
@@ -276,8 +274,8 @@ export class Program {
     title: string,
     evs: ICSVItem[],
     fileName: string,
-    param3: ISizeObj
-  ): Promise<IChartItem[]> {
+    param3: any
+  ): Promise<any[]> {
     const csv = this.get_csv(evs)
     // await generateExcelPieChart(csv, 'output.xlsx', "Pie Chart Data", "D", "A");
     return this.generateChart(title, csv, fileName, param3)
@@ -331,15 +329,16 @@ export class Program {
   }
 
   private async generateChart(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     title: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     csvData: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     outputFile: string,
-    sizeObj: ISizeObj
-  ): Promise<IChartItem[]> {
-    // Parse the CSV data
-    const items: IChartItem[] = this.csvDataToChartItems(csvData)
-    await ChartHelper.generateChartFromObj(title, items, outputFile, sizeObj)
-    return Promise.resolve(items)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    sizeObj: any
+  ): Promise<any[]> {
+    return Promise.resolve([])
   }
 
   private async handleIssue(
@@ -1169,6 +1168,7 @@ fragment currentWorkspace on Workspace {
       new Set(userMoves.map(um => um.user))
     )
     const movesAvgArr: any[] = []
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const movesAvg = movesUsers.reduce((res: any, item: string) => {
       const objs = userMoves.filter(um => um.user === item)
       const movedForward = objs.filter(oo => oo.isForward).length
@@ -1224,7 +1224,7 @@ fragment currentWorkspace on Workspace {
 
     const date = new Date()
 
-    const timeChartItems: IChartItem[] = await this.generateChartFromObj(
+    const timeChartItems: any[] = await this.generateChartFromObj(
       `Time spent in pipelines on ${date.toISOString()} (${handledCount} issues)`,
       evs,
       this._config.outputImageFilename,
@@ -1241,17 +1241,15 @@ fragment currentWorkspace on Workspace {
     })
     console.log(JSON.stringify(avg, null, 2))
 
-    const countChartItems: IChartItem[] = Object.keys(avg).map(
-      (pipeline: string) => {
-        return {
-          label: pipeline,
-          data: avg[pipeline].issueCount
-        } as IChartItem
-      }
-    )
+    const countChartItems: any[] = Object.keys(avg).map((pipeline: string) => {
+      return {
+        label: pipeline,
+        data: avg[pipeline].issueCount
+      } as any
+    })
     console.log(`Handled ${handledCount} issues`)
 
-    await ChartHelper.generateChartFromObj(
+    await this.doGenerateChartFromObj(
       `Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`,
       countChartItems,
       this._config.outputImageFilename.replace('.png', '_issues.png'),
@@ -1445,12 +1443,7 @@ fragment currentWorkspace on Workspace {
             <h3>Control chart list</h3>
               ${this.generateTable(chartData, baseTableFn('number'))}
             <div>
-                ${await this.getControlChartHTML(chartData).catch(e => {
-                  if (!e.message.includes("Cannot find module 'canvas'")) {
-                    throw e
-                  }
-                  console.warn(e.message)
-                })}
+                ${await this.getControlChartHTML(chartData)}
             </div>
         </section>` +
       `<section>
@@ -1461,12 +1454,7 @@ fragment currentWorkspace on Workspace {
             <h3>Velocity list</h3>
             ${this.generateTableFromCSV(ccsv.velocityList)}
             <div>
-                ${await this.getVeloctiyChart(veloccity).catch(e => {
-                  if (!e.message.includes("Cannot find module 'canvas'")) {
-                    throw e
-                  }
-                  console.warn(e.message)
-                })}
+                ${await this.getVeloctiyChart(veloccity)}
             </div>
         </section>` +
       `<section>
@@ -1475,26 +1463,14 @@ fragment currentWorkspace on Workspace {
                 ${this.generateTableFromCSV(ccsv.mainList)}
             </div>
             <div>
-                ${await this.getMainChartHTML(avg).catch(e => {
-                  if (!e.message.includes("Cannot find module 'canvas'")) {
-                    throw e
-                  }
-                  console.warn(e.message)
-                })}
+                ${await this.getMainChartHTML(avg)}
             </div>
         </section>` +
       `<section>
             <h3>Commits and PRs list</h3>
             ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
             <div>
-                ${await this.getCommitsChartHTML(
-                  allResult.userReviewStats
-                ).catch(e => {
-                  if (!e.message.includes("Cannot find module 'canvas'")) {
-                    throw e
-                  }
-                  console.warn(e.message)
-                })}
+                ${await this.getCommitsChartHTML(allResult.userReviewStats)}
             </div>
         </section>` +
       `<section>
@@ -1505,14 +1481,7 @@ fragment currentWorkspace on Workspace {
             <h3>Remaining opened issues per pipeline</h3>
             ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
             <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline0, 100).catch(
-                  e => {
-                    if (!e.message.includes("Cannot find module 'canvas'")) {
-                      throw e
-                    }
-                    console.warn(e.message)
-                  }
-                )}
+                ${await this.getOpenedChartHTML(openedPerPipeline0, 100)}
             </div>
         </section>` +
       `<section>
@@ -1677,7 +1646,7 @@ fragment currentWorkspace on Workspace {
     return html
   }
 
-  private csvDataToChartItems(csvData: string): IChartItem[] {
+  private csvDataToChartItems(csvData: string): any[] {
     const rows: string[][] = csvData
       .split('\n')
       .map(row => row.split(','))
@@ -1688,7 +1657,7 @@ fragment currentWorkspace on Workspace {
       return {
         label: r[0],
         data: Number(r[3])
-      } as IChartItem
+      } as any
     })
   }
 
@@ -1922,157 +1891,39 @@ fragment currentWorkspace on Workspace {
     return tableStr
   }
 
-  private async getVeloctiyChart(data0: IVelocity): Promise<string> {
-    // console.log(data);
-    const data = data0.data.filter(r => r.key)
-
-    const labels: string[] = data.map(d => d.key || '')
-
-    const values: BubbleDataPoint[] = data.map(d => {
-      return {
-        x: (Number(d.key) || 0) * 7 * 24 * 3600000, // in ms
-        y: d.count,
-        r: d.estimate
-      } as BubbleDataPoint
-    })
-
-    const file = path.join(this._mainOutputFolder, 'velocity_stuff.png')
-    const title = 'Velocity graph'
-    const b64img: string = await ChartHelper.generateScatterChart(
-      title,
-      values,
-      labels,
-      file,
-      5
-    )
-    // return Promise.resolve(`<img title="${title}" src="${file.replace(/output./, "")}">`);
-    return Promise.resolve(
-      `<img title="${title}" src="data:image/png;base64,${b64img}">`
-    )
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected async getVeloctiyChart(data0: IVelocity): Promise<string> {
+    return Promise.resolve('')
   }
 
-  private async getControlChartHTML(
+  protected async getControlChartHTML(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     data0: IControlChartItem[]
   ): Promise<string> {
-    // console.log(data);
-    const data = data0.slice()
-    // data.sort((a: IControlChartItem, b: IControlChartItem) => {
-    // 	return a.comppleted.getTime() - b.comppleted.getTime();
-    // })
-
-    const labels: string[] = data.map(d => d.comppleted.toLocaleDateString())
-    const values: BubbleDataPoint[] = data.map(d => {
-      return {
-        x: d.comppleted.getTime(),
-        y: Number(d.completionTimeStr),
-        r: d.estimate
-      } as BubbleDataPoint
-    })
-
-    const file = path.join(this._mainOutputFolder, 'bubble_stuff.png')
-    const title = 'My Title'
-    const b64img: string = await ChartHelper.generateScatterChart(
-      title,
-      values,
-      labels,
-      file,
-      this._bubbleBaseWith
-    )
-    // return Promise.resolve(`<img title="${title}" src="${file.replace(/output./, "")}">`);
-    return Promise.resolve(
-      `<img title="${title}" src="data:image/png;base64,${b64img}">`
-    )
-
-    // const imgFiles = [
-    //
-    // 		path: path.join(this._mainOutputFolder, "issueCount.png"),
-    // 		title: "Total issues per pipeline",
-    // 		key: "issueCount",
-    // 		labelKey: "pipeline"
-    // 	},
-    // 	{
-    // 		path: path.join(this._mainOutputFolder, "duration.png"),
-    // 		title: "Days per pipeline",
-    // 		key: "duration",
-    // 		labelKey: "pipeline"
-    // 	}
-    // ];
-    //
-    // return this.generateChartFromArray(imgFiles, dataq, 50);
+    return Promise.resolve('')
   }
 
-  private async getMainChartHTML(
+  protected async getMainChartHTML(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     csvPrAndCommits: IAVGItemMap
   ): Promise<string> {
-    console.log(csvPrAndCommits)
-    const pipelines = Object.keys(csvPrAndCommits)
-    const dataq = pipelines.map((pipeline: string) => {
-      const item: IAVGItem = csvPrAndCommits[pipeline]
-      return {
-        pipeline,
-        issueCount: item.issueCount,
-        duration: item.data.durationDays
-      }
-    })
-
-    const imgFiles = [
-      {
-        path: path.join(this._mainOutputFolder, 'issueCount.png'),
-        title: 'Total issues per pipeline',
-        key: 'issueCount',
-        labelKey: 'pipeline'
-      },
-      {
-        path: path.join(this._mainOutputFolder, 'duration.png'),
-        title: 'Days per pipeline',
-        key: 'duration',
-        labelKey: 'pipeline'
-      }
-    ]
-
-    return this.generateChartFromArray(imgFiles, dataq, 50)
+    return Promise.resolve('')
   }
 
-  private async getOpenedChartHTML(
+  protected async getOpenedChartHTML(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     csvPrAndCommits: { pipeline: string; opened: number }[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     chartSizePerc = 50
   ): Promise<string> {
-    const imgFiles = [
-      {
-        path: path.join(this._mainOutputFolder, 'remainingissueCount.png'),
-        title: 'Remaining opened issues per pipeline',
-        key: 'opened',
-        labelKey: 'pipeline'
-      }
-    ]
-
-    return this.generateChartFromArray(imgFiles, csvPrAndCommits, chartSizePerc)
+    return Promise.resolve('')
   }
 
-  private async getCommitsChartHTML(
+  protected async getCommitsChartHTML(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     csvPrAndCommits: IPrReviewStat[]
   ): Promise<string> {
-    const imgFiles = [
-      {
-        path: path.join(this._mainOutputFolder, 'prCommitCreated.png'),
-        title: 'Repartition of PR creation',
-        key: 'created',
-        labelKey: 'user'
-      },
-      {
-        path: path.join(this._mainOutputFolder, 'prCommitReviewed.png'),
-        title: 'Repartition of PR reviews',
-        key: 'didReviewCount',
-        labelKey: 'user'
-      },
-      {
-        path: path.join(this._mainOutputFolder, 'prCommitCommited.png'),
-        title: 'Repartition of commits',
-        key: 'totalCommits',
-        labelKey: 'user'
-      }
-    ]
-    return this.generateChartFromArray(imgFiles, csvPrAndCommits, 33)
+    return Promise.resolve('')
   }
 
   private async getChartGeneric(
@@ -2083,13 +1934,13 @@ fragment currentWorkspace on Workspace {
     labelKey?: string
   ): Promise<string> {
     // await this.generateChartFromObj("", evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
-    const items: IChartItem[] = csvPrAndCommits.map(c => {
+    const items: any[] = csvPrAndCommits.map(c => {
       return {
         label: labelKey === undefined ? '' : c[labelKey],
         data: c[key]
-      } as IChartItem
+      } as any
     })
-    return ChartHelper.generateChartFromObj(title, items, outputFile, {
+    return this.doGenerateChartFromObj(title, items, outputFile, {
       width: 1600,
       height: 1200
     })
@@ -2326,12 +2177,15 @@ fragment currentWorkspace on Workspace {
   }
 
   private getHeadersSorted(strings: string[]): string[] {
-    const target = strings.find((str: string) => str === 'number')
+    const target: string | undefined = strings.find(
+      (str: string) => str === 'number'
+    )
     if (target === undefined) {
       return strings
     }
 
-    return [target].concat(strings.filter(s => s !== target))
+    const filtered: string[] = strings.filter((s: string) => s !== target)
+    return [target].concat(filtered)
   }
 
   protected getSumPerc(
@@ -2550,5 +2404,18 @@ fragment currentWorkspace on Workspace {
     } as any)
 
     return remainingEstimatedDays
+  }
+
+  protected async doGenerateChartFromObj(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    s: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    countChartItems: any[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    s2: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    param4: any
+  ): Promise<string> {
+    return Promise.resolve('')
   }
 }
