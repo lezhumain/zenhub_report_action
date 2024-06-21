@@ -3,6 +3,7 @@ import { IProgramResult, Program } from './zenhub_reports/src/zenhub_call'
 import * as fs from 'fs'
 import { IssueFilter } from './zenhub_reports/src/filters'
 import { IMainConfig } from './zenhub_reports/src/main_conf'
+import * as path from 'path'
 
 export interface IMain {
   config0: IMainConfig | undefined
@@ -84,6 +85,13 @@ class Main implements IMain {
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const program = new Program(config0)
+
+      fs.writeFileSync(
+        path.join('output', 'config.json'),
+        JSON.stringify(program.config, null, 2),
+        { encoding: 'utf8' }
+      )
+
       const mainFilter = new IssueFilter(program.config)
       // const res = { mark: 'hii' }
       // skip ReBrowse
