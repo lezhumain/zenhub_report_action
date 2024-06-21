@@ -106,6 +106,68 @@ describe('action', () => {
     expect(errorMock).not.toHaveBeenCalled()
   }, 10000)
 
+  it('works with multiple repo ids', async () => {
+    // Set the action's inputs as return values from core.getInput()
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'WORKSPACE_ID':
+          return '5e3018c2d1'
+        case 'REPO_ID':
+          return '500,501'
+        case 'FROM_PIPELINE':
+          return 'My from'
+        case 'TO_PIPELINE':
+          return 'My to'
+        case 'FROM_DATE':
+          return ''
+        case 'TO_DATE':
+          return ''
+        default:
+          return ''
+      }
+    })
+
+    main.init()
+
+    expect(getInputMock).toHaveBeenNthCalledWith(4, 'WORKSPACE_ID')
+    expect(getInputMock).toHaveBeenNthCalledWith(3, 'REPO_ID')
+    expect(getInputMock).toHaveBeenNthCalledWith(2, 'FROM_DATE')
+    expect(getInputMock).toHaveBeenNthCalledWith(1, 'TO_DATE')
+
+    const newConf: IMainConfig = MockMain.getTestConf(
+      main.config0 as IMainConfig
+    )
+    Object.assign(main.config0!, newConf)
+    const myFile: string | undefined = main.config0!.inputJsonFilename
+
+    // eslint-disable-next-line github/no-then
+    const hsaErr = await run().then(
+      () => false,
+      () => {
+        return true
+      }
+    )
+    expect(hsaErr).toBeFalsy()
+    expect(runMock).toHaveReturned()
+
+    // Verify that all of the core library functions were called correctly
+    expect(debugMock).toHaveBeenNthCalledWith(1, `Got file ${myFile}`)
+
+    expect(setOutputMock).toHaveBeenNthCalledWith(
+      1,
+      'markdownContent',
+      expect.stringMatching(/.+/)
+    )
+    expect(errorMock).not.toHaveBeenCalled()
+
+    expect(JSON.stringify(main.config0?.includeRepos)).toEqual(
+      JSON.stringify([500, 501])
+    )
+    expect(JSON.stringify(newConf.includeRepos)).toEqual(
+      JSON.stringify([500, 501])
+    )
+  }, 10000)
+
   it('bad workspace id', async () => {
     // Set the action's inputs as return values from core.getInput()
     getInputMock.mockImplementation((name: string) => {
