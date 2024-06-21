@@ -37564,6 +37564,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const zenhub_call_1 = __nccwpck_require__(5812);
 const fs = __importStar(__nccwpck_require__(7147));
 const filters_1 = __nccwpck_require__(9377);
+const path = __importStar(__nccwpck_require__(1017));
 class Main {
     _config0;
     get config0() {
@@ -37630,6 +37631,7 @@ class Main {
             }
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const program = new zenhub_call_1.Program(config0);
+            fs.writeFileSync(path.join('output', 'config.json'), JSON.stringify(program.config, null, 2), { encoding: 'utf8' });
             const mainFilter = new filters_1.IssueFilter(program.config);
             // const res = { mark: 'hii' }
             // skip ReBrowse
@@ -37641,6 +37643,7 @@ class Main {
         catch (error) {
             // Fail the workflow run if an error occurs
             if (error instanceof Error) {
+                console.warn(`Main Error: ${error.message}`);
                 core.setFailed(error.message);
             }
         }
