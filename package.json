@@ -1,7 +1,7 @@
 {
   "name": "zenhub-report-action",
   "description": "GitHub Actions to retrieve Zenhub issue stats",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "lezhumain",
   "private": true,
   "homepage": "https://github.com/actions/typescript-action",
