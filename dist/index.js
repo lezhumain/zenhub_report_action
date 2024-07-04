@@ -37505,7 +37505,11 @@ async function getPContributorsData(repoId) {
         const content = fs.readFileSync(savedName, { encoding: 'utf8' });
         if (content) {
             return Promise.resolve({
-                data: JSON.parse(content)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data: JSON.parse(content).map((e) => {
+                    e.incomplete = true;
+                    return e;
+                })
             });
         }
     }
