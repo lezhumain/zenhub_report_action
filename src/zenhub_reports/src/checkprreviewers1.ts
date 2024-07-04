@@ -1,4 +1,3 @@
-// @ts-expect-error will see later
 // eslint-disable-next-line import/named
 import { AxiosResponse, get } from 'axios'
 import { IGithubPR } from './igithubpr'

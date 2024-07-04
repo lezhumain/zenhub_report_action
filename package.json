@@ -29,7 +29,6 @@
   },
   "scripts": {
     "bundle": "npm run format:write && npm run package",
-    "postpackage": "cp src/zenhub_reports/src/check_pr_reviewers.js dist/",
     "ci-test": "npx jest",
     "coverage": "npx make-coverage-badge --output-path ./badges/coverage.svg",
     "format:write": "npx prettier --write .",
