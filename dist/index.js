@@ -38732,7 +38732,9 @@ fragment currentWorkspace on Workspace {
         // 		}) as ICheckPr;
         // 	})
         // );
-        const res = await this.getGithubData(repos);
+        const res =
+        // await this.getGithubData([repos[0]])
+        await this.getGithubData(repos);
         // const allD: ICheckPr[] = res.allD;
         const newAllD = res.newAllD;
         const allResult = {
@@ -39245,7 +39247,7 @@ fragment currentWorkspace on Workspace {
             const d = (await reviewer_call
                 .check_prs(repo, this._config)
                 .catch((err) => {
-                console.error(err.message);
+                console.error(`[getGithubData]: ${err.message}`);
                 return {
                     summary: [],
                     users: []

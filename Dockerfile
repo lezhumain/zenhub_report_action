@@ -1,6 +1,8 @@
 FROM node:20-bookworm
 
-RUN apt-get update && apt-get -y upgrade && apt-get install -y default-jdk
+RUN apt-get update && apt-get -y upgrade
+RUN apt-get install -y default-jdk dos2unix
+
 #RUN apt-get update && apt-get -y upgrade && apt-get install -y python3 pip g++ make default-jdk
 
 #FROM node:18-alpine
@@ -40,7 +42,9 @@ ENV GH_API_KEY=$ARG_GH_API_KEY
 #ENV NODE_EXTRA_CA_CERTS="/.certificates/ZscalerRootCertificate-2048-SHA256.crt"
 
 #CMD npm ci && npm run bundle
-CMD npm run main
+#CMD npm run main
+CMD dos2unix /app/run_with_inputs.sh && bash /app/run_with_inputs.sh
+
 #CMD java --version && npm list -g && echo "Typescript: $(npx tsc -v)"
 
 

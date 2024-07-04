@@ -1352,7 +1352,9 @@ fragment currentWorkspace on Workspace {
     // );
 
     const res: { allD: ICheckPr[]; newAllD: ICheckPr } =
+      // await this.getGithubData([repos[0]])
       await this.getGithubData(repos)
+
     // const allD: ICheckPr[] = res.allD;
     const newAllD: ICheckPr = res.newAllD
 
