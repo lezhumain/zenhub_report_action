@@ -37290,245 +37290,6 @@ exports["default"] = _default;
 
 /***/ }),
 
-/***/ 2074:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-/* module decorator */ module = __nccwpck_require__.nmd(module);
-/* eslint-disable no-tabs,indent */
-const axios = __nccwpck_require__(8757)
-
-// GitHub repository owner and name
-const repo = 'BrowserPuppeteerTests'
-
-const callGithubAPIByURL = async apiUrl => {
-  return new Promise((resolve, reject) => {
-    // Make a GET request to the GitHub API for pull requests with API key in headers
-    axios
-      .get(apiUrl, {
-        headers: {
-          Authorization: `token ${process.env.GH_API_KEY}`
-        }
-      })
-      .then(response => {
-        resolve(response)
-      })
-      .catch(error => {
-        reject(error)
-      })
-  })
-}
-
-const callGithubAPIByEndpoint = async (endpoint, repoId) => {
-  // GitHub API endpoint for pull requests
-  if (!endpoint.startsWith('/')) {
-    endpoint = `/${endpoint}`
-  }
-  const owner = 'whitespace-software'
-  const url = `https://api.github.com/repos/${owner}/${repoId}${endpoint}` // pulls
-  return callGithubAPIByURL(url)
-}
-
-async function getByURL(url) {
-  const resp = await callGithubAPIByURL(url)
-  return resp.data
-}
-
-/**
- * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-hourly-commit-count-for-each-day
- * @returns {Promise<unknown>}
- */
-async function getCommitDailySummary(repoId) {
-  return callGithubAPIByEndpoint('/stats/punch_card', repoId).then(e => {
-    return e
-  })
-}
-
-/**
- * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
- * @returns {Promise<unknown>}
- */
-async function getLastYearSummary(repoId) {
-  return callGithubAPIByEndpoint('/stats/commit_activity', repoId).then(e => {
-    return e
-  })
-}
-
-/**
- * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-all-contributor-commit-activity
- * @returns {Promise<unknown>}
- */
-async function getPContributorsData(repoId) {
-  return callGithubAPIByEndpoint('/stats/contributors', repoId).then(e => {
-    const res = Object.assign({}, e)
-
-    if (!Array.isArray(res.data) && Object.keys(res.data).length > 0) {
-      throw new Error(`Unknown data:\n${JSON.stringify(res.data)}`)
-    }
-
-    Array.isArray(res.data)
-    res.data = Array.isArray(res.data)
-      ? res.data.map(ee => {
-          ee.authorName = ee.author.login
-          delete ee.author
-
-          return ee
-        })
-      : []
-
-    return res
-  })
-}
-
-async function main(
-  repoId,
-  config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
-) {
-  let prsResponse
-  try {
-    prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId)
-  } catch (e) {
-    throw e
-  }
-  const prs = prsResponse.data
-  // const openedPrs = prs.filter(p => p.state === 'open' && !p.draft)
-  const openedPrs = prs.filter(p => !p.draft)
-
-  const res = { summary: [], users: [] }
-
-  const minEpoch = new Date(config.minDate).getTime()
-  const maxEpoch = new Date(config.maxDate).getTime()
-
-  const summary = []
-  // for (const pr of openedPrs) {
-  for (const pr of prs) {
-    try {
-      const created = new Date(pr.created_at).getTime()
-      if (created < minEpoch || created > maxEpoch) {
-        continue
-      }
-
-      const author = pr.user.login
-
-      const comments = pr.comments_url ? await getByURL(pr.comments_url) : []
-      const review_comments = pr.review_comments_url
-        ? await getByURL(pr.review_comments_url)
-        : []
-
-      const all_comments = comments.concat(review_comments)
-
-      const commentators = Array.from(
-        new Set(all_comments.map(comment => comment.user.login))
-      )
-
-      const obj = {
-        author,
-        commentators,
-        url: pr.html_url
-      }
-
-      summary.push(obj)
-    } catch (e) {
-      debugger
-    }
-  }
-  res.summary = summary
-
-  const everyone = Array.from(
-    new Set(
-      summary.reduce((acc, summaryItem) => {
-        acc.push(summaryItem.author)
-        acc.push(...summaryItem.commentators)
-        return acc
-      }, [])
-    )
-  )
-
-  const contribsResp = await getPContributorsData(repoId)
-  const contribs = contribsResp.data.filter(r => r.total > 0)
-
-  for (const user of everyone) {
-    // TODO single loop
-    const otherPrs = summary.filter(s => s.author !== user)
-    const shouldReviewCount = otherPrs.length
-    const didReviewCount = otherPrs.filter(op =>
-      op.commentators.includes(user)
-    ).length
-    const reviewedPerc = Number((didReviewCount / shouldReviewCount).toFixed(2))
-
-    const contrib = contribs.find(c => c.authorName === user)
-    // copied
-    const filteredWeeks =
-      contrib?.weeks.filter(
-        w =>
-          (config.minDate === undefined ||
-            w.w * 1000 >= new Date(config.minDate).getTime()) &&
-          (config.maxDate === undefined ||
-            w.w * 1000 <= new Date(config.maxDate).getTime())
-      ) || []
-    const totalCommits = filteredWeeks.reduce((res, cw) => res + cw.c, 0)
-    const averageCommitsPerWeek = Number(
-      (totalCommits / filteredWeeks.length).toFixed(2)
-    )
-    const created = summary.filter(s => s.author === user)
-    res.users.push({
-      user,
-      shouldReviewCount,
-      didReviewCount,
-      reviewedPerc,
-      created: created.length,
-      createdPerc: created.length / summary.length,
-      totalCommits,
-      totalCommitsPerWeek: averageCommitsPerWeek
-    })
-  }
-
-  const dailyCommitsResp = await getCommitDailySummary(repoId)
-  const dailyCommits = dailyCommitsResp.data
-
-  const yearCommitsResp = await getLastYearSummary(repoId)
-  const yearCommits = yearCommitsResp.data
-
-  try {
-    if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
-      console.warn(
-        `Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`
-      )
-    }
-    res.yearCommits =
-      (Array.isArray(yearCommits) ? yearCommits : [])
-        .map(yc => {
-          const clone = Object.assign({}, yc)
-          delete clone.days
-          return clone
-        })
-        .filter(
-          w =>
-            (config?.minDate === undefined ||
-              w.week * 1000 >= new Date(config.minDate).getTime()) &&
-            (config?.maxDate === undefined ||
-              w.week * 1000 <= new Date(config.maxDate).getTime())
-        ) || []
-  } catch (e) {
-    console.error(e.message)
-    throw e
-  }
-
-  return Promise.resolve(res)
-}
-
-if (module.parent !== null) {
-  module.exports = {
-    check_prs: main
-  }
-} else {
-  main(repo).then(res => {
-    console.log(JSON.stringify(res, null, 2))
-  })
-}
-
-
-/***/ }),
-
 /***/ 399:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -37661,6 +37422,241 @@ exports.main = new Main();
 async function run() {
     return exports.main.run();
 }
+
+
+/***/ }),
+
+/***/ 7090:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.check_prs = check_prs;
+// eslint-disable-next-line import/named
+const axios_1 = __nccwpck_require__(8757);
+const fs = __importStar(__nccwpck_require__(7561));
+// GitHub repository owner and name
+// const repo = 'BrowserPuppeteerTests'
+const callGithubAPIByURL = async (apiUrl) => {
+    return (0, axios_1.get)(apiUrl, {
+        headers: {
+            Authorization: `token ${process.env.GH_API_KEY}`
+        }
+    });
+};
+const callGithubAPIByEndpoint = async (endpoint, repoId) => {
+    // GitHub API endpoint for pull requests
+    if (!endpoint.startsWith('/')) {
+        endpoint = `/${endpoint}`;
+    }
+    const owner = 'whitespace-software';
+    const url = `https://api.github.com/repos/${owner}/${repoId}${endpoint}`; // pulls
+    return callGithubAPIByURL(url);
+};
+async function getByURL(url) {
+    const resp = await callGithubAPIByURL(url);
+    return Promise.resolve(resp.data);
+}
+// /**
+//  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-hourly-commit-count-for-each-day
+//  * @returns {Promise<unknown>}
+//  */
+// async function getCommitDailySummary(repoId: string): Promise<AxiosResponse> {
+//   return callGithubAPIByEndpoint('/stats/punch_card', repoId)
+// }
+/**
+ * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
+ * @returns {Promise<unknown>}
+ */
+async function getLastYearSummary(repoId) {
+    return callGithubAPIByEndpoint('/stats/commit_activity', repoId);
+}
+/**
+ * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-all-contributor-commit-activity
+ * @returns {Promise<unknown>}
+ */
+async function getPContributorsData(repoId) {
+    const savedName = getContribFilename(repoId);
+    if (fs.existsSync(savedName)) {
+        const content = fs.readFileSync(savedName, { encoding: 'utf8' });
+        if (content) {
+            return Promise.resolve({
+                data: JSON.parse(content)
+            });
+        }
+    }
+    const e = await callGithubAPIByEndpoint('/stats/contributors', repoId);
+    const res = Object.assign({}, e);
+    if (!Array.isArray(res.data) && Object.keys(res.data).length > 0) {
+        throw new Error(`Unknown data:\n${JSON.stringify(res.data)}`);
+    }
+    res.data = Array.isArray(res.data)
+        ? res.data.map(ee => {
+            ee.authorName = ee.author.login;
+            delete ee.author;
+            return ee;
+        })
+        : [];
+    return res;
+}
+// interface IPrResponse {
+//   user: object
+//   draft: boolean
+//   created_at: string
+// }
+function getContribFilename(repoId) {
+    return `output/contribs_${repoId}.json`;
+}
+async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+    const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId);
+    const prs = prsResponse.data;
+    // const openedPrs = prs.filter(p => p.state === 'open' && !p.draft)
+    // const openedPrs: IGithubPR[] = prs.filter((p: IPrResponse) => !p.draft)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = {
+        summary: [],
+        users: [],
+        yearCommits: []
+    };
+    const minEpoch = new Date(config.minDate).getTime();
+    const maxEpoch = new Date(config.maxDate).getTime();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const summary = [];
+    // for (const pr of openedPrs) {
+    for (const pr of prs) {
+        try {
+            const created = new Date(pr.created_at).getTime();
+            if (created < minEpoch || created > maxEpoch) {
+                continue;
+            }
+            const author = pr.user.login;
+            const comments = pr.comments_url
+                ? await getByURL(pr.comments_url)
+                : [];
+            const review_comments = pr.review_comments_url
+                ? await getByURL(pr.review_comments_url)
+                : [];
+            const all_comments = comments.concat(review_comments);
+            const commentators = Array.from(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            new Set(all_comments.map((comment) => comment.user.login)));
+            const obj = {
+                author,
+                commentators,
+                url: pr.html_url
+            };
+            summary.push(obj);
+        }
+        catch (e) {
+            console.warn('check pr error');
+        }
+    }
+    res.summary = summary;
+    const everyone = Array.from(new Set(summary.reduce((acc, summaryItem) => {
+        acc.push(summaryItem.author);
+        acc.push(...summaryItem.commentators);
+        return acc;
+    }, [])));
+    const contribsResp = await getPContributorsData(repoId);
+    const contribs = 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    contribsResp.data.filter((r) => r.total > 0);
+    if (contribs.length > 0) {
+        fs.writeFileSync(getContribFilename(repoId), JSON.stringify(contribs, null, 2), { encoding: 'utf8' });
+    }
+    for (const user of everyone) {
+        // TODO single loop
+        const otherPrs = summary.filter(s => s.author !== user);
+        const shouldReviewCount = otherPrs.length;
+        const didReviewCount = otherPrs.filter(op => op.commentators.includes(user)).length;
+        const reviewedPerc = Number((didReviewCount / shouldReviewCount).toFixed(2));
+        const contrib = contribs.find(c => c.authorName === user);
+        // copied
+        const filteredWeeks = contrib?.weeks.filter(w => (config.minDate === undefined ||
+            w.w * 1000 >= new Date(config.minDate).getTime()) &&
+            (config.maxDate === undefined ||
+                w.w * 1000 <= new Date(config.maxDate).getTime())) || [];
+        const totalCommits = filteredWeeks.reduce(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (res0, cw) => res0 + cw.c, 0);
+        const averageCommitsPerWeek = Number((filteredWeeks.length > 0
+            ? totalCommits / filteredWeeks.length
+            : 0).toFixed(2));
+        const created = summary.filter(s => s.author === user);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        res.users.push({
+            user,
+            shouldReviewCount,
+            didReviewCount,
+            reviewedPerc,
+            created: created.length,
+            createdPerc: created.length / summary.length,
+            totalCommits,
+            totalCommitsPerWeek: averageCommitsPerWeek
+        });
+    }
+    // const dailyCommitsResp = await getCommitDailySummary(repoId)
+    // const dailyCommits = dailyCommitsResp.data
+    const yearCommitsResp = await getLastYearSummary(repoId);
+    const yearCommits = yearCommitsResp.data;
+    try {
+        if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
+            console.warn(`Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`);
+        }
+        res.yearCommits =
+            (Array.isArray(yearCommits) ? yearCommits : [])
+                .map(yc => {
+                const clone = Object.assign({}, yc);
+                delete clone.days;
+                return clone;
+            })
+                .filter(w => (config?.minDate === undefined ||
+                w.week * 1000 >= new Date(config.minDate).getTime()) &&
+                (config?.maxDate === undefined ||
+                    w.week * 1000 <= new Date(config.maxDate).getTime())) || [];
+    }
+    catch (e) {
+        console.error(e.message);
+        throw e;
+    }
+    return Promise.resolve(res);
+}
+async function check_prs(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+    return main(repoId, config);
+}
+// if (module.parent !== null) {
+//   module.exports = {
+//     check_prs: main
+//   }
+// } else {
+//   main(repo).then(res => {
+//     console.log(JSON.stringify(res, null, 2))
+//   })
+// }
 
 
 /***/ }),
@@ -37878,8 +37874,9 @@ const md5_1 = __importDefault(__nccwpck_require__(1711));
 const fs = __importStar(__nccwpck_require__(7147));
 const models_1 = __nccwpck_require__(5927);
 const path = __importStar(__nccwpck_require__(9411));
+const checkprreviewers1_1 = __nccwpck_require__(7090);
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
-const reviewer_call = __nccwpck_require__(2074);
+// const reviewer_call = require('./check_pr_reviewers.js')
 /*
     Takes issues that moved during a timespan
  */
@@ -39244,10 +39241,8 @@ fragment currentWorkspace on Workspace {
     async getGithubData(repos) {
         const allD = [];
         for (const repo of repos) {
-            const d = (await reviewer_call
-                .check_prs(repo, this._config)
-                .catch((err) => {
-                console.error(err.message);
+            const d = (await (0, checkprreviewers1_1.check_prs)(repo, this._config).catch((err) => {
+                console.error(`[getGithubData]: ${err.message}`);
                 return {
                     summary: [],
                     users: []
@@ -39570,6 +39565,14 @@ module.exports = require("net");
 
 "use strict";
 module.exports = require("node:events");
+
+/***/ }),
+
+/***/ 7561:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:fs");
 
 /***/ }),
 
