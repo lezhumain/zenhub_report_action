@@ -1,35 +1,16 @@
-FROM node:20-bookworm
+FROM node:20-alpine
 
-RUN apt-get update && apt-get -y upgrade && apt-get install -y default-jdk
-#RUN apt-get update && apt-get -y upgrade && apt-get install -y python3 pip g++ make default-jdk
-
-#FROM node:18-alpine
-#RUN apk update && apk add bash python3
-#RUN apk add --update --no-cache \
-#    make \
-#    g++ \
-#    jpeg-dev \
-#    cairo-dev \
-#    giflib-dev \
-#    pango-dev \
-#    libtool \
-#    autoconf \
-#    automake
-
-#RUN npm install -g npm@9.8.1
+RUN apk update && apk upgrade
+RUN apk add bash
+RUN apk add dos2unix
+RUN apk add openjdk17 python3 make g++
 
 WORKDIR /app
 
 COPY . .
 
-#RUN cp .github/linters/.*.yml /app/
-#RUN cp .github/linters/* /app/
-
 RUN npm ci
 RUN npm run bundle
-#RUN echo "$(node -v && npm -v && npx tsc -v && npx ncc -v)" > /app/dist/version.txt
-RUN echo "$(node -v && npm -v && npx tsc -v && npx ncc -v)" > /app/dist/version.txt
-#RUN npx tsc
 
 ARG ARG_API_KEY=abc
 ENV API_KEY=$ARG_API_KEY
@@ -37,15 +18,13 @@ ENV API_KEY=$ARG_API_KEY
 ARG ARG_GH_API_KEY=abc
 ENV GH_API_KEY=$ARG_GH_API_KEY
 
-#ENV NODE_EXTRA_CA_CERTS="/.certificates/ZscalerRootCertificate-2048-SHA256.crt"
-
-#CMD npm ci && npm run bundle
-CMD npm run main
-#CMD java --version && npm list -g && echo "Typescript: $(npx tsc -v)"
-
+CMD dos2unix /app/run_with_inputs.sh && bash /app/run_with_inputs.sh
 
 # docker build -t zenhub_reports .
 # docker build --build-arg ARG_API_KEY="$API_KEY" --build-arg ARG_GH_API_KEY="$GH_API_KEY" -t zenhub_reports .
-# docker run -t zenhub_reports
+
+# docker run --name zenhub_reports_container -t zenhub_reports
+# docker run --env API_KEY --env GH_API_KEY --name zenhub_reports_container -t zenhub_reports
+
 # docker run -v "$(pwd)/my_output:/app/output" -t zenhub_reports
 # docker run -v "$(pwd)/my_output:/app/output" -v "~/.certificates:/.certificates" -t zenhub_reports

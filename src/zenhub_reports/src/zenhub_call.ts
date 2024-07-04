@@ -23,9 +23,10 @@ import {
 } from './models'
 import * as path from 'node:path'
 import { IMainConfig } from './main_conf'
+import { check_prs } from './checkprreviewers1'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
-const reviewer_call = require('./check_pr_reviewers.js')
+// const reviewer_call = require('./check_pr_reviewers.js')
 
 /*
 	Takes issues that moved during a timespan
@@ -1352,7 +1353,9 @@ fragment currentWorkspace on Workspace {
     // );
 
     const res: { allD: ICheckPr[]; newAllD: ICheckPr } =
+      // await this.getGithubData([repos[0]])
       await this.getGithubData(repos)
+
     // const allD: ICheckPr[] = res.allD;
     const newAllD: ICheckPr = res.newAllD
 
@@ -2076,15 +2079,15 @@ fragment currentWorkspace on Workspace {
   private async getGithubData(repos: string[]): Promise<any> {
     const allD: ICheckPr[] = []
     for (const repo of repos) {
-      const d = (await reviewer_call
-        .check_prs(repo, this._config)
-        .catch((err: Error) => {
-          console.error(err.message)
+      const d = (await check_prs(repo, this._config as any).catch(
+        (err: Error) => {
+          console.error(`[getGithubData]: ${err.message}`)
           return {
             summary: [],
             users: []
           }
-        })) as ICheckPr
+        }
+      )) as ICheckPr
       allD.push(d)
     }
 
