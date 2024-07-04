@@ -58,7 +58,11 @@ async function getPContributorsData(repoId: string): Promise<AxiosResponse> {
     const content = fs.readFileSync(savedName, { encoding: 'utf8' })
     if (content) {
       return Promise.resolve({
-        data: JSON.parse(content)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: (JSON.parse(content) as never[]).map((e: any) => {
+          e.incomplete = true
+          return e
+        })
       } as AxiosResponse)
     }
   }
@@ -163,7 +167,11 @@ async function main(
   )
 
   const contribsResp: AxiosResponse = await getPContributorsData(repoId)
-  const contribs: { authorName: string; weeks: { w: number }[] }[] =
+  const contribs: {
+    authorName: string
+    weeks: { w: number }[]
+    incomplete?: boolean
+  }[] =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     contribsResp.data.filter((r: any) => r.total > 0)
 
