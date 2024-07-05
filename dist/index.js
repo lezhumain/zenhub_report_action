@@ -38733,9 +38733,11 @@ fragment currentWorkspace on Workspace {
         // 		}) as ICheckPr;
         // 	})
         // );
+        console.log('Getting pr data');
         const res = 
         // await this.getGithubData([repos[0]])
         await this.getGithubData(repos);
+        console.log('Got pr data');
         // const allD: ICheckPr[] = res.allD;
         const newAllD = res.newAllD;
         const allResult = {
