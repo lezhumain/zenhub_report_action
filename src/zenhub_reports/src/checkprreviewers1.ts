@@ -272,6 +272,7 @@ async function main(
     throw e
   }
   console.log('pr resp 7')
+  console.log(res)
 
   return Promise.resolve(res)
 }

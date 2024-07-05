@@ -37656,6 +37656,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
         throw e;
     }
     console.log('pr resp 7');
+    console.log(res);
     return Promise.resolve(res);
 }
 async function check_prs(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
@@ -38747,6 +38748,7 @@ fragment currentWorkspace on Workspace {
         // await this.getGithubData([repos[0]])
         await this.getGithubData(repos);
         console.log('Got pr data');
+        console.log(res);
         // const allD: ICheckPr[] = res.allD;
         const newAllD = res.newAllD;
         const allResult = {

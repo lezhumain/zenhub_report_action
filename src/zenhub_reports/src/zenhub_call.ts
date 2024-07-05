@@ -1357,6 +1357,7 @@ fragment currentWorkspace on Workspace {
       // await this.getGithubData([repos[0]])
       await this.getGithubData(repos)
     console.log('Got pr data')
+    console.log(res)
 
     // const allD: ICheckPr[] = res.allD;
     const newAllD: ICheckPr = res.newAllD
