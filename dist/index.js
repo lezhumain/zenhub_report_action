@@ -37536,7 +37536,9 @@ function getContribFilename(repoId) {
     return `output/contribs_${repoId}.json`;
 }
 async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+    console.log('pr resp 0');
     const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId);
+    console.log('pr resp 1');
     const prs = prsResponse.data;
     // const openedPrs = prs.filter(p => p.state === 'open' && !p.draft)
     // const openedPrs: IGithubPR[] = prs.filter((p: IPrResponse) => !p.draft)
@@ -37579,12 +37581,14 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
             console.log('check pr error');
         }
     }
+    console.log('pr resp 2');
     res.summary = summary;
     const everyone = Array.from(new Set(summary.reduce((acc, summaryItem) => {
         acc.push(summaryItem.author);
         acc.push(...summaryItem.commentators);
         return acc;
     }, [])));
+    console.log('pr resp 3');
     const contribsResp = await getPContributorsData(repoId);
     const contribs = 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37592,6 +37596,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     if (contribs.length > 0) {
         fs.writeFileSync(getContribFilename(repoId), JSON.stringify(contribs, null, 2), { encoding: 'utf8' });
     }
+    console.log('pr resp 4');
     for (const user of everyone) {
         // TODO single loop
         const otherPrs = summary.filter(s => s.author !== user);
@@ -37625,8 +37630,10 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     }
     // const dailyCommitsResp = await getCommitDailySummary(repoId)
     // const dailyCommits = dailyCommitsResp.data
+    console.log('pr resp 5');
     const yearCommitsResp = await getLastYearSummary(repoId);
     const yearCommits = yearCommitsResp.data;
+    console.log('pr resp 6');
     try {
         if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
             console.warn(`Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`);
@@ -37644,9 +37651,11 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
                     w.week * 1000 <= new Date(config.maxDate).getTime())) || [];
     }
     catch (e) {
+        console.log('pr resp 6 ERROR');
         console.error(e.message);
         throw e;
     }
+    console.log('pr resp 7');
     return Promise.resolve(res);
 }
 async function check_prs(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {

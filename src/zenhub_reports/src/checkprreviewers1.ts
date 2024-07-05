@@ -99,7 +99,9 @@ async function main(
   repoId: string,
   config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
 ): Promise<object> {
+  console.log('pr resp 0')
   const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId)
+  console.log('pr resp 1')
 
   const prs: IGithubPR[] = prsResponse.data
 
@@ -154,6 +156,8 @@ async function main(
       console.log('check pr error')
     }
   }
+  console.log('pr resp 2')
+
   res.summary = summary
 
   const everyone: string[] = Array.from(
@@ -165,6 +169,8 @@ async function main(
       }, [])
     )
   )
+
+  console.log('pr resp 3')
 
   const contribsResp: AxiosResponse = await getPContributorsData(repoId)
   const contribs: {
@@ -182,6 +188,8 @@ async function main(
       { encoding: 'utf8' }
     )
   }
+
+  console.log('pr resp 4')
 
   for (const user of everyone) {
     // TODO single loop
@@ -230,9 +238,12 @@ async function main(
 
   // const dailyCommitsResp = await getCommitDailySummary(repoId)
   // const dailyCommits = dailyCommitsResp.data
+  console.log('pr resp 5')
 
   const yearCommitsResp = await getLastYearSummary(repoId)
   const yearCommits = yearCommitsResp.data
+
+  console.log('pr resp 6')
 
   try {
     if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
@@ -255,9 +266,12 @@ async function main(
               w.week * 1000 <= new Date(config.maxDate).getTime())
         ) || []
   } catch (e) {
+    console.log('pr resp 6 ERROR')
+
     console.error((e as Error).message)
     throw e
   }
+  console.log('pr resp 7')
 
   return Promise.resolve(res)
 }
