@@ -2077,11 +2077,13 @@ fragment currentWorkspace on Workspace {
   }
 
   private async getGithubData(repos: string[]): Promise<any> {
+    console.error(`[getGithubData]: ${repos.join(",")}`)
+
     const allD: ICheckPr[] = []
     for (const repo of repos) {
       const d = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
-          console.error(`[getGithubData]: ${err.message}`)
+          console.error(`[getGithubData]: error: ${err.message}`)
           return {
             summary: [],
             users: []
