@@ -2079,7 +2079,7 @@ fragment currentWorkspace on Workspace {
   }
 
   private async getGithubData(repos: string[]): Promise<any> {
-    console.error(`[getGithubData]: ${repos.join(',')}`)
+    console.log(`[getGithubData]: ${repos?.join(',')}`)
 
     const allD: ICheckPr[] = []
     for (const repo of repos) {
