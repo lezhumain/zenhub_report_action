@@ -39245,7 +39245,7 @@ fragment currentWorkspace on Workspace {
         return uu;
     }
     async getGithubData(repos) {
-        console.error(`[getGithubData]: ${repos.join(',')}`);
+        console.log(`[getGithubData]: ${repos?.join(',')}`);
         const allD = [];
         for (const repo of repos) {
             const d = (await (0, checkprreviewers1_1.check_prs)(repo, this._config).catch((err) => {
