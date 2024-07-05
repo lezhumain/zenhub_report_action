@@ -2085,7 +2085,7 @@ fragment currentWorkspace on Workspace {
     for (const repo of repos) {
       const d = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
-          console.error(`[getGithubData]: error: ${err.message}`)
+          console.log(`[getGithubData]: error: ${err.message}`)
           return {
             summary: [],
             users: []
