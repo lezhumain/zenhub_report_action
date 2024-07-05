@@ -37576,7 +37576,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
             summary.push(obj);
         }
         catch (e) {
-            console.warn('check pr error');
+            console.log('check pr error');
         }
     }
     res.summary = summary;

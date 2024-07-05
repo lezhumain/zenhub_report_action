@@ -151,7 +151,7 @@ async function main(
 
       summary.push(obj)
     } catch (e) {
-      console.warn('check pr error')
+      console.log('check pr error')
     }
   }
   res.summary = summary
