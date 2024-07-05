@@ -39243,10 +39243,11 @@ fragment currentWorkspace on Workspace {
         return uu;
     }
     async getGithubData(repos) {
+        console.error(`[getGithubData]: ${repos.join(',')}`);
         const allD = [];
         for (const repo of repos) {
             const d = (await (0, checkprreviewers1_1.check_prs)(repo, this._config).catch((err) => {
-                console.error(`[getGithubData]: ${err.message}`);
+                console.error(`[getGithubData]: error: ${err.message}`);
                 return {
                     summary: [],
                     users: []
