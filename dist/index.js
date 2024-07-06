@@ -37585,7 +37585,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
             summary.push(obj);
         }
         catch (e) {
-            // console.log('check pr error')
+            console.log('check pr error');
         }
     }
     // console.log('pr resp 2')
@@ -37662,7 +37662,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     }
     catch (e) {
         // console.log('pr resp 6 ERROR')
-        console.error(e.message);
+        console.log(e.message);
         throw e;
     }
     // console.log('pr resp 7')
@@ -39270,7 +39270,7 @@ fragment currentWorkspace on Workspace {
         const allD = [];
         for (const repo of repos) {
             const d = (await (0, checkprreviewers1_1.check_prs)(repo, this._config).catch((err) => {
-                // console.log(`[getGithubData]: error: ${err.message}`)
+                console.log(`[getGithubData]: error: ${err.message}`);
                 return {
                     summary: [],
                     users: []
