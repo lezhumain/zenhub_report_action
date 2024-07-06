@@ -161,7 +161,7 @@ async function main(
       // console.log(obj)
       summary.push(obj)
     } catch (e) {
-      // console.log('check pr error')
+      console.log('check pr error')
     }
   }
   // console.log('pr resp 2')
@@ -279,7 +279,7 @@ async function main(
   } catch (e) {
     // console.log('pr resp 6 ERROR')
 
-    console.error((e as Error).message)
+    console.log((e as Error).message)
     throw e
   }
   // console.log('pr resp 7')
