@@ -268,7 +268,7 @@ export class Program {
 
     this._config.labels = this._config.labels?.map(l => l.toLowerCase())
 
-    console.log(`Target file: ${this._file}`)
+    // console.log(`Target file: ${this._file}`)
   }
 
   private async generateChartFromObj(
@@ -384,7 +384,7 @@ export class Program {
     }
 
     const move_events: IGhEvent[] = createdEventArr.concat(move_events0)
-    // console.log(move_events);
+    // // console.log(move_events);
 
     const filteredEvents: IGhEvent[] = []
     for (const event of move_events) {
@@ -609,7 +609,7 @@ export class Program {
 
     return response.json()
     // .then(data => {
-    // 	console.log(data);
+    // 	// console.log(data);
     // })
     // .catch(error => {
     // 	console.error(error);
@@ -753,7 +753,7 @@ export class Program {
     workspaceId: string,
     last = 73
   ): Promise<IWorkspace> {
-    console.log('Getting board data')
+    // console.log('Getting board data')
     const base: IWorkspace = await this.getBoard(workspaceId, last)
     this._config.releaseID = await this.getReleases(workspaceId)
 
@@ -768,7 +768,7 @@ export class Program {
           endCursor
         )
 
-        // console.log(moreData);
+        // // console.log(moreData);
 
         pieline.issues.push(...moreData.nodes)
 
@@ -1240,7 +1240,7 @@ fragment currentWorkspace on Workspace {
       console.warn(e.message)
       return []
     })
-    console.log(JSON.stringify(avg, null, 2))
+    // console.log(JSON.stringify(avg, null, 2))
 
     const countChartItems: any[] = Object.keys(avg).map((pipeline: string) => {
       return {
@@ -1248,7 +1248,7 @@ fragment currentWorkspace on Workspace {
         data: avg[pipeline].issueCount
       } as any
     })
-    console.log(`Handled ${handledCount} issues`)
+    // console.log(`Handled ${handledCount} issues`)
 
     await this.doGenerateChartFromObj(
       `Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`,
@@ -1295,10 +1295,10 @@ fragment currentWorkspace on Workspace {
     fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
       encoding: 'utf8'
     })
-    console.log(`Wrote file ${this._file}`)
+    // console.log(`Wrote file ${this._file}`)
 
     const chartData: IControlChartItem[] = this.getControlChartData(issues)
-    console.log(chartData)
+    // console.log(chartData)
 
     const completinList: number[] = chartData.map(c =>
       Number(c.completionTimeStr)
@@ -1330,7 +1330,7 @@ fragment currentWorkspace on Workspace {
     // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
 
     const outs: ICSVItem[] = this.findOutstandingIssues(allEvs).slice(0, 5)
-    // console.log(JSON.stringify(outs, null, 2));
+    // // console.log(JSON.stringify(outs, null, 2));
 
     const allRepos: string[] = issues
       .filter((ii: IIssue) => ii.handled)
@@ -1352,9 +1352,12 @@ fragment currentWorkspace on Workspace {
     // 	})
     // );
 
+    console.log('Getting pr data')
     const res: { allD: ICheckPr[]; newAllD: ICheckPr } =
       // await this.getGithubData([repos[0]])
       await this.getGithubData(repos)
+    console.log('Got pr data')
+    // console.log(JSON.stringify(res, null, 2))
 
     // const allD: ICheckPr[] = res.allD;
     const newAllD: ICheckPr = res.newAllD
@@ -1511,7 +1514,7 @@ fragment currentWorkspace on Workspace {
     )
 
     console.log(
-      `${allEvs.length} ${issues.filter(iu => !iu.filtered).length} ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`
+      `ev count: ${allEvs.length}, issue count: ${issues.filter(iu => !iu.filtered).length}, issues handled: ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`
     )
     return Promise.resolve({
       mark,
@@ -1546,21 +1549,21 @@ fragment currentWorkspace on Workspace {
   }
 
   private getFromFile(): IWorkspace | null {
-    console.log(`Getting from file ${this._file}`)
+    // console.log(`Getting from file ${this._file}`)
     if (!FileUtils.fileExists(this._file)) {
-      console.log(`File doesn't exist`)
+      // console.log(`File doesn't exist`)
       return null
     }
 
     const content = fs.readFileSync(this._file, { encoding: 'utf8' })
     try {
       const obj: IWorkspace = JSON.parse(content) as IWorkspace
-      console.log(`Got existing`)
+      // console.log(`Got existing`)
       if (
         obj.configHash !== this._configHash &&
         !this._config.inputJsonFilename
       ) {
-        console.log(`Using existing`)
+        // console.log(`Using existing`)
         return null
       }
       return obj
@@ -2077,11 +2080,13 @@ fragment currentWorkspace on Workspace {
   }
 
   private async getGithubData(repos: string[]): Promise<any> {
+    // console.log(`[getGithubData]: ${repos?.join(',')}`)
+
     const allD: ICheckPr[] = []
     for (const repo of repos) {
       const d = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
-          console.error(`[getGithubData]: ${err.message}`)
+          // console.log(`[getGithubData]: error: ${err.message}`)
           return {
             summary: [],
             users: []
@@ -2118,7 +2123,7 @@ fragment currentWorkspace on Workspace {
         // const avz: IPrUser[] = this.averageUsers(prUs);
         // const av: IPrUser = avz[0];
 
-        // console.log(av);
+        // // console.log(av);
         res.users.push(av)
 
         const sbumaroes: ISummary[] = []
@@ -2209,10 +2214,10 @@ fragment currentWorkspace on Workspace {
       const currentPipeline = this._pipelines[pipelineI]
       const vals = avg[currentPipeline]
       if (vals) {
-        console.log(`1 - Adding pipeline ${currentPipeline}`)
+        // console.log(`1 - Adding pipeline ${currentPipeline}`)
         days += vals.data.durationAverage
       } else {
-        console.log(`2 - Adding pipeline ${currentPipeline}`)
+        // console.log(`2 - Adding pipeline ${currentPipeline}`)
       }
     }
 
@@ -2236,7 +2241,7 @@ fragment currentWorkspace on Workspace {
         fromPipelineIndex,
         toPipelineIndex
       )
-    console.log('')
+    // console.log('')
 
     let openedTotals = 0
     let estimatedDays = 0
@@ -2296,7 +2301,7 @@ fragment currentWorkspace on Workspace {
     return Object.keys(avg).reduce((res: number, ke: string) => {
       const currentIndex = this._pipelines.indexOf(ke)
       if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
-        console.log(`Adding pipeline ${ke}`)
+        // console.log(`Adding pipeline ${ke}`)
         res += avg[ke].data.durationAverage
       }
       return res
