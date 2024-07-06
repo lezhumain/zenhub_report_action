@@ -99,9 +99,9 @@ async function main(
   repoId: string,
   config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
 ): Promise<object> {
-  console.log('pr resp 0')
+  // console.log('pr resp 0')
   const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId)
-  console.log('pr resp 1')
+  // console.log('pr resp 1')
 
   const prs: IGithubPR[] = prsResponse.data
 
@@ -118,6 +118,9 @@ async function main(
   const minEpoch = new Date(config.minDate).getTime()
   const maxEpoch = new Date(config.maxDate).getTime()
 
+  // console.log('prs')
+  // console.log(JSON.stringify(prs, null, 2))
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const summary: any[] = []
 
@@ -126,8 +129,10 @@ async function main(
     try {
       const created = new Date(pr.created_at).getTime()
       if (created < minEpoch || created > maxEpoch) {
+        // console.log('Not in epoch...')
         continue
       }
+      // console.log('Within timespan')
 
       const author = pr.user.login
 
@@ -139,6 +144,7 @@ async function main(
         : []
 
       const all_comments: object[] = comments.concat(review_comments)
+      // console.log(`rr ${all_comments.length} comments for ${pr.url}`)
 
       const commentators: object[] = Array.from(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,12 +157,15 @@ async function main(
         url: pr.html_url
       }
 
+      // console.log('obj===')
+      // console.log(obj)
       summary.push(obj)
     } catch (e) {
-      console.log('check pr error')
+      // console.log('check pr error')
     }
   }
-  console.log('pr resp 2')
+  // console.log('pr resp 2')
+  // console.log(summary)
 
   res.summary = summary
 
@@ -170,7 +179,7 @@ async function main(
     )
   )
 
-  console.log('pr resp 3')
+  // console.log('pr resp 3')
 
   const contribsResp: AxiosResponse = await getPContributorsData(repoId)
   const contribs: {
@@ -189,7 +198,8 @@ async function main(
     )
   }
 
-  console.log('pr resp 4')
+  // console.log('pr resp 4')
+  // console.log(`Everyone: ${everyone.join(',')}`)
 
   for (const user of everyone) {
     // TODO single loop
@@ -238,12 +248,13 @@ async function main(
 
   // const dailyCommitsResp = await getCommitDailySummary(repoId)
   // const dailyCommits = dailyCommitsResp.data
-  console.log('pr resp 5')
+  // console.log('pr resp 5')
 
   const yearCommitsResp = await getLastYearSummary(repoId)
   const yearCommits = yearCommitsResp.data
 
-  console.log('pr resp 6')
+  // console.log('pr resp 6')
+  // console.log(JSON.stringify(yearCommits, null, 2))
 
   try {
     if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
@@ -266,13 +277,13 @@ async function main(
               w.week * 1000 <= new Date(config.maxDate).getTime())
         ) || []
   } catch (e) {
-    console.log('pr resp 6 ERROR')
+    // console.log('pr resp 6 ERROR')
 
     console.error((e as Error).message)
     throw e
   }
-  console.log('pr resp 7')
-  console.log(res)
+  // console.log('pr resp 7')
+  // console.log(res)
 
   return Promise.resolve(res)
 }
@@ -290,6 +301,6 @@ export async function check_prs(
 //   }
 // } else {
 //   main(repo).then(res => {
-//     console.log(JSON.stringify(res, null, 2))
+//     // console.log(JSON.stringify(res, null, 2))
 //   })
 // }
