@@ -37536,9 +37536,9 @@ function getContribFilename(repoId) {
     return `output/contribs_${repoId}.json`;
 }
 async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
-    console.log('pr resp 0');
+    // console.log('pr resp 0')
     const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId);
-    console.log('pr resp 1');
+    // console.log('pr resp 1')
     const prs = prsResponse.data;
     // const openedPrs = prs.filter(p => p.state === 'open' && !p.draft)
     // const openedPrs: IGithubPR[] = prs.filter((p: IPrResponse) => !p.draft)
@@ -37550,6 +37550,8 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     };
     const minEpoch = new Date(config.minDate).getTime();
     const maxEpoch = new Date(config.maxDate).getTime();
+    // console.log('prs')
+    // console.log(JSON.stringify(prs, null, 2))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const summary = [];
     // for (const pr of openedPrs) {
@@ -37557,8 +37559,10 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
         try {
             const created = new Date(pr.created_at).getTime();
             if (created < minEpoch || created > maxEpoch) {
+                // console.log('Not in epoch...')
                 continue;
             }
+            // console.log('Within timespan')
             const author = pr.user.login;
             const comments = pr.comments_url
                 ? await getByURL(pr.comments_url)
@@ -37567,6 +37571,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
                 ? await getByURL(pr.review_comments_url)
                 : [];
             const all_comments = comments.concat(review_comments);
+            // console.log(`rr ${all_comments.length} comments for ${pr.url}`)
             const commentators = Array.from(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             new Set(all_comments.map((comment) => comment.user.login)));
@@ -37575,20 +37580,23 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
                 commentators,
                 url: pr.html_url
             };
+            // console.log('obj===')
+            // console.log(obj)
             summary.push(obj);
         }
         catch (e) {
-            console.log('check pr error');
+            // console.log('check pr error')
         }
     }
-    console.log('pr resp 2');
+    // console.log('pr resp 2')
+    // console.log(summary)
     res.summary = summary;
     const everyone = Array.from(new Set(summary.reduce((acc, summaryItem) => {
         acc.push(summaryItem.author);
         acc.push(...summaryItem.commentators);
         return acc;
     }, [])));
-    console.log('pr resp 3');
+    // console.log('pr resp 3')
     const contribsResp = await getPContributorsData(repoId);
     const contribs = 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37596,7 +37604,8 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     if (contribs.length > 0) {
         fs.writeFileSync(getContribFilename(repoId), JSON.stringify(contribs, null, 2), { encoding: 'utf8' });
     }
-    console.log('pr resp 4');
+    // console.log('pr resp 4')
+    // console.log(`Everyone: ${everyone.join(',')}`)
     for (const user of everyone) {
         // TODO single loop
         const otherPrs = summary.filter(s => s.author !== user);
@@ -37630,10 +37639,11 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     }
     // const dailyCommitsResp = await getCommitDailySummary(repoId)
     // const dailyCommits = dailyCommitsResp.data
-    console.log('pr resp 5');
+    // console.log('pr resp 5')
     const yearCommitsResp = await getLastYearSummary(repoId);
     const yearCommits = yearCommitsResp.data;
-    console.log('pr resp 6');
+    // console.log('pr resp 6')
+    // console.log(JSON.stringify(yearCommits, null, 2))
     try {
         if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
             console.warn(`Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`);
@@ -37651,12 +37661,12 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
                     w.week * 1000 <= new Date(config.maxDate).getTime())) || [];
     }
     catch (e) {
-        console.log('pr resp 6 ERROR');
+        // console.log('pr resp 6 ERROR')
         console.error(e.message);
         throw e;
     }
-    console.log('pr resp 7');
-    console.log(res);
+    // console.log('pr resp 7')
+    // console.log(res)
     return Promise.resolve(res);
 }
 async function check_prs(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
@@ -37668,7 +37678,7 @@ async function check_prs(repoId, config = { minDate: '2024-04-22', maxDate: '202
 //   }
 // } else {
 //   main(repo).then(res => {
-//     console.log(JSON.stringify(res, null, 2))
+//     // console.log(JSON.stringify(res, null, 2))
 //   })
 // }
 
@@ -38005,7 +38015,7 @@ class Program {
             ? this._config.inputJsonFilename
             : path.join(this._mainOutputFolder, `${this._baseFilename}_${this._configHash}.json`);
         this._config.labels = this._config.labels?.map(l => l.toLowerCase());
-        console.log(`Target file: ${this._file}`);
+        // console.log(`Target file: ${this._file}`)
     }
     async generateChartFromObj(title, evs, fileName, param3) {
         const csv = this.get_csv(evs);
@@ -38072,7 +38082,7 @@ class Program {
             createdEventArr.push(created_event);
         }
         const move_events = createdEventArr.concat(move_events0);
-        // console.log(move_events);
+        // // console.log(move_events);
         const filteredEvents = [];
         for (const event of move_events) {
             if (skipEventIfFn !== undefined && (await skipEventIfFn(event))) {
@@ -38232,7 +38242,7 @@ class Program {
         }
         return response.json();
         // .then(data => {
-        // 	console.log(data);
+        // 	// console.log(data);
         // })
         // .catch(error => {
         // 	console.error(error);
@@ -38338,7 +38348,7 @@ class Program {
         return Promise.resolve(issues);
     }
     async getBoardFull(workspaceId, last = 73) {
-        console.log('Getting board data');
+        // console.log('Getting board data')
         const base = await this.getBoard(workspaceId, last);
         this._config.releaseID = await this.getReleases(workspaceId);
         for (const pieline of base.pipelinesConnection) {
@@ -38346,7 +38356,7 @@ class Program {
             let endCursor = pieline.issueEndCursor;
             while (endCursor !== undefined) {
                 const moreData = await this.getPipelineIssues(pipelineID, this._config.releaseID !== undefined ? [this._config.releaseID] : [], this._config.labels || [], endCursor);
-                // console.log(moreData);
+                // // console.log(moreData);
                 pieline.issues.push(...moreData.nodes);
                 endCursor = moreData.pageInfo.hasNextPage
                     ? moreData.pageInfo.endCursor
@@ -38665,14 +38675,14 @@ fragment currentWorkspace on Workspace {
             console.warn(e.message);
             return [];
         });
-        console.log(JSON.stringify(avg, null, 2));
+        // console.log(JSON.stringify(avg, null, 2))
         const countChartItems = Object.keys(avg).map((pipeline) => {
             return {
                 label: pipeline,
                 data: avg[pipeline].issueCount
             };
         });
-        console.log(`Handled ${handledCount} issues`);
+        // console.log(`Handled ${handledCount} issues`)
         await this.doGenerateChartFromObj(`Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`, countChartItems, this._config.outputImageFilename.replace('.png', '_issues.png'), { width: 1600, height: 1200 }).catch(e => {
             if (!e.message.includes("Cannot find module 'canvas'")) {
                 throw e;
@@ -38709,9 +38719,9 @@ fragment currentWorkspace on Workspace {
         fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
             encoding: 'utf8'
         });
-        console.log(`Wrote file ${this._file}`);
+        // console.log(`Wrote file ${this._file}`)
         const chartData = this.getControlChartData(issues);
-        console.log(chartData);
+        // console.log(chartData)
         const completinList = chartData.map(c => Number(c.completionTimeStr));
         const stats = models_1.StatHelper.getStats(completinList);
         const openedPerPipeline = this.getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats);
@@ -38727,7 +38737,7 @@ fragment currentWorkspace on Workspace {
         const veloccity = this.getVelocity(chartData);
         // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
         const outs = this.findOutstandingIssues(allEvs).slice(0, 5);
-        // console.log(JSON.stringify(outs, null, 2));
+        // // console.log(JSON.stringify(outs, null, 2));
         const allRepos = issues
             .filter((ii) => ii.handled)
             .map((ii) => ii.htmlUrl.split('/')[4]);
@@ -38748,7 +38758,7 @@ fragment currentWorkspace on Workspace {
         // await this.getGithubData([repos[0]])
         await this.getGithubData(repos);
         console.log('Got pr data');
-        console.log(res);
+        // console.log(JSON.stringify(res, null, 2))
         // const allD: ICheckPr[] = res.allD;
         const newAllD = res.newAllD;
         const allResult = {
@@ -38871,7 +38881,7 @@ fragment currentWorkspace on Workspace {
         this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
         const mark = `${models_1.Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
         fs.writeFileSync(path.join(this._mainOutputFolder, 'main_report.md'), mark, { encoding: 'utf8' });
-        console.log(`${allEvs.length} ${issues.filter(iu => !iu.filtered).length} ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`);
+        console.log(`ev count: ${allEvs.length}, issue count: ${issues.filter(iu => !iu.filtered).length}, issues handled: ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`);
         return Promise.resolve({
             mark,
             allResult
@@ -38895,18 +38905,18 @@ fragment currentWorkspace on Workspace {
         console.log(`Remaining: ${strVal}`);
     }
     getFromFile() {
-        console.log(`Getting from file ${this._file}`);
+        // console.log(`Getting from file ${this._file}`)
         if (!FileUtils.fileExists(this._file)) {
-            console.log(`File doesn't exist`);
+            // console.log(`File doesn't exist`)
             return null;
         }
         const content = fs.readFileSync(this._file, { encoding: 'utf8' });
         try {
             const obj = JSON.parse(content);
-            console.log(`Got existing`);
+            // console.log(`Got existing`)
             if (obj.configHash !== this._configHash &&
                 !this._config.inputJsonFilename) {
-                console.log(`Using existing`);
+                // console.log(`Using existing`)
                 return null;
             }
             return obj;
@@ -39256,11 +39266,11 @@ fragment currentWorkspace on Workspace {
         return uu;
     }
     async getGithubData(repos) {
-        console.log(`[getGithubData]: ${repos?.join(',')}`);
+        // console.log(`[getGithubData]: ${repos?.join(',')}`)
         const allD = [];
         for (const repo of repos) {
             const d = (await (0, checkprreviewers1_1.check_prs)(repo, this._config).catch((err) => {
-                console.log(`[getGithubData]: error: ${err.message}`);
+                // console.log(`[getGithubData]: error: ${err.message}`)
                 return {
                     summary: [],
                     users: []
@@ -39285,7 +39295,7 @@ fragment currentWorkspace on Workspace {
             ]);
             // const avz: IPrUser[] = this.averageUsers(prUs);
             // const av: IPrUser = avz[0];
-            // console.log(av);
+            // // console.log(av);
             res.users.push(av);
             const sbumaroes = []
                 // @ts-ignore
@@ -39346,11 +39356,11 @@ fragment currentWorkspace on Workspace {
             const currentPipeline = this._pipelines[pipelineI];
             const vals = avg[currentPipeline];
             if (vals) {
-                console.log(`1 - Adding pipeline ${currentPipeline}`);
+                // console.log(`1 - Adding pipeline ${currentPipeline}`)
                 days += vals.data.durationAverage;
             }
             else {
-                console.log(`2 - Adding pipeline ${currentPipeline}`);
+                // console.log(`2 - Adding pipeline ${currentPipeline}`)
             }
         }
         return days / daysSum;
@@ -39359,7 +39369,7 @@ fragment currentWorkspace on Workspace {
         const fromPipelineIndex = this._pipelines.indexOf(this._config.fromPipeline);
         const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline);
         const totalMsAverageFromPipelineToPipeline = this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
-        console.log('');
+        // console.log('')
         let openedTotals = 0;
         let estimatedDays = 0;
         const openedPerPipeline = openedPipelines
@@ -39397,7 +39407,7 @@ fragment currentWorkspace on Workspace {
         return Object.keys(avg).reduce((res, ke) => {
             const currentIndex = this._pipelines.indexOf(ke);
             if (currentIndex >= fromPipelineIndex && currentIndex < toPipelineIndex) {
-                console.log(`Adding pipeline ${ke}`);
+                // console.log(`Adding pipeline ${ke}`)
                 res += avg[ke].data.durationAverage;
             }
             return res;
