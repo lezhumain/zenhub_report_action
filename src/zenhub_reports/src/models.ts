@@ -149,6 +149,12 @@ export class Utils {
   static issueNumberAsString(issueNumber: number): string {
     return `#${issueNumber.toFixed(0)}`
   }
+
+  static waitForTimeout(timeout: number) {
+    return new Promise(function(resolve) {
+      setTimeout(resolve, timeout);
+    });
+  }
 }
 
 export class ControlChartItem implements IControlChartItem {

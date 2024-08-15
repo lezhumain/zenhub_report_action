@@ -1352,11 +1352,9 @@ fragment currentWorkspace on Workspace {
     // 	})
     // );
 
-    console.log('Getting pr data')
-    const res: { allD: ICheckPr[]; newAllD: ICheckPr } =
-      // await this.getGithubData([repos[0]])
-      await this.getGithubData(repos)
-    console.log('Got pr data')
+    // console.log('Getting pr data')
+    const res: { allD: ICheckPr[]; newAllD: ICheckPr } = await this.getGithubData(repos)
+    // console.log('Got pr data')
     // console.log(JSON.stringify(res, null, 2))
 
     // const allD: ICheckPr[] = res.allD;
@@ -2086,7 +2084,9 @@ fragment currentWorkspace on Workspace {
     for (const repo of repos) {
       const d = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
-          // console.log(`[getGithubData]: error: ${err.message}`)
+          const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
+          console.warn(msg)
+          fs.writeFileSync("github_error.txt", msg, { encoding: 'utf8' })
           return {
             summary: [],
             users: []
@@ -2216,9 +2216,10 @@ fragment currentWorkspace on Workspace {
       if (vals) {
         // console.log(`1 - Adding pipeline ${currentPipeline}`)
         days += vals.data.durationAverage
-      } else {
-        // console.log(`2 - Adding pipeline ${currentPipeline}`)
       }
+      // else {
+        // console.log(`2 - Adding pipeline ${currentPipeline}`)
+      // }
     }
 
     return days / daysSum
