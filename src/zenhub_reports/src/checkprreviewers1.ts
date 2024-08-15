@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/named
-import get from "axios"
+import get from 'axios'
 import { AxiosResponse } from 'axios'
 import { IGithubPR } from './igithubpr'
 import * as fs from 'node:fs'
@@ -97,7 +97,11 @@ function getContribFilename(repoId: string): string {
   return `output/contribs_${repoId}.json`
 }
 
-async function handleYearCommits(repoId: string, config: { minDate: string; maxDate: string }, tryCount = 0) {
+async function handleYearCommits(
+  repoId: string,
+  config: { minDate: string; maxDate: string },
+  tryCount = 0
+) {
   const yearCommitsResp = await getLastYearSummary(repoId)
   const yearCommits = yearCommitsResp.data
 
@@ -121,7 +125,7 @@ async function handleYearCommits(repoId: string, config: { minDate: string; maxD
             w.week * 1000 <= new Date(config.maxDate).getTime())
       ) || []
 
-  if(resYearCommits.length === 0 && tryCount > 0) {
+  if (resYearCommits.length === 0 && tryCount > 0) {
     await Utils.waitForTimeout(1000)
     return handleYearCommits(repoId, config, tryCount - 1)
   }

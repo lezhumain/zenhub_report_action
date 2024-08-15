@@ -151,9 +151,9 @@ export class Utils {
   }
 
   static waitForTimeout(timeout: number) {
-    return new Promise(function(resolve) {
-      setTimeout(resolve, timeout);
-    });
+    return new Promise(function (resolve) {
+      setTimeout(resolve, timeout)
+    })
   }
 }
 

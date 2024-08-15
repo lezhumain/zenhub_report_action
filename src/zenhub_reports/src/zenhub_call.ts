@@ -1353,7 +1353,8 @@ fragment currentWorkspace on Workspace {
     // );
 
     // console.log('Getting pr data')
-    const res: { allD: ICheckPr[]; newAllD: ICheckPr } = await this.getGithubData(repos)
+    const res: { allD: ICheckPr[]; newAllD: ICheckPr } =
+      await this.getGithubData(repos)
     // console.log('Got pr data')
     // console.log(JSON.stringify(res, null, 2))
 
@@ -2086,7 +2087,7 @@ fragment currentWorkspace on Workspace {
         (err: Error) => {
           const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
           console.warn(msg)
-          fs.writeFileSync("github_error.txt", msg, { encoding: 'utf8' })
+          fs.writeFileSync('github_error.txt', msg, { encoding: 'utf8' })
           return {
             summary: [],
             users: []
@@ -2218,7 +2219,7 @@ fragment currentWorkspace on Workspace {
         days += vals.data.durationAverage
       }
       // else {
-        // console.log(`2 - Adding pipeline ${currentPipeline}`)
+      // console.log(`2 - Adding pipeline ${currentPipeline}`)
       // }
     }
 
