@@ -1,7 +1,9 @@
 // eslint-disable-next-line import/named
-import { AxiosResponse, get } from 'axios'
+import get from 'axios'
+import { AxiosResponse } from 'axios'
 import { IGithubPR } from './igithubpr'
 import * as fs from 'node:fs'
+import { Utils } from './models'
 
 // GitHub repository owner and name
 // const repo = 'BrowserPuppeteerTests'
@@ -93,6 +95,42 @@ async function getPContributorsData(repoId: string): Promise<AxiosResponse> {
 
 function getContribFilename(repoId: string): string {
   return `output/contribs_${repoId}.json`
+}
+
+async function handleYearCommits(
+  repoId: string,
+  config: { minDate: string; maxDate: string },
+  tryCount = 0
+) {
+  const yearCommitsResp = await getLastYearSummary(repoId)
+  const yearCommits = yearCommitsResp.data
+
+  if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
+    console.warn(
+      `Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`
+    )
+  }
+  const resYearCommits =
+    (Array.isArray(yearCommits) ? yearCommits : [])
+      .map(yc => {
+        const clone = Object.assign({}, yc)
+        delete clone.days
+        return clone
+      })
+      .filter(
+        w =>
+          (config?.minDate === undefined ||
+            w.week * 1000 >= new Date(config.minDate).getTime()) &&
+          (config?.maxDate === undefined ||
+            w.week * 1000 <= new Date(config.maxDate).getTime())
+      ) || []
+
+  if (resYearCommits.length === 0 && tryCount > 0) {
+    await Utils.waitForTimeout(1000)
+    return handleYearCommits(repoId, config, tryCount - 1)
+  }
+
+  return Promise.resolve(resYearCommits)
 }
 
 async function main(
@@ -250,40 +288,15 @@ async function main(
   // const dailyCommits = dailyCommitsResp.data
   // console.log('pr resp 5')
 
-  const yearCommitsResp = await getLastYearSummary(repoId)
-  const yearCommits = yearCommitsResp.data
-
   // console.log('pr resp 6')
   // console.log(JSON.stringify(yearCommits, null, 2))
 
   try {
-    if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
-      console.warn(
-        `Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`
-      )
-    }
-    res.yearCommits =
-      (Array.isArray(yearCommits) ? yearCommits : [])
-        .map(yc => {
-          const clone = Object.assign({}, yc)
-          delete clone.days
-          return clone
-        })
-        .filter(
-          w =>
-            (config?.minDate === undefined ||
-              w.week * 1000 >= new Date(config.minDate).getTime()) &&
-            (config?.maxDate === undefined ||
-              w.week * 1000 <= new Date(config.maxDate).getTime())
-        ) || []
+    res.yearCommits = await handleYearCommits(repoId, config, 3)
   } catch (e) {
-    // console.log('pr resp 6 ERROR')
-
     console.error((e as Error).message)
     throw e
   }
-  // console.log('pr resp 7')
-  // console.log(res)
 
   return Promise.resolve(res)
 }
