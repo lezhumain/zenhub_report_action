@@ -123,12 +123,12 @@ jobs:
           echo "$CONTENT"
           ls -aldh "$TARGET"
 
-      - name: Create issue
-        uses: peter-evans/create-issue-from-file@v5
-        with:
-          title: Monthly zenhub metrics report
-          content-filepath: ./zenhub_report.md
-          assignees: ''
-          labels: |
-            report
-          token: ${{ secrets.GH_TOKEN }}
+#      - name: Create issue
+#        uses: peter-evans/create-issue-from-file@v5
+#        with:
+#          title: Monthly zenhub metrics report
+#          content-filepath: ./zenhub_report.md
+#          assignees: ''
+#          labels: |
+#            report
+#          token: ${{ secrets.GH_TOKEN }}
