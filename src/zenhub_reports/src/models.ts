@@ -150,7 +150,7 @@ export class Utils {
     return `#${issueNumber.toFixed(0)}`
   }
 
-  static waitForTimeout(timeout: number) {
+  static async waitForTimeout(timeout: number): Promise<void> {
     return new Promise(function (resolve) {
       setTimeout(resolve, timeout)
     })
