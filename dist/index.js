@@ -37818,7 +37818,7 @@ class Utils {
     static issueNumberAsString(issueNumber) {
         return `#${issueNumber.toFixed(0)}`;
     }
-    static waitForTimeout(timeout) {
+    static async waitForTimeout(timeout) {
         return new Promise(function (resolve) {
             setTimeout(resolve, timeout);
         });
