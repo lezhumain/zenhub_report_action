@@ -41,8 +41,8 @@
     "run": "npx ts-node src/index.ts",
     "run1": "node dist/index.js",
     "build_sub": "cd src/zenhub_reports && rm -rf dist/* && npm run build && cd ../..",
-    "build": "rm -rf dist/* && npx tsc && npm run build_sub && rm -rf /* && cp -r src/zenhub_reports/dist/* /",
-    "cp_extra_files": "cp src/zenhub_reports/src/check_pr_reviewers.js ./ && cp src/zenhub_reports/src/*.html ./dist/",
+    "build": "rm -rf dist/* && npx tsc && npm run build_sub && rm -rf /* && npx -y cpx -r src/zenhub_reports/dist/* /",
+    "cp_extra_files": "npx -y cpx src/zenhub_reports/src/check_pr_reviewers.js ./ && npx -y cpx src/zenhub_reports/src/*.html ./dist/",
     "build_single": "npx tsc && npm run cp_extra_files",
     "prepFiles": "./prepareFiles.sh",
     "local_run": "npx ts-node src/zenhub_reports/src/index.ts"

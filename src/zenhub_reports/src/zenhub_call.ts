@@ -1370,7 +1370,7 @@ fragment currentWorkspace on Workspace {
       outstandingItems: outs,
       velocity: veloccity,
       avg,
-      prList: (newAllD.summary as any) as IPrSummary[],
+      prList: newAllD.summary as any as IPrSummary[],
       // userReviewStats: d.users as IPrUser[]
       userReviewStats: newAllD.users as IPrReviewStat[],
       remainingOpenedIssues,
