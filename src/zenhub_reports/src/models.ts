@@ -270,7 +270,7 @@ export interface ICheckPr {
 
 export interface ISummary {
   author: string
-  commentators: any[]
+  commentators: object[]
   url: string
 }
 

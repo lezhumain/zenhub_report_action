@@ -198,7 +198,7 @@ async function main(
       // console.log('obj===')
       // console.log(obj)
       summary.push(obj)
-    } catch (e) {
+    } catch {
       // console.log('check pr error')
     }
   }

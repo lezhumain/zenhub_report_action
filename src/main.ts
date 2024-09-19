@@ -17,7 +17,7 @@ class Main implements IMain {
     return this._config0
   }
 
-  init(): void {
+  init(): IMainConfig {
     let toDate = new Date(new Date().toDateString()) // hours set to 0
     if (core.getInput('TO_DATE')) {
       toDate = new Date(core.getInput('TO_DATE'))
@@ -39,7 +39,7 @@ class Main implements IMain {
       throw new Error(errMsg)
     }
 
-    this._config0 = {
+    const cconf = {
       workspaceId,
       outputJsonFilename: 'output/allEvs.json',
       outputImageFilename: `output/output_average.png`,
@@ -69,6 +69,9 @@ class Main implements IMain {
       maxCount: 5,
       release: core.getInput('RELEASE') || ''
     }
+
+    this._config0 = cconf
+    return cconf
   }
 
   async run(conf?: IMainConfig, skipInit = false): Promise<void> {
