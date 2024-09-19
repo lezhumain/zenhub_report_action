@@ -7,7 +7,7 @@ const minus1month = new Date(current)
 minus1month.setMonth(minus1month.getMonth() - 3)
 
 export const config0: IMainConfig = Object.assign({}, mainConfig)
-config0.workspaceId = process.env.WORKSPACE_ID!
+config0.workspaceId = process.env.WORKSPACE_ID || ''
 config0.includeRepos = process.env.REPO_ID
   ? process.env.REPO_ID.split(',').map(r => Number(r.trim()))
   : []

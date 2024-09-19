@@ -101,7 +101,7 @@ async function handleYearCommits(
   repoId: string,
   config: { minDate: string; maxDate: string },
   tryCount = 0
-) {
+): Promise<unknown[]> {
   const yearCommitsResp = await getLastYearSummary(repoId)
   const yearCommits = yearCommitsResp.data
 
