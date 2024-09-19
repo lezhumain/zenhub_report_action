@@ -37380,7 +37380,7 @@ class Main {
             console.error(errMsg);
             throw new Error(errMsg);
         }
-        this._config0 = {
+        const cconf = {
             workspaceId,
             outputJsonFilename: 'output/allEvs.json',
             outputImageFilename: `output/output_average.png`,
@@ -37408,6 +37408,8 @@ class Main {
             maxCount: 5,
             release: core.getInput('RELEASE') || ''
         };
+        this._config0 = cconf;
+        return cconf;
     }
     async run(conf, skipInit = false) {
         let config0;
@@ -37639,7 +37641,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
             // console.log(obj)
             summary.push(obj);
         }
-        catch (e) {
+        catch {
             // console.log('check pr error')
         }
     }
@@ -38961,7 +38963,7 @@ fragment currentWorkspace on Workspace {
             }
             return obj;
         }
-        catch (e) {
+        catch {
             return null;
         }
     }
