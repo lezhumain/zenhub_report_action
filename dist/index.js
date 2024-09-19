@@ -37492,7 +37492,6 @@ exports.check_prs = check_prs;
 const axios_1 = __importDefault(__nccwpck_require__(8757));
 const fs = __importStar(__nccwpck_require__(7561));
 const models_1 = __nccwpck_require__(5927);
-const node_path_1 = __importDefault(__nccwpck_require__(9411));
 // GitHub repository owner and name
 // const repo = 'BrowserPuppeteerTests'
 const callGithubAPIByURL = async (apiUrl) => {
@@ -37588,13 +37587,6 @@ async function handleYearCommits(repoId, config, tryCount = 0) {
     if (resYearCommits.length === 0 && tryCount > 0) {
         await models_1.Utils.waitForTimeout(1000);
         return handleYearCommits(repoId, config, tryCount - 1);
-    }
-    else {
-        const outputPath = node_path_1.default.join('output', 'pr-commits.csv');
-        fs.writeFileSync(outputPath, JSON.stringify(resYearCommits, null, 2), {
-            encoding: 'utf8',
-            flag: 'w'
-        });
     }
     return Promise.resolve(resYearCommits);
 }
