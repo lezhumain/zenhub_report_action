@@ -9,9 +9,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*"],
-  "exclude": [
-    "node_modules",
-    "node_modules/**/*",
-    "node_modules/chartjs-node-canvas/src/*"
-  ]
+  "exclude": ["node_modules", "node_modules/**/*"]
 }
