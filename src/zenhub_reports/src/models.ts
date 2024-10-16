@@ -1,8 +1,8 @@
 import { NodeHtmlMarkdown } from 'node-html-markdown'
 
-export interface IGhEvent<T> {
+export interface IGhEvent {
   type: string
-  data: T
+  data: any
   createdAt: string
 }
 
@@ -28,7 +28,7 @@ export interface IIssue {
   }
   handled?: boolean
   // events?: IIssueEvent[];
-  events?: IGhEvent<unknown>[]
+  events?: IGhEvent[]
   number: string
   estimateValue?: number
   repositoryGhId: number
@@ -75,7 +75,7 @@ export interface Issue {
   repository: { ghId: number; name: string; ownerName: string }
   estimate?: { value: string } | null
   number: number
-  events?: IGhEvent<unknown>[]
+  events?: IGhEvent[]
   htmlUrl: string
   pullRequest?: boolean
   createdAt: string
