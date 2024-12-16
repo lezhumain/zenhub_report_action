@@ -1369,7 +1369,9 @@ fragment currentWorkspace on Workspace {
       user.totalCommits = target.commit_count
       user.created = target.pr_count
       user.createdPerc = target.pr_perc
-      user.totalCommitsPerWeek = Number((target.commit_count / weekCount).toFixed(2))
+      user.totalCommitsPerWeek = Number(
+        (target.commit_count / weekCount).toFixed(2)
+      )
     }
 
     // const allD: ICheckPr[] = res.allD;
@@ -2448,6 +2450,13 @@ fragment currentWorkspace on Workspace {
   }
 
   private getWeekCount(): number {
-    return ((new Date(this._config.maxDate ?? 0).getTime()) - (new Date(this._config.minDate ?? 0).getTime())) / 1000 / 3600 / 24 / 7
+    return (
+      (new Date(this._config.maxDate ?? 0).getTime() -
+        new Date(this._config.minDate ?? 0).getTime()) /
+      1000 /
+      3600 /
+      24 /
+      7
+    )
   }
 }

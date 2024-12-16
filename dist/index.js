@@ -38471,6 +38471,188 @@ exports.IssueFilter = IssueFilter;
 
 /***/ }),
 
+/***/ 8194:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/* eslint-disable no-tabs */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getAllData = getAllData;
+const owner = 'whitespace-software'; // Replace with the repository owner's username or organization name
+const repo = 'BrowserPuppeteerTests'; // Replace with the repository name
+const token = ''; // Replace with your GitHub personal access token
+const currentDate = new Date();
+const oneWeekAgo = new Date(currentDate);
+// const currentDateEpoch = currentDate.getTime()
+// const oneWeekAgoEpoch = oneWeekAgo.getTime()
+oneWeekAgo.setDate(currentDate.getDate() - 7);
+// const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
+// const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
+// const specificAuthor = 'author_username' // Replace with the specific author's username
+async function fetchPullRequestsOnly(minDate, maxDate, page = 1) {
+    const sinceP = minDate;
+    const untilP = maxDate;
+    const url = `https://api.github.com/repos/${owner}/${repo}/pulls`;
+    const params = new URLSearchParams({
+        state: 'all',
+        sort: 'created',
+        direction: 'desc',
+        sinceP,
+        untilP
+    });
+    try {
+        const response = await fetch(`${url}?${params}`, {
+            headers: {
+                Authorization: `token ${token}`,
+                Accept: 'application/vnd.github.v3+json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        // const sinceD = oneWeekAgo
+        // const untilD = currentDate
+        const pulls = await response.json();
+        const pullsFiltered = pulls.filter((p) => {
+            const depoch = new Date(p.created_at).getTime();
+            const res = depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime();
+            return res;
+        });
+        if (pulls.length === pullsFiltered.length) {
+            const newFiltered = await fetchPullRequestsOnly(minDate, maxDate, page + 1);
+            pullsFiltered.push(...newFiltered);
+        }
+        return pullsFiltered; // Return the result as an object
+    }
+    catch (error) {
+        console.error('Error fetching pull requests only:', error);
+        return []; // Return an empty array in case of error
+    }
+}
+async function fetchPullRequests(minDate, maxDate) {
+    try {
+        const pulls = await fetchPullRequestsOnly(minDate, maxDate);
+        const pullRequestsWithCommits = await Promise.all(pulls.map(async (pr) => {
+            const commits = await fetchCommitsForPullRequest(pr.number); // Updated to pr_number
+            // const allAuthors = Array.from(new Set(commits.map(c => c.author?.login)))
+            // const mainAuthor = commits.reduce((res: { done: string[], author: string }, item: Commit, all: Commit[]) => {
+            // 	const auth = item.author?.login
+            // 	if(!res.done.includes(auth)) {
+            // 		res.done.push(auth);
+            // 		const count = all.filter()
+            // 	}
+            // 	return res;
+            // }, { done: [], author: "" })
+            return {
+                title: pr.title,
+                createdAt: pr.created_at,
+                commits: commits.filter(commit => commit.author?.login === pr.user?.login),
+                author: pr.user?.login ?? ''
+            };
+        }));
+        return pullRequestsWithCommits; // Return the result as an object
+    }
+    catch (error) {
+        console.error('Error fetching pull requests:', error);
+        return []; // Return an empty array in case of error
+    }
+}
+async function fetchCommitsForPullRequest(prNumber) {
+    const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/commits`;
+    try {
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `token ${token}`,
+                Accept: 'application/vnd.github.v3+json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const commits = await response.json();
+        return commits;
+    }
+    catch (error) {
+        console.error(`Error fetching commits for PR #${prNumber}:`, error);
+        return [];
+    }
+}
+function makeStats(pullRequests) {
+    const allAuthors = Array.from(new Set(pullRequests.map(p => p.author)));
+    const res = {};
+    for (const auth of allAuthors) {
+        const prs = pullRequests.filter(p => p.author === auth);
+        const prCount = prs.length;
+        const commitCount = prs.reduce((res1, pr) => {
+            return res1 + pr.commits.length;
+        }, 0);
+        res[auth] = {
+            pr_count: prCount,
+            commit_count: commitCount
+        };
+    }
+    return res;
+}
+async function fetch_prs_for_repo(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+    // Execute the function to fetch pull requests and handle the result
+    try {
+        const pullRequests = await fetchPullRequests(config.minDate, config.maxDate);
+        console.log(pullRequests); // Log the result
+        const stats = makeStats(pullRequests);
+        // console.log(JSON.stringify(stats, null, 2))
+        return Promise.resolve(stats);
+    }
+    catch (e) {
+        console.error('Error fetching pull requests:', e);
+    }
+}
+function generateSummary(all) {
+    const obj = {};
+    // const users = Object.keys(all[0])
+    // const entries = Object.entries(all[0])
+    const entries = Array.from(all.map(f => Object.entries(f))).flat();
+    const users = Array.from(new Set(entries.map(e => e[0])));
+    const [prCount, commitCount] = entries.reduce((res, data) => {
+        const record = data[1];
+        res[0] += record.pr_count;
+        res[1] += record.commit_count;
+        return res;
+    }, [0, 0]);
+    for (const user of users) {
+        const targets = entries
+            .filter(a => a[0] === user)
+            .map(r => r[1]);
+        const sums = targets.reduce((res, item) => {
+            res.commit_count += item.commit_count;
+            res.pr_count += item.pr_count;
+            return res;
+        }, { pr_count: 0, commit_count: 0, pr_perc: 0, commit_perc: 0 });
+        sums.commit_perc = sums.commit_count / commitCount;
+        sums.pr_perc = sums.pr_count / prCount;
+        obj[user] = sums;
+    }
+    return obj;
+}
+async function getAllData() {
+    const repos = ['BrowserPuppeteerTests', 'CucuVAPI'];
+    const all = [];
+    for (const r of repos) {
+        const rres = await fetch_prs_for_repo(r);
+        if (rres !== undefined) {
+            all.push(rres);
+        }
+    }
+    const summary = generateSummary(all);
+    // console.log(JSON.stringify(all, null, 2))
+    // console.log(JSON.stringify(summary, null, 2))
+    return Promise.resolve({ all, summary });
+}
+// main()
+
+
+/***/ }),
+
 /***/ 6099:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -38649,6 +38831,7 @@ const fs = __importStar(__nccwpck_require__(9896));
 const models_1 = __nccwpck_require__(6099);
 const path = __importStar(__nccwpck_require__(6760));
 const checkprreviewers1_1 = __nccwpck_require__(7708);
+const getPrAndCommits_1 = __nccwpck_require__(8194);
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 // const reviewer_call = require('./check_pr_reviewers.js')
 /*
@@ -39505,8 +39688,17 @@ fragment currentWorkspace on Workspace {
         // );
         // console.log('Getting pr data')
         const res = await this.getGithubData(repos);
-        // console.log('Got pr data')
-        // console.log(JSON.stringify(res, null, 2))
+        const weekCount = this.getWeekCount();
+        for (const user of res.newAllD.users) {
+            const target = res.ggdata.summary[user.user];
+            if (!target) {
+                continue;
+            }
+            user.totalCommits = target.commit_count;
+            user.created = target.pr_count;
+            user.createdPerc = target.pr_perc;
+            user.totalCommitsPerWeek = Number((target.commit_count / weekCount).toFixed(2));
+        }
         // const allD: ICheckPr[] = res.allD;
         const newAllD = res.newAllD;
         const allResult = {
@@ -40058,12 +40250,15 @@ fragment currentWorkspace on Workspace {
         // newAllD.users = usersAvg.users;
         newAllD.users = this.averageUsers(usersAvg.users);
         newAllD.summary = usersAvg.summary;
+        const ggdata = await (0, getPrAndCommits_1.getAllData)();
+        // eslint-disable-next-line no-debugger
+        // debugger
         // TODO year commit
         // const d: ICheckPr = newAllD;
         //
         // // const tb = this.averageOBjects(d.users, ["reviewedPerc", "createdPerc"]);
         // const dUsers: IPrUser[] = this.averageUsers(d.users);
-        return Promise.resolve({ allD, newAllD });
+        return Promise.resolve({ allD, newAllD, ggdata });
     }
     addRepoProps(item) {
         const clone = Object.assign({}, item);
@@ -40235,6 +40430,14 @@ fragment currentWorkspace on Workspace {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     param4) {
         return Promise.resolve('');
+    }
+    getWeekCount() {
+        return ((new Date(this._config.maxDate ?? 0).getTime() -
+            new Date(this._config.minDate ?? 0).getTime()) /
+            1000 /
+            3600 /
+            24 /
+            7);
     }
 }
 exports.Program = Program;
