@@ -1,12 +1,12 @@
 FROM node:20-alpine
 
 RUN apk update && apk upgrade
-RUN apk add bash=5.2.26-r0
-RUN apk add dos2unix=7.5.2-r0
-RUN apk add openjdk17=17.0.12_p7-r0
+RUN apk add bash
+RUN apk add dos2unix
+RUN apk add openjdk17
 RUN apk add python3
-RUN apk add make=4.4.1-r2
-RUN apk add g++=13.2.1_git20240309-r0
+RUN apk add make
+RUN apk add g++
 #RUN apk add openjdk17 python3 make g++
 
 WORKDIR /app
