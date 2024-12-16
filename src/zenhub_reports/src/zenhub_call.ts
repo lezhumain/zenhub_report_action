@@ -24,6 +24,7 @@ import {
 import * as path from 'node:path'
 import { IMainConfig } from './main_conf'
 import { check_prs } from './checkprreviewers1'
+import { getAllData } from './getPrAndCommits'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 // const reviewer_call = require('./check_pr_reviewers.js')
@@ -1353,10 +1354,25 @@ fragment currentWorkspace on Workspace {
     // );
 
     // console.log('Getting pr data')
-    const res: { allD: ICheckPr[]; newAllD: ICheckPr } =
-      await this.getGithubData(repos)
-    // console.log('Got pr data')
-    // console.log(JSON.stringify(res, null, 2))
+    const res: {
+      allD: ICheckPr[]
+      newAllD: ICheckPr
+      ggdata: { summary: Record<string, any> }
+    } = await this.getGithubData(repos)
+
+    const weekCount = this.getWeekCount()
+    for (const user of res.newAllD.users) {
+      const target = res.ggdata.summary[user.user]
+      if (!target) {
+        continue
+      }
+      user.totalCommits = target.commit_count
+      user.created = target.pr_count
+      user.createdPerc = target.pr_perc
+      user.totalCommitsPerWeek = Number(
+        (target.commit_count / weekCount).toFixed(2)
+      )
+    }
 
     // const allD: ICheckPr[] = res.allD;
     const newAllD: ICheckPr = res.newAllD
@@ -2143,6 +2159,10 @@ fragment currentWorkspace on Workspace {
     newAllD.users = this.averageUsers(usersAvg.users)
     newAllD.summary = usersAvg.summary
 
+    const ggdata = await getAllData()
+    // eslint-disable-next-line no-debugger
+    // debugger
+
     // TODO year commit
 
     // const d: ICheckPr = newAllD;
@@ -2150,7 +2170,7 @@ fragment currentWorkspace on Workspace {
     // // const tb = this.averageOBjects(d.users, ["reviewedPerc", "createdPerc"]);
     // const dUsers: IPrUser[] = this.averageUsers(d.users);
 
-    return Promise.resolve({ allD, newAllD })
+    return Promise.resolve({ allD, newAllD, ggdata })
   }
 
   private addRepoProps(item: ISarchIssuesByPipeline): ISarchIssuesByPipeline {
@@ -2427,5 +2447,16 @@ fragment currentWorkspace on Workspace {
     param4: any
   ): Promise<string> {
     return Promise.resolve('')
+  }
+
+  private getWeekCount(): number {
+    return (
+      (new Date(this._config.maxDate ?? 0).getTime() -
+        new Date(this._config.minDate ?? 0).getTime()) /
+      1000 /
+      3600 /
+      24 /
+      7
+    )
   }
 }
