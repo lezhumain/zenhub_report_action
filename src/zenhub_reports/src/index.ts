@@ -29,6 +29,16 @@ const argConfig: Partial<IMainConfig> = {
   release: args[10] || undefined
 }
 
+for (const key of Object.keys(argConfig)) {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-expect-error
+  if (!argConfig[key]) {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    delete argConfig[key]
+  }
+}
+
 // if (args.length > 0) {
 //   Object.assign(config0, argConfig) // source's `undefined` properties will not be skipped, need to delete
 // }
