@@ -33,13 +33,13 @@ const owner = process.env.GH_REPO_OWNER // Replace with the repository owner's u
 // const repo = 'BrowserPuppeteerTests' // Replace with the repository name
 const token = process.env.GH_API_KEY // Replace with your GitHub personal access token
 
-const currentDate = new Date()
-const oneWeekAgo = new Date(currentDate)
-// const currentDateEpoch = currentDate.getTime()
-// const oneWeekAgoEpoch = oneWeekAgo.getTime()
-oneWeekAgo.setDate(currentDate.getDate() - 7)
-// const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
-// const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
+// const currentDate = new Date()
+// const oneWeekAgo = new Date(currentDate)
+// // const currentDateEpoch = currentDate.getTime()
+// // const oneWeekAgoEpoch = oneWeekAgo.getTime()
+// oneWeekAgo.setDate(currentDate.getDate() - 7)
+// // const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
+// // const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
 
 // const specificAuthor = 'author_username' // Replace with the specific author's username
 
@@ -49,16 +49,16 @@ async function fetchPullRequestsOnly(
   repoId: string,
   page = 1
 ): Promise<PullRequest[]> {
-  const sinceP = minDate
-  const untilP = maxDate
+  // const sinceP = minDate
+  // const untilP = maxDate
 
   const url = `https://api.github.com/repos/${owner}/${repoId}/pulls`
   const params = new URLSearchParams({
     state: 'all',
     sort: 'created',
     direction: 'desc',
-    sinceP,
-    untilP
+    // sinceP,
+    // untilP
   })
 
   try {
@@ -76,6 +76,9 @@ async function fetchPullRequestsOnly(
     // const sinceD = oneWeekAgo
     // const untilD = currentDate
 
+    const oneWeekAgo = new Date(minDate)
+    const currentDate = new Date(maxDate)
+
     const pulls: PullRequest[] = await response.json()
     const pullsFiltered: PullRequest[] = pulls.filter((p: PullRequest) => {
       const depoch = new Date(p.created_at).getTime()
@@ -84,7 +87,7 @@ async function fetchPullRequestsOnly(
       return res
     })
 
-    if (pulls.length === pullsFiltered.length) {
+    if (pulls.length > 0 && pulls.length === pullsFiltered.length) {
       const newFiltered = await fetchPullRequestsOnly(
         minDate,
         maxDate,
@@ -142,7 +145,7 @@ async function fetchPullRequests(
   }
 }
 
-async function fetchCommitsForPullRequest(
+export async function fetchCommitsForPullRequest(
   prNumber: number,
   repoId: string
 ): Promise<Commit[]> {
@@ -299,9 +302,11 @@ export async function getAllData(
   }
   const all: Record<string, { pr_count: number; commit_count: number }>[] = []
   for (const r of repos) {
-    const rres:
-      | Record<string, { pr_count: number; commit_count: number }>
-      | undefined = await fetch_prs_for_repo(r, config)
+    const rres: Record<string, { pr_count: number; commit_count: number }>
+      | undefined = await fetch_prs_for_repo(r, config).catch((err: any) => {
+        console.warn("err: " + err.message)
+        return undefined
+    })
     if (rres !== undefined) {
       all.push(rres)
     }

@@ -23,7 +23,7 @@ import {
 } from './models'
 import * as path from 'node:path'
 import { IMainConfig } from './main_conf'
-import { check_prs } from './checkprreviewers1'
+import { check_prs, getWeekCount } from './checkprreviewers1'
 import { getAllData } from './getPrAndCommits'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
@@ -102,10 +102,11 @@ interface IReport {
   userMoves: IUserMove[]
 }
 
-interface IPrSummary {
-  author: string
-  commentators: string[]
-  url: string
+export interface IPrSummary {
+  author: string;
+  commentators: any[];
+  commits: any[];
+  url: string;
 }
 
 export interface IProgramResult {
@@ -319,7 +320,6 @@ export class Program {
     const date = new Date()
 
     const all: ICSVResult = this.getAllCSV(report, date)
-
     const mainCSV = `${all.csvChart}\n\n${all.csvOutstanding}\n\n${all.velocityList}\n\n${all.mainList}\n\n${all.csvPrAndCommits}`
     fs.writeFileSync(
       path.join(this._mainOutputFolder, 'main_report.csv'),
@@ -1333,27 +1333,8 @@ fragment currentWorkspace on Workspace {
     const outs: ICSVItem[] = this.findOutstandingIssues(allEvs).slice(0, 5)
     // // console.log(JSON.stringify(outs, null, 2));
 
-    const allRepos: string[] = issues
-      .filter((ii: IIssue) => ii.handled)
-      .map((ii: IIssue) => ii.htmlUrl.split('/')[4])
+    const repos: string[] = Array.from(new Set(issues.map((ii) => ii.htmlUrl.split('/')[4])))
 
-    const repos: string[] = Array.from(
-      new Set([].concat(...(allRepos as any[])))
-    )
-
-    // const allD: ICheckPr[] = await Promise.all(
-    // 	repos.map(repo => {
-    // 		return reviewer_call.check_prs(repo, this._config).catch((err: Error) => {
-    // 			console.error(err.message);
-    // 			return {
-    // 				summary: [],
-    // 				users:[]
-    // 			};
-    // 		}) as ICheckPr;
-    // 	})
-    // );
-
-    // console.log('Getting pr data')
     const res: {
       allD: ICheckPr[]
       newAllD: ICheckPr
@@ -1366,9 +1347,6 @@ fragment currentWorkspace on Workspace {
       if (!target) {
         continue
       }
-      user.totalCommits = target.commit_count
-      user.created = target.pr_count
-      user.createdPerc = target.pr_perc
       user.totalCommitsPerWeek = Number(
         (target.commit_count / weekCount).toFixed(2)
       )
@@ -2088,8 +2066,9 @@ fragment currentWorkspace on Workspace {
     uu.forEach((u: IPrUser) => {
       const othersCreated = totalCreated - u.created
 
-      u.createdPerc = Number((u.created / totalCreated).toFixed(2))
-      u.reviewedPerc = Number((u.didReviewCount / othersCreated).toFixed(2))
+      u.createdPerc = totalCreated > 0 ? Number((u.created / totalCreated).toFixed(2)) : 0
+      u.reviewedPerc = othersCreated > 0 ? Number((u.didReviewCount / othersCreated).toFixed(2)) : 0
+      u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2))
     })
     return uu
   }
@@ -2099,7 +2078,7 @@ fragment currentWorkspace on Workspace {
 
     const allD: ICheckPr[] = []
     for (const repo of repos) {
-      const d = (await check_prs(repo, this._config as any).catch(
+      const d: ICheckPr = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
           const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
           console.warn(msg)
@@ -2119,14 +2098,8 @@ fragment currentWorkspace on Workspace {
       ...allD.map((ad: ICheckPr) => ad.users)
     )
 
-    // @ts-ignore
     const users: string[] = Array.from(
-      new Set(
-        [].concat(
-          // @ts-ignore
-          ...allD.map((f: ICheckPr) => f.users.map((au: IPrUser) => au.user))
-        )
-      )
+      new Set(allD.map((f: ICheckPr) => f.users.map((au: IPrUser) => au.user)).flat())
     )
     const usersAvg = users.reduce(
       (res: any, us: string) => {
@@ -2455,13 +2428,6 @@ fragment currentWorkspace on Workspace {
   }
 
   private getWeekCount(): number {
-    return (
-      (new Date(this._config.maxDate ?? 0).getTime() -
-        new Date(this._config.minDate ?? 0).getTime()) /
-      1000 /
-      3600 /
-      24 /
-      7
-    )
+    return getWeekCount(new Date(this._config.minDate ?? 0), new Date(this._config.maxDate ?? 0))
   }
 }

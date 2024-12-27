@@ -3,10 +3,13 @@ import get from 'axios'
 import { AxiosResponse } from 'axios'
 import { IGithubPR } from './igithubpr'
 import * as fs from 'node:fs'
-import { Utils } from './models'
+import { ICheckPr, Utils } from './models'
+import { fetchCommitsForPullRequest } from './getPrAndCommits'
+import { IPrSummary } from './zenhub_call'
 
-// GitHub repository owner and name
-// const repo = 'BrowserPuppeteerTests'
+export function getWeekCount(dateFrom: Date, dateTo: Date): number {
+  return Number(((dateTo.getTime() - dateFrom.getTime()) / 1000 / 3600 / 24 / 7).toFixed((2)))
+}
 
 const callGithubAPIByURL = async (apiUrl: string): Promise<AxiosResponse> => {
   return get(apiUrl, {
@@ -136,7 +139,7 @@ async function handleYearCommits(
 async function main(
   repoId: string,
   config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
-): Promise<object> {
+): Promise<ICheckPr> {
   // console.log('pr resp 0')
   const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId)
   // console.log('pr resp 1')
@@ -160,7 +163,7 @@ async function main(
   // console.log(JSON.stringify(prs, null, 2))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const summary: any[] = []
+  const summary: IPrSummary[] = []
 
   // for (const pr of openedPrs) {
   for (const pr of prs) {
@@ -184,15 +187,22 @@ async function main(
       const all_comments: object[] = comments.concat(review_comments)
       // console.log(`rr ${all_comments.length} comments for ${pr.url}`)
 
-      const commentators: object[] = Array.from(
+      const commentators: any[] = Array.from(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         new Set(all_comments.map((comment: any) => comment.user.login))
       )
 
-      const obj = {
+      const allCommitData = await fetchCommitsForPullRequest(pr.number, prs[0].head.repo.name)
+      const filteredCommit = allCommitData.filter((item: any) => {
+        const commitDate = new Date(item.commit.committer.date)
+        const created = commitDate.getTime()
+        return created >= minEpoch && created <= maxEpoch
+      })
+      const obj: IPrSummary = {
         author,
         commentators,
-        url: pr.html_url
+        url: pr.html_url,
+        commits: filteredCommit
       }
 
       // console.log('obj===')
@@ -209,7 +219,7 @@ async function main(
 
   const everyone: string[] = Array.from(
     new Set(
-      summary.reduce((acc, summaryItem) => {
+      summary.reduce((acc: string[], summaryItem: IPrSummary) => {
         acc.push(summaryItem.author)
         acc.push(...summaryItem.commentators)
         return acc
@@ -225,8 +235,8 @@ async function main(
     weeks: { w: number }[]
     incomplete?: boolean
   }[] =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    contribsResp.data.filter((r: any) => r.total > 0)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contribsResp.data.filter((r: any) => r.total > 0)
 
   if (contribs.length > 0) {
     fs.writeFileSync(
@@ -239,6 +249,8 @@ async function main(
   // console.log('pr resp 4')
   // console.log(`Everyone: ${everyone.join(',')}`)
 
+  const weekCount = getWeekCount(new Date(config.minDate), new Date(config.maxDate))
+
   for (const user of everyone) {
     // TODO single loop
     const otherPrs = summary.filter(s => s.author !== user)
@@ -246,56 +258,23 @@ async function main(
     const didReviewCount = otherPrs.filter(op =>
       op.commentators.includes(user)
     ).length
-    const reviewedPerc = Number((didReviewCount / shouldReviewCount).toFixed(2))
+    const reviewedPerc = shouldReviewCount === 0 ? 0 : Number((didReviewCount / shouldReviewCount).toFixed(2))
 
-    const contrib = contribs.find(c => c.authorName === user)
-    // copied
-    const filteredWeeks =
-      contrib?.weeks.filter(
-        w =>
-          (config.minDate === undefined ||
-            w.w * 1000 >= new Date(config.minDate).getTime()) &&
-          (config.maxDate === undefined ||
-            w.w * 1000 <= new Date(config.maxDate).getTime())
-      ) || []
-
-    const totalCommits = filteredWeeks.reduce(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (res0: number, cw: any) => res0 + cw.c,
-      0
-    )
-    const averageCommitsPerWeek = Number(
-      (filteredWeeks.length > 0
-        ? totalCommits / filteredWeeks.length
-        : 0
-      ).toFixed(2)
-    )
     const created = summary.filter(s => s.author === user)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+    const totalCommits: number = summary.map(c => c.commits.length).reduce((res, item) => res + item, 0)
+    const averageCommitsPerWeek = weekCount > 0 ? (totalCommits / weekCount) : 0
+
     res.users.push({
       user,
       shouldReviewCount,
       didReviewCount,
       reviewedPerc,
       created: created.length,
-      createdPerc: created.length / summary.length,
+      createdPerc: summary.length > 0 ? created.length / summary.length : 0,
       totalCommits,
-      totalCommitsPerWeek: averageCommitsPerWeek
+      totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2))
     })
-  }
-
-  // const dailyCommitsResp = await getCommitDailySummary(repoId)
-  // const dailyCommits = dailyCommitsResp.data
-  // console.log('pr resp 5')
-
-  // console.log('pr resp 6')
-  // console.log(JSON.stringify(yearCommits, null, 2))
-
-  try {
-    res.yearCommits = await handleYearCommits(repoId, config, 3)
-  } catch (e) {
-    console.error((e as Error).message)
-    throw e
   }
 
   return Promise.resolve(res)
@@ -304,7 +283,7 @@ async function main(
 export async function check_prs(
   repoId: string,
   config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
-): Promise<object> {
+): Promise<ICheckPr> {
   return main(repoId, config)
 }
 
