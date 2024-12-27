@@ -26,6 +26,9 @@ ENV API_KEY=$ARG_API_KEY
 ARG ARG_GH_API_KEY=abc
 ENV GH_API_KEY=$ARG_GH_API_KEY
 
+ARG ARG_GH_REPO_OWNER=abc
+ENV GH_REPO_OWNER=$ARG_GH_REPO_OWNER
+
 #ENV NODE_EXTRA_CA_CERTS="/.certificates/ZscalerRootCertificate-2048-SHA256.crt"
 
 CMD npm ci && npm run main

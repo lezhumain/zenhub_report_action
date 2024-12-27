@@ -22,6 +22,9 @@ ENV API_KEY=$ARG_API_KEY
 ARG ARG_GH_API_KEY=abc
 ENV GH_API_KEY=$ARG_GH_API_KEY
 
+ARG ARG_GH_REPO_OWNER=abc
+ENV GH_REPO_OWNER=$ARG_GH_REPO_OWNER
+
 #RUN apk info bash > /info.txt
 #RUN apk info dos2unix >> /info.txt
 #RUN apk info openjdk17 >> /info.txt
