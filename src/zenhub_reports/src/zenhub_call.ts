@@ -2159,7 +2159,12 @@ fragment currentWorkspace on Workspace {
     newAllD.users = this.averageUsers(usersAvg.users)
     newAllD.summary = usersAvg.summary
 
-    const ggdata = await getAllData()
+    const ggdata = await getAllData(
+      repos,
+      this.config.minDate && this.config.maxDate
+        ? (this.config as any)
+        : undefined
+    )
     // eslint-disable-next-line no-debugger
     // debugger
 

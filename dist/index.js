@@ -38479,9 +38479,9 @@ exports.IssueFilter = IssueFilter;
 /* eslint-disable no-tabs */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getAllData = getAllData;
-const owner = 'whitespace-software'; // Replace with the repository owner's username or organization name
-const repo = 'BrowserPuppeteerTests'; // Replace with the repository name
-const token = ''; // Replace with your GitHub personal access token
+const owner = process.env.GH_REPO_OWNER; // Replace with the repository owner's username or organization name
+// const repo = 'BrowserPuppeteerTests' // Replace with the repository name
+const token = process.env.GH_API_KEY; // Replace with your GitHub personal access token
 const currentDate = new Date();
 const oneWeekAgo = new Date(currentDate);
 // const currentDateEpoch = currentDate.getTime()
@@ -38490,10 +38490,10 @@ oneWeekAgo.setDate(currentDate.getDate() - 7);
 // const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
 // const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
 // const specificAuthor = 'author_username' // Replace with the specific author's username
-async function fetchPullRequestsOnly(minDate, maxDate, page = 1) {
+async function fetchPullRequestsOnly(minDate, maxDate, repoId, page = 1) {
     const sinceP = minDate;
     const untilP = maxDate;
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls`;
+    const url = `https://api.github.com/repos/${owner}/${repoId}/pulls`;
     const params = new URLSearchParams({
         state: 'all',
         sort: 'created',
@@ -38520,7 +38520,7 @@ async function fetchPullRequestsOnly(minDate, maxDate, page = 1) {
             return res;
         });
         if (pulls.length === pullsFiltered.length) {
-            const newFiltered = await fetchPullRequestsOnly(minDate, maxDate, page + 1);
+            const newFiltered = await fetchPullRequestsOnly(minDate, maxDate, repoId, page + 1);
             pullsFiltered.push(...newFiltered);
         }
         return pullsFiltered; // Return the result as an object
@@ -38530,11 +38530,11 @@ async function fetchPullRequestsOnly(minDate, maxDate, page = 1) {
         return []; // Return an empty array in case of error
     }
 }
-async function fetchPullRequests(minDate, maxDate) {
+async function fetchPullRequests(minDate, maxDate, repoId) {
     try {
-        const pulls = await fetchPullRequestsOnly(minDate, maxDate);
+        const pulls = await fetchPullRequestsOnly(minDate, maxDate, repoId);
         const pullRequestsWithCommits = await Promise.all(pulls.map(async (pr) => {
-            const commits = await fetchCommitsForPullRequest(pr.number); // Updated to pr_number
+            const commits = await fetchCommitsForPullRequest(pr.number, repoId); // Updated to pr_number
             // const allAuthors = Array.from(new Set(commits.map(c => c.author?.login)))
             // const mainAuthor = commits.reduce((res: { done: string[], author: string }, item: Commit, all: Commit[]) => {
             // 	const auth = item.author?.login
@@ -38558,8 +38558,8 @@ async function fetchPullRequests(minDate, maxDate) {
         return []; // Return an empty array in case of error
     }
 }
-async function fetchCommitsForPullRequest(prNumber) {
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/commits`;
+async function fetchCommitsForPullRequest(prNumber, repoId) {
+    const url = `https://api.github.com/repos/${owner}/${repoId}/pulls/${prNumber}/commits`;
     try {
         const response = await fetch(url, {
             headers: {
@@ -38597,7 +38597,7 @@ function makeStats(pullRequests) {
 async function fetch_prs_for_repo(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
     // Execute the function to fetch pull requests and handle the result
     try {
-        const pullRequests = await fetchPullRequests(config.minDate, config.maxDate);
+        const pullRequests = await fetchPullRequests(config.minDate, config.maxDate, repoId);
         console.log(pullRequests); // Log the result
         const stats = makeStats(pullRequests);
         // console.log(JSON.stringify(stats, null, 2))
@@ -38634,11 +38634,13 @@ function generateSummary(all) {
     }
     return obj;
 }
-async function getAllData() {
-    const repos = ['BrowserPuppeteerTests', 'CucuVAPI'];
+async function getAllData(repos, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+    if (repos === undefined) {
+        repos = ['BrowserPuppeteerTests', 'CucuVAPI'];
+    }
     const all = [];
     for (const r of repos) {
-        const rres = await fetch_prs_for_repo(r);
+        const rres = await fetch_prs_for_repo(r, config);
         if (rres !== undefined) {
             all.push(rres);
         }
@@ -38648,7 +38650,10 @@ async function getAllData() {
     // console.log(JSON.stringify(summary, null, 2))
     return Promise.resolve({ all, summary });
 }
-// main()
+// eslint-disable-next-line github/no-then
+// getAllData().then(res => {
+//   console.log(JSON.stringify(res, null, 2))
+// })
 
 
 /***/ }),
@@ -40250,7 +40255,9 @@ fragment currentWorkspace on Workspace {
         // newAllD.users = usersAvg.users;
         newAllD.users = this.averageUsers(usersAvg.users);
         newAllD.summary = usersAvg.summary;
-        const ggdata = await (0, getPrAndCommits_1.getAllData)();
+        const ggdata = await (0, getPrAndCommits_1.getAllData)(repos, this.config.minDate && this.config.maxDate
+            ? this.config
+            : undefined);
         // eslint-disable-next-line no-debugger
         // debugger
         // TODO year commit

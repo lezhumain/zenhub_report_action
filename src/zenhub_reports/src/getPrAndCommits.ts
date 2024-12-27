@@ -29,9 +29,9 @@ interface PullRequestWithCommits {
   commits: Commit[]
 }
 
-const owner = 'whitespace-software' // Replace with the repository owner's username or organization name
-const repo = 'BrowserPuppeteerTests' // Replace with the repository name
-const token = '' // Replace with your GitHub personal access token
+const owner = process.env.GH_REPO_OWNER // Replace with the repository owner's username or organization name
+// const repo = 'BrowserPuppeteerTests' // Replace with the repository name
+const token = process.env.GH_API_KEY // Replace with your GitHub personal access token
 
 const currentDate = new Date()
 const oneWeekAgo = new Date(currentDate)
@@ -46,12 +46,13 @@ oneWeekAgo.setDate(currentDate.getDate() - 7)
 async function fetchPullRequestsOnly(
   minDate: string,
   maxDate: string,
+  repoId: string,
   page = 1
 ): Promise<PullRequest[]> {
   const sinceP = minDate
   const untilP = maxDate
 
-  const url = `https://api.github.com/repos/${owner}/${repo}/pulls`
+  const url = `https://api.github.com/repos/${owner}/${repoId}/pulls`
   const params = new URLSearchParams({
     state: 'all',
     sort: 'created',
@@ -87,6 +88,7 @@ async function fetchPullRequestsOnly(
       const newFiltered = await fetchPullRequestsOnly(
         minDate,
         maxDate,
+        repoId,
         page + 1
       )
       pullsFiltered.push(...newFiltered)
@@ -101,13 +103,18 @@ async function fetchPullRequestsOnly(
 
 async function fetchPullRequests(
   minDate: string,
-  maxDate: string
+  maxDate: string,
+  repoId: string
 ): Promise<PullRequestWithCommits[]> {
   try {
-    const pulls: PullRequest[] = await fetchPullRequestsOnly(minDate, maxDate)
+    const pulls: PullRequest[] = await fetchPullRequestsOnly(
+      minDate,
+      maxDate,
+      repoId
+    )
     const pullRequestsWithCommits: PullRequestWithCommits[] = await Promise.all(
       pulls.map(async pr => {
-        const commits = await fetchCommitsForPullRequest(pr.number) // Updated to pr_number
+        const commits = await fetchCommitsForPullRequest(pr.number, repoId) // Updated to pr_number
         // const allAuthors = Array.from(new Set(commits.map(c => c.author?.login)))
         // const mainAuthor = commits.reduce((res: { done: string[], author: string }, item: Commit, all: Commit[]) => {
         // 	const auth = item.author?.login
@@ -135,8 +142,11 @@ async function fetchPullRequests(
   }
 }
 
-async function fetchCommitsForPullRequest(prNumber: number): Promise<Commit[]> {
-  const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/commits`
+async function fetchCommitsForPullRequest(
+  prNumber: number,
+  repoId: string
+): Promise<Commit[]> {
+  const url = `https://api.github.com/repos/${owner}/${repoId}/pulls/${prNumber}/commits`
   try {
     const response = await fetch(url, {
       headers: {
@@ -189,7 +199,11 @@ async function fetch_prs_for_repo(
 > {
   // Execute the function to fetch pull requests and handle the result
   try {
-    const pullRequests = await fetchPullRequests(config.minDate, config.maxDate)
+    const pullRequests = await fetchPullRequests(
+      config.minDate,
+      config.maxDate,
+      repoId
+    )
     console.log(pullRequests) // Log the result
     const stats: Record<string, { pr_count: number; commit_count: number }> =
       makeStats(pullRequests)
@@ -273,16 +287,21 @@ function generateSummary(
   return obj
 }
 
-export async function getAllData(): Promise<{
+export async function getAllData(
+  repos?: string[],
+  config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
+): Promise<{
   all: Record<string, { pr_count: number; commit_count: number }>[]
   summary: Record<string, { pr_count: number; commit_count: number }>
 }> {
-  const repos = ['BrowserPuppeteerTests', 'CucuVAPI']
+  if (repos === undefined) {
+    repos = ['BrowserPuppeteerTests', 'CucuVAPI']
+  }
   const all: Record<string, { pr_count: number; commit_count: number }>[] = []
   for (const r of repos) {
     const rres:
       | Record<string, { pr_count: number; commit_count: number }>
-      | undefined = await fetch_prs_for_repo(r)
+      | undefined = await fetch_prs_for_repo(r, config)
     if (rres !== undefined) {
       all.push(rres)
     }
@@ -296,4 +315,7 @@ export async function getAllData(): Promise<{
   return Promise.resolve({ all, summary })
 }
 
-// main()
+// eslint-disable-next-line github/no-then
+// getAllData().then(res => {
+//   console.log(JSON.stringify(res, null, 2))
+// })
