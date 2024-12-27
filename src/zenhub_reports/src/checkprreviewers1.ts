@@ -8,7 +8,9 @@ import { fetchCommitsForPullRequest } from './getPrAndCommits'
 import { IPrSummary } from './zenhub_call'
 
 export function getWeekCount(dateFrom: Date, dateTo: Date): number {
-  return Number(((dateTo.getTime() - dateFrom.getTime()) / 1000 / 3600 / 24 / 7).toFixed((2)))
+  return Number(
+    ((dateTo.getTime() - dateFrom.getTime()) / 1000 / 3600 / 24 / 7).toFixed(2)
+  )
 }
 
 const callGithubAPIByURL = async (apiUrl: string): Promise<AxiosResponse> => {
@@ -192,7 +194,10 @@ async function main(
         new Set(all_comments.map((comment: any) => comment.user.login))
       )
 
-      const allCommitData = await fetchCommitsForPullRequest(pr.number, prs[0].head.repo.name)
+      const allCommitData = await fetchCommitsForPullRequest(
+        pr.number,
+        prs[0].head.repo.name
+      )
       const filteredCommit = allCommitData.filter((item: any) => {
         const commitDate = new Date(item.commit.committer.date)
         const created = commitDate.getTime()
@@ -235,8 +240,8 @@ async function main(
     weeks: { w: number }[]
     incomplete?: boolean
   }[] =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  contribsResp.data.filter((r: any) => r.total > 0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    contribsResp.data.filter((r: any) => r.total > 0)
 
   if (contribs.length > 0) {
     fs.writeFileSync(
@@ -249,7 +254,10 @@ async function main(
   // console.log('pr resp 4')
   // console.log(`Everyone: ${everyone.join(',')}`)
 
-  const weekCount = getWeekCount(new Date(config.minDate), new Date(config.maxDate))
+  const weekCount = getWeekCount(
+    new Date(config.minDate),
+    new Date(config.maxDate)
+  )
 
   for (const user of everyone) {
     // TODO single loop
@@ -258,12 +266,17 @@ async function main(
     const didReviewCount = otherPrs.filter(op =>
       op.commentators.includes(user)
     ).length
-    const reviewedPerc = shouldReviewCount === 0 ? 0 : Number((didReviewCount / shouldReviewCount).toFixed(2))
+    const reviewedPerc =
+      shouldReviewCount === 0
+        ? 0
+        : Number((didReviewCount / shouldReviewCount).toFixed(2))
 
     const created = summary.filter(s => s.author === user)
 
-    const totalCommits: number = summary.map(c => c.commits.length).reduce((res, item) => res + item, 0)
-    const averageCommitsPerWeek = weekCount > 0 ? (totalCommits / weekCount) : 0
+    const totalCommits: number = summary
+      .map(c => c.commits.length)
+      .reduce((res, item) => res + item, 0)
+    const averageCommitsPerWeek = weekCount > 0 ? totalCommits / weekCount : 0
 
     res.users.push({
       user,

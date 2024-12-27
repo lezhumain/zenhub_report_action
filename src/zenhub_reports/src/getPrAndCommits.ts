@@ -56,7 +56,7 @@ async function fetchPullRequestsOnly(
   const params = new URLSearchParams({
     state: 'all',
     sort: 'created',
-    direction: 'desc',
+    direction: 'desc'
     // sinceP,
     // untilP
   })
@@ -302,10 +302,11 @@ export async function getAllData(
   }
   const all: Record<string, { pr_count: number; commit_count: number }>[] = []
   for (const r of repos) {
-    const rres: Record<string, { pr_count: number; commit_count: number }>
+    const rres:
+      | Record<string, { pr_count: number; commit_count: number }>
       | undefined = await fetch_prs_for_repo(r, config).catch((err: any) => {
-        console.warn("err: " + err.message)
-        return undefined
+      console.warn('err: ' + err.message)
+      return undefined
     })
     if (rres !== undefined) {
       all.push(rres)

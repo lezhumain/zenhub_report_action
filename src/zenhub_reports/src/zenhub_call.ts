@@ -103,10 +103,10 @@ interface IReport {
 }
 
 export interface IPrSummary {
-  author: string;
-  commentators: any[];
-  commits: any[];
-  url: string;
+  author: string
+  commentators: any[]
+  commits: any[]
+  url: string
 }
 
 export interface IProgramResult {
@@ -1333,7 +1333,9 @@ fragment currentWorkspace on Workspace {
     const outs: ICSVItem[] = this.findOutstandingIssues(allEvs).slice(0, 5)
     // // console.log(JSON.stringify(outs, null, 2));
 
-    const repos: string[] = Array.from(new Set(issues.map((ii) => ii.htmlUrl.split('/')[4])))
+    const repos: string[] = Array.from(
+      new Set(issues.map(ii => ii.htmlUrl.split('/')[4]))
+    )
 
     const res: {
       allD: ICheckPr[]
@@ -2066,8 +2068,12 @@ fragment currentWorkspace on Workspace {
     uu.forEach((u: IPrUser) => {
       const othersCreated = totalCreated - u.created
 
-      u.createdPerc = totalCreated > 0 ? Number((u.created / totalCreated).toFixed(2)) : 0
-      u.reviewedPerc = othersCreated > 0 ? Number((u.didReviewCount / othersCreated).toFixed(2)) : 0
+      u.createdPerc =
+        totalCreated > 0 ? Number((u.created / totalCreated).toFixed(2)) : 0
+      u.reviewedPerc =
+        othersCreated > 0
+          ? Number((u.didReviewCount / othersCreated).toFixed(2))
+          : 0
       u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2))
     })
     return uu
@@ -2099,7 +2105,9 @@ fragment currentWorkspace on Workspace {
     )
 
     const users: string[] = Array.from(
-      new Set(allD.map((f: ICheckPr) => f.users.map((au: IPrUser) => au.user)).flat())
+      new Set(
+        allD.map((f: ICheckPr) => f.users.map((au: IPrUser) => au.user)).flat()
+      )
     )
     const usersAvg = users.reduce(
       (res: any, us: string) => {
@@ -2428,6 +2436,9 @@ fragment currentWorkspace on Workspace {
   }
 
   private getWeekCount(): number {
-    return getWeekCount(new Date(this._config.minDate ?? 0), new Date(this._config.maxDate ?? 0))
+    return getWeekCount(
+      new Date(this._config.minDate ?? 0),
+      new Date(this._config.maxDate ?? 0)
+    )
   }
 }
