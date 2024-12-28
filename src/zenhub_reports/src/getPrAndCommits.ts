@@ -100,7 +100,9 @@ async function fetchPullRequestsOnly(
     return pullsFiltered // Return the result as an object
   } catch (error: any) {
     // console.error('Error fetching pull requests only:', error)
-    console.error(`Error fetching pull requests only: ${error.message} (${url})`)
+    console.error(
+      `Error fetching pull requests only: ${error.message} (${url})`
+    )
     return [] // Return an empty array in case of error
   }
 }
@@ -166,7 +168,9 @@ export async function fetchCommitsForPullRequest(
     const commits: Commit[] = await response.json()
     return commits
   } catch (error: any) {
-    console.error(`Error fetching commits for PR #${prNumber}: ${error.message} (${url})`)
+    console.error(
+      `Error fetching commits for PR #${prNumber}: ${error.message} (${url})`
+    )
     return []
   }
 }
