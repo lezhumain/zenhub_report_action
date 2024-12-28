@@ -38195,13 +38195,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getWeekCount = getWeekCount;
 exports.check_prs = check_prs;
 // eslint-disable-next-line import/named
 const axios_1 = __importDefault(__nccwpck_require__(7269));
 const fs = __importStar(__nccwpck_require__(3024));
 const models_1 = __nccwpck_require__(6099);
-// GitHub repository owner and name
-// const repo = 'BrowserPuppeteerTests'
+const getPrAndCommits_1 = __nccwpck_require__(8194);
+function getWeekCount(dateFrom, dateTo) {
+    return Number(((dateTo.getTime() - dateFrom.getTime()) / 1000 / 3600 / 24 / 7).toFixed(2));
+}
 const callGithubAPIByURL = async (apiUrl) => {
     return (0, axios_1.default)(apiUrl, {
         headers: {
@@ -38338,10 +38341,17 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
             const commentators = Array.from(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             new Set(all_comments.map((comment) => comment.user.login)));
+            const allCommitData = await (0, getPrAndCommits_1.fetchCommitsForPullRequest)(pr.number, prs[0].head.repo.name);
+            const filteredCommit = allCommitData.filter((item) => {
+                const commitDate = new Date(item.commit.committer.date);
+                const created = commitDate.getTime();
+                return created >= minEpoch && created <= maxEpoch;
+            });
             const obj = {
                 author,
                 commentators,
-                url: pr.html_url
+                url: pr.html_url,
+                commits: filteredCommit
             };
             // console.log('obj===')
             // console.log(obj)
@@ -38369,48 +38379,30 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     }
     // console.log('pr resp 4')
     // console.log(`Everyone: ${everyone.join(',')}`)
+    const weekCount = getWeekCount(new Date(config.minDate), new Date(config.maxDate));
     for (const user of everyone) {
         // TODO single loop
         const otherPrs = summary.filter(s => s.author !== user);
         const shouldReviewCount = otherPrs.length;
         const didReviewCount = otherPrs.filter(op => op.commentators.includes(user)).length;
-        const reviewedPerc = Number((didReviewCount / shouldReviewCount).toFixed(2));
-        const contrib = contribs.find(c => c.authorName === user);
-        // copied
-        const filteredWeeks = contrib?.weeks.filter(w => (config.minDate === undefined ||
-            w.w * 1000 >= new Date(config.minDate).getTime()) &&
-            (config.maxDate === undefined ||
-                w.w * 1000 <= new Date(config.maxDate).getTime())) || [];
-        const totalCommits = filteredWeeks.reduce(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (res0, cw) => res0 + cw.c, 0);
-        const averageCommitsPerWeek = Number((filteredWeeks.length > 0
-            ? totalCommits / filteredWeeks.length
-            : 0).toFixed(2));
+        const reviewedPerc = shouldReviewCount === 0
+            ? 0
+            : Number((didReviewCount / shouldReviewCount).toFixed(2));
         const created = summary.filter(s => s.author === user);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const totalCommits = summary
+            .map(c => c.commits.length)
+            .reduce((res, item) => res + item, 0);
+        const averageCommitsPerWeek = weekCount > 0 ? totalCommits / weekCount : 0;
         res.users.push({
             user,
             shouldReviewCount,
             didReviewCount,
             reviewedPerc,
             created: created.length,
-            createdPerc: created.length / summary.length,
+            createdPerc: summary.length > 0 ? created.length / summary.length : 0,
             totalCommits,
-            totalCommitsPerWeek: averageCommitsPerWeek
+            totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2))
         });
-    }
-    // const dailyCommitsResp = await getCommitDailySummary(repoId)
-    // const dailyCommits = dailyCommitsResp.data
-    // console.log('pr resp 5')
-    // console.log('pr resp 6')
-    // console.log(JSON.stringify(yearCommits, null, 2))
-    try {
-        res.yearCommits = await handleYearCommits(repoId, config, 3);
-    }
-    catch (e) {
-        console.error(e.message);
-        throw e;
     }
     return Promise.resolve(res);
 }
@@ -38478,28 +38470,29 @@ exports.IssueFilter = IssueFilter;
 
 /* eslint-disable no-tabs */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fetchCommitsForPullRequest = fetchCommitsForPullRequest;
 exports.getAllData = getAllData;
 const owner = process.env.GH_REPO_OWNER; // Replace with the repository owner's username or organization name
 // const repo = 'BrowserPuppeteerTests' // Replace with the repository name
 const token = process.env.GH_API_KEY; // Replace with your GitHub personal access token
-const currentDate = new Date();
-const oneWeekAgo = new Date(currentDate);
-// const currentDateEpoch = currentDate.getTime()
-// const oneWeekAgoEpoch = oneWeekAgo.getTime()
-oneWeekAgo.setDate(currentDate.getDate() - 7);
-// const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
-// const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
+// const currentDate = new Date()
+// const oneWeekAgo = new Date(currentDate)
+// // const currentDateEpoch = currentDate.getTime()
+// // const oneWeekAgoEpoch = oneWeekAgo.getTime()
+// oneWeekAgo.setDate(currentDate.getDate() - 7)
+// // const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
+// // const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
 // const specificAuthor = 'author_username' // Replace with the specific author's username
 async function fetchPullRequestsOnly(minDate, maxDate, repoId, page = 1) {
-    const sinceP = minDate;
-    const untilP = maxDate;
+    // const sinceP = minDate
+    // const untilP = maxDate
     const url = `https://api.github.com/repos/${owner}/${repoId}/pulls`;
     const params = new URLSearchParams({
         state: 'all',
         sort: 'created',
-        direction: 'desc',
-        sinceP,
-        untilP
+        direction: 'desc'
+        // sinceP,
+        // untilP
     });
     try {
         const response = await fetch(`${url}?${params}`, {
@@ -38513,20 +38506,23 @@ async function fetchPullRequestsOnly(minDate, maxDate, repoId, page = 1) {
         }
         // const sinceD = oneWeekAgo
         // const untilD = currentDate
+        const oneWeekAgo = new Date(minDate);
+        const currentDate = new Date(maxDate);
         const pulls = await response.json();
         const pullsFiltered = pulls.filter((p) => {
             const depoch = new Date(p.created_at).getTime();
             const res = depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime();
             return res;
         });
-        if (pulls.length === pullsFiltered.length) {
+        if (pulls.length > 0 && pulls.length === pullsFiltered.length) {
             const newFiltered = await fetchPullRequestsOnly(minDate, maxDate, repoId, page + 1);
             pullsFiltered.push(...newFiltered);
         }
         return pullsFiltered; // Return the result as an object
     }
     catch (error) {
-        console.error('Error fetching pull requests only:', error);
+        // console.error('Error fetching pull requests only:', error)
+        console.error(`Error fetching pull requests only: ${error.message} (${url})`);
         return []; // Return an empty array in case of error
     }
 }
@@ -38574,7 +38570,7 @@ async function fetchCommitsForPullRequest(prNumber, repoId) {
         return commits;
     }
     catch (error) {
-        console.error(`Error fetching commits for PR #${prNumber}:`, error);
+        console.error(`Error fetching commits for PR #${prNumber}: ${error.message} (${url})`);
         return [];
     }
 }
@@ -38640,7 +38636,10 @@ async function getAllData(repos, config = { minDate: '2024-04-22', maxDate: '202
     }
     const all = [];
     for (const r of repos) {
-        const rres = await fetch_prs_for_repo(r, config);
+        const rres = await fetch_prs_for_repo(r, config).catch((err) => {
+            console.warn('err: ' + err.message);
+            return undefined;
+        });
         if (rres !== undefined) {
             all.push(rres);
         }
@@ -39676,22 +39675,7 @@ fragment currentWorkspace on Workspace {
         // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
         const outs = this.findOutstandingIssues(allEvs).slice(0, 5);
         // // console.log(JSON.stringify(outs, null, 2));
-        const allRepos = issues
-            .filter((ii) => ii.handled)
-            .map((ii) => ii.htmlUrl.split('/')[4]);
-        const repos = Array.from(new Set([].concat(...allRepos)));
-        // const allD: ICheckPr[] = await Promise.all(
-        // 	repos.map(repo => {
-        // 		return reviewer_call.check_prs(repo, this._config).catch((err: Error) => {
-        // 			console.error(err.message);
-        // 			return {
-        // 				summary: [],
-        // 				users:[]
-        // 			};
-        // 		}) as ICheckPr;
-        // 	})
-        // );
-        // console.log('Getting pr data')
+        const repos = Array.from(new Set(issues.map(ii => ii.htmlUrl.split('/')[4])));
         const res = await this.getGithubData(repos);
         const weekCount = this.getWeekCount();
         for (const user of res.newAllD.users) {
@@ -39699,9 +39683,6 @@ fragment currentWorkspace on Workspace {
             if (!target) {
                 continue;
             }
-            user.totalCommits = target.commit_count;
-            user.created = target.pr_count;
-            user.createdPerc = target.pr_perc;
             user.totalCommitsPerWeek = Number((target.commit_count / weekCount).toFixed(2));
         }
         // const allD: ICheckPr[] = res.allD;
@@ -40205,8 +40186,13 @@ fragment currentWorkspace on Workspace {
         const totalCreated = uu.reduce((res, it) => res + it.created, 0);
         uu.forEach((u) => {
             const othersCreated = totalCreated - u.created;
-            u.createdPerc = Number((u.created / totalCreated).toFixed(2));
-            u.reviewedPerc = Number((u.didReviewCount / othersCreated).toFixed(2));
+            u.createdPerc =
+                totalCreated > 0 ? Number((u.created / totalCreated).toFixed(2)) : 0;
+            u.reviewedPerc =
+                othersCreated > 0
+                    ? Number((u.didReviewCount / othersCreated).toFixed(2))
+                    : 0;
+            u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2));
         });
         return uu;
     }
@@ -40229,10 +40215,7 @@ fragment currentWorkspace on Workspace {
         const prUsers = [].concat(
         // @ts-ignore
         ...allD.map((ad) => ad.users));
-        // @ts-ignore
-        const users = Array.from(new Set([].concat(
-        // @ts-ignore
-        ...allD.map((f) => f.users.map((au) => au.user)))));
+        const users = Array.from(new Set(allD.map((f) => f.users.map((au) => au.user)).flat()));
         const usersAvg = users.reduce((res, us) => {
             // @ts-ignore
             const prUs = prUsers.filter((u) => u.user === us);
@@ -40439,12 +40422,7 @@ fragment currentWorkspace on Workspace {
         return Promise.resolve('');
     }
     getWeekCount() {
-        return ((new Date(this._config.maxDate ?? 0).getTime() -
-            new Date(this._config.minDate ?? 0).getTime()) /
-            1000 /
-            3600 /
-            24 /
-            7);
+        return (0, checkprreviewers1_1.getWeekCount)(new Date(this._config.minDate ?? 0), new Date(this._config.maxDate ?? 0));
     }
 }
 exports.Program = Program;
