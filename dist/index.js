@@ -38136,7 +38136,7 @@ class Main {
             const res = await program.main(mainFilter.filterIssues, mainFilter.filterEvents);
             const file = 'zenhub_report.md';
             fs.writeFileSync(file, res.mark, { encoding: 'utf8' });
-            core.setOutput('markdownContent', res.mark);
+            // core.setOutput('markdownContent', res.mark)
         }
         catch (error) {
             // Fail the workflow run if an error occurs
@@ -38521,7 +38521,8 @@ async function fetchPullRequestsOnly(minDate, maxDate, repoId, page = 1) {
         return pullsFiltered; // Return the result as an object
     }
     catch (error) {
-        console.error('Error fetching pull requests only:', error);
+        // console.error('Error fetching pull requests only:', error)
+        console.error(`Error fetching pull requests only: ${error.message} (${url})`);
         return []; // Return an empty array in case of error
     }
 }
@@ -38569,7 +38570,7 @@ async function fetchCommitsForPullRequest(prNumber, repoId) {
         return commits;
     }
     catch (error) {
-        console.error(`Error fetching commits for PR #${prNumber}:`, error);
+        console.error(`Error fetching commits for PR #${prNumber}: ${error.message} (${url})`);
         return [];
     }
 }
