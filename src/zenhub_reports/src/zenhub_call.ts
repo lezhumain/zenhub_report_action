@@ -1885,7 +1885,9 @@ fragment currentWorkspace on Workspace {
         return clone
       }
     )
-    report.userReviewStats = userReviewStatsAnon.map(r => Object.assign({} as IPrReviewStat, r))
+    report.userReviewStats = userReviewStatsAnon.map(r =>
+      Object.assign({} as IPrReviewStat, r)
+    )
     const csvPrAndCommits = this.toCSV(userReviewStatsAnon, false)
 
     return {
