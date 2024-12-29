@@ -755,11 +755,11 @@ export class Program {
     last = 73
   ): Promise<IWorkspace> {
     // console.log('Getting board data')
-    console.log("Getting board")
+    console.log('Getting board')
     const base: IWorkspace = await this.getBoard(workspaceId, last)
-    console.log("Getting releases")
+    console.log('Getting releases')
     this._config.releaseID = await this.getReleases(workspaceId)
-    console.log("PArsing stuff")
+    console.log('PArsing stuff')
 
     for (const pieline of base.pipelinesConnection) {
       const pipelineID = pieline.id
@@ -1063,7 +1063,7 @@ fragment currentWorkspace on Workspace {
       let allMsg = msg
       for (const err of this._errorMessages) {
         console.error(err)
-        allMsg += "\n\t" + err
+        allMsg += '\n\t' + err
       }
       throw new Error(allMsg)
     }
