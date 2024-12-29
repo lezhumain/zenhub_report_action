@@ -38404,7 +38404,7 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
         //   .reduce((res, item) => res + item, 0)
         const myCommits = createdPrs
             .map(c => c.commits.length)
-            .reduce((res, item) => res + item, 0);
+            .reduce((res0, item) => res0 + item, 0);
         const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0;
         res.users.push({
             user,
@@ -39201,12 +39201,6 @@ class Program {
             throw new Error(`Failed to fetch ZenHub API: ${t}`);
         }
         return response.json();
-        // .then(data => {
-        // 	// console.log(data);
-        // })
-        // .catch(error => {
-        // 	console.error(error);
-        // })
     }
     async getEvents(repositoryGhId, issueNumber, last = 50) {
         const query = `query getTimelineItems($repositoryGhId: Int!, $issueNumber: Int!) {
@@ -39294,7 +39288,8 @@ class Program {
                         : undefined,
                     repositoryGhId: Number(ee.repository.ghId),
                     pipelineName: item.name,
-                    labels: ee.labels?.nodes?.map((n) => n.name) || undefined,
+                    labels: ee.labels?.nodes?.map((n) => n.name) ||
+                        undefined,
                     releases: ee.releases?.nodes?.map((n) => n.title) || undefined,
                     events: ee.events,
                     pullRequest: !!ee.pullRequest,
@@ -39359,11 +39354,22 @@ fragment currentWorkspace on Workspace {
   }
 }`;
         const variables = { workspaceId };
-        const res1 = await this.callZenhub(query, variables);
-        const err = res1.errors?.map((e) => e.message) || [];
+        let tmpRes = null;
+        const errors = [];
+        try {
+            tmpRes = await this.callZenhub(query, variables);
+            if (tmpRes.errors) {
+                errors.push(...tmpRes.errors.slice());
+            }
+        }
+        catch (e) {
+            errors.push(e);
+        }
+        const err = errors.map((e) => e.message);
         if (err.length > 0) {
             return Promise.reject(new Error(err.join('\n')));
         }
+        const res1 = tmpRes;
         const releases = Array.from(new Set([]
             .concat(...[]
             .concat(...res1.data.workspace.pipelinesConnection.nodes.map((n) => n.issues.nodes.map((nn) => nn.releases.nodes)))
@@ -40043,7 +40049,7 @@ fragment currentWorkspace on Workspace {
             delete clone.shouldReviewCount;
             return clone;
         });
-        report.userReviewStats = userReviewStatsAnon;
+        report.userReviewStats = userReviewStatsAnon.map(r => Object.assign({}, r));
         const csvPrAndCommits = this.toCSV(userReviewStatsAnon, false);
         return {
             csvChart,
@@ -40099,32 +40105,53 @@ fragment currentWorkspace on Workspace {
     csvPrAndCommits) {
         return Promise.resolve('');
     }
-    async getChartGeneric(title, outputFile, csvPrAndCommits, key, labelKey) {
-        // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
-        const items = csvPrAndCommits.map(c => {
-            return {
-                label: labelKey === undefined ? '' : c[labelKey],
-                data: c[key]
-            };
-        });
-        return this.doGenerateChartFromObj(title, items, outputFile, {
-            width: 1600,
-            height: 1200
-        });
-    }
-    async generateChartFromArray(imgFiles, dataq, sizePerc) {
-        if (sizePerc < 0) {
-            sizePerc *= 100;
-        }
-        const res = [];
-        for (const dat of imgFiles) {
-            const b64img = await this.getChartGeneric(dat.title, dat.path, dataq, dat.key, dat.labelKey);
-            res.push(`<!--<img style="width: ${sizePerc}%" title="${dat.title}" src="${dat.path.replace(/output./, '')}">-->`);
-            // const b64img: string = fs.readFileSync(dat.path, { encoding: "base64" });
-            res.push(`<img style="width: ${sizePerc}%" title="${dat.title}" src="data:image/png;base64,${b64img}">`);
-        }
-        return res.join('');
-    }
+    // private async getChartGeneric(
+    //   title: string,
+    //   outputFile: string,
+    //   csvPrAndCommits: object[],
+    //   key: string,
+    //   labelKey?: string
+    // ): Promise<string> {
+    //   // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
+    //   const items: object[] = csvPrAndCommits.map(c => {
+    //     return {
+    //       label: labelKey === undefined ? '' : c[labelKey],
+    //       data: c[key]
+    //     } as any
+    //   })
+    //   return this.doGenerateChartFromObj(title, items, outputFile, {
+    //     width: 1600,
+    //     height: 1200
+    //   })
+    // }
+    //
+    // private async generateChartFromArray(
+    //   imgFiles: any[],
+    //   dataq: object[],
+    //   sizePerc: number
+    // ): Promise<string> {
+    //   if (sizePerc < 0) {
+    //     sizePerc *= 100
+    //   }
+    //   const res: string[] = []
+    //   for (const dat of imgFiles) {
+    //     const b64img: string = await this.getChartGeneric(
+    //       dat.title,
+    //       dat.path,
+    //       dataq,
+    //       dat.key,
+    //       dat.labelKey
+    //     )
+    //     res.push(
+    //       `<!--<img style="width: ${sizePerc}%" title="${dat.title}" src="${dat.path.replace(/output./, '')}">-->`
+    //     )
+    //     // const b64img: string = fs.readFileSync(dat.path, { encoding: "base64" });
+    //     res.push(
+    //       `<img style="width: ${sizePerc}%" title="${dat.title}" src="data:image/png;base64,${b64img}">`
+    //     )
+    //   }
+    //   return res.join('')
+    // }
     averageOBjects(objects, includeKeys) {
         const result = {};
         for (const obj of objects) {
@@ -40403,17 +40430,26 @@ fragment currentWorkspace on Workspace {
                 }
                 : null;
         })
-            .filter(r => !!r);
+            .filter(r => r !== null);
         const tot = remainingEstimatedDays.reduce((res0, item) => res0 + item.durationAverage, 0);
+        const myResult = [];
         for (const item of remainingEstimatedDays) {
-            item.durationAveragePerc = item.durationAverage / tot;
+            const newObj = {
+                pipeline: item.pipeline,
+                durationAverage: item.durationAverage,
+                count: item.count,
+                durationAveragePerc: item.durationAverage / tot,
+                durationAveragePercSum: 0,
+                estimatedRemainingDays: 0
+            };
+            myResult.push(newObj);
         }
         const sum = this.getTotalMsAverageFromPipelineToPipelineConfig(avg);
         let percSum = 0;
         let countTotal = 0;
         let remainingTotal = 0;
-        for (let i = remainingEstimatedDays.length - 1; i >= 0; --i) {
-            const iItem = remainingEstimatedDays[i];
+        for (let i = myResult.length - 1; i >= 0; --i) {
+            const iItem = myResult[i];
             countTotal += iItem.count;
             iItem.durationAveragePercSum =
                 this.getTotalMsAverageFromPipelineToPipelineStr(avg, iItem.pipeline, this._config.toPipeline || this._pipelines[this._pipelines.length - 1]) / sum;
@@ -40421,15 +40457,15 @@ fragment currentWorkspace on Workspace {
             iItem.estimatedRemainingDays = Number((iItem.durationAveragePercSum * stats.average * iItem.count).toFixed(1));
             remainingTotal += iItem.estimatedRemainingDays;
         }
-        remainingEstimatedDays.push({
+        myResult.push({
             pipeline: '',
-            durationAverage: '',
+            durationAverage: 0,
             count: countTotal,
             durationAveragePerc: percSum,
-            durationAveragePercSum: '',
-            estimatedRemainingDays: remainingTotal.toFixed(1)
+            durationAveragePercSum: 0,
+            estimatedRemainingDays: Number(remainingTotal.toFixed(1))
         });
-        return remainingEstimatedDays;
+        return myResult;
     }
     async doGenerateChartFromObj(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -40441,9 +40477,6 @@ fragment currentWorkspace on Workspace {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     param4) {
         return Promise.resolve('');
-    }
-    getWeekCount() {
-        return (0, checkprreviewers1_1.getWeekCount)(new Date(this._config.minDate ?? 0), new Date(this._config.maxDate ?? 0));
     }
 }
 exports.Program = Program;
