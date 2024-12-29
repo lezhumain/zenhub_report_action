@@ -605,7 +605,8 @@ export class Program {
     })
 
     if (!response.ok) {
-      throw new Error('Failed to fetch ZenHub API')
+      const t = await response.text()
+      throw new Error('Failed to fetch ZenHub API: ' + t)
     }
 
     return response.json()
@@ -871,11 +872,16 @@ fragment currentWorkspace on Workspace {
 
     const variables = { workspaceId }
 
-    const res1 = await this.callZenhub(query, variables)
+    let res1 = null
+    try {
+      res1 = await this.callZenhub(query, variables)
+    } catch (e) {
+      res1 = { errors: [e] }
+    }
 
-    const err = res1.errors?.map((e: any) => e.message) || []
+    const err = res1?.errors?.map((e: any) => e.message) ?? []
     if (err.length > 0) {
-      const errr = new Error(err.join(' --- '))
+      const errr = new Error('Error: ' + err.join(' --- '))
       // return Promise.reject(errr)
       throw errr
     }
@@ -1065,7 +1071,7 @@ fragment currentWorkspace on Workspace {
       let allMsg = msg
       for (const err of this._errorMessages) {
         console.error(err)
-        allMsg += '\n\t' + err
+        allMsg += '---' + err
       }
       throw new Error(allMsg)
     }
