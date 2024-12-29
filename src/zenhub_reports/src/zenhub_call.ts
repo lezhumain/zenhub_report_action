@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any,github/no-then */
 import md5 from 'md5'
 import * as fs from 'fs'
 import {
@@ -9,9 +8,7 @@ import {
   IWorkspace,
   IGhEvent,
   ControlChartItem,
-  Utils,
   IStatResult,
-  StatHelper,
   IVelocity,
   IVelocityItem,
   ISarchIssuesByPipeline,
@@ -19,7 +16,9 @@ import {
   ISummary,
   IPrUser,
   IPrReviewStat,
-  IOpenedIssue
+  IOpenedIssue,
+  utils,
+  statHelper
 } from './models'
 import * as path from 'node:path'
 import { IMainConfig } from './main_conf'
@@ -69,11 +68,12 @@ export interface IAVGItemMap {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-export class FileUtils {
-  static fileExists(filePath: string): boolean {
+class FileUtils {
+  fileExists(filePath: string): boolean {
     return fs.existsSync(filePath)
   }
 }
+export const fileUtils = new FileUtils()
 
 interface IHandleIssueResult {
   csvItems: ICSVItem[]
@@ -216,7 +216,7 @@ export class Program {
     }
     this._config = Object.assign(defaultConfig, config)
 
-    if (!Utils.isHex(this._config.workspaceId)) {
+    if (!utils.isHex(this._config.workspaceId)) {
       throw new Error('Bad workspace ID')
     }
 
@@ -249,14 +249,13 @@ export class Program {
       }
     }
 
-    for (const key of Object.keys(this._config)) {
-      // @ts-ignore
-      if (!this._config[key]) {
-        // @ts-ignore
-        // this._config[key] = undefined;
-        delete this._config[key]
+    const partial: Partial<IMainConfig> = Object.assign({}, this._config)
+    for (const key of Object.keys(partial) as (keyof IMainConfig)[]) {
+      if (!partial[key]) {
+        delete partial[key]
       }
     }
+    this._config = partial as IMainConfig
 
     const str = JSON.stringify(this._config)
     this._configHash = md5(str)
@@ -359,7 +358,7 @@ export class Program {
       existing ||
       (await this.getEvents(
         issueObj.repositoryGhId,
-        Utils.issueNumberAsNumber(issueNumber)
+        utils.issueNumberAsNumber(issueNumber)
       ).catch(err => {
         this._errorMessages.push(err.message)
         return []
@@ -467,7 +466,7 @@ export class Program {
           data: {
             count: 1,
             duration: ev.duration,
-            durationDays: Utils.getMsAsDays(ev.duration),
+            durationDays: utils.getMsAsDays(ev.duration),
             durationAverage: 0,
             durationString: '',
             durationAverageString: ''
@@ -495,8 +494,8 @@ export class Program {
                 if (movedToEvs.length > 0 && movedToEvs[0].data.from_pipeline) {
                   if (
                     this.comparePipelines(
-                      movedToEvs[0].data.to_pipeline,
-                      movedToEvs[0].data.from_pipeline
+                      movedToEvs[0].data.to_pipeline.name,
+                      movedToEvs[0].data.from_pipeline.name
                     )
                   ) {
                     res.back++
@@ -519,7 +518,7 @@ export class Program {
     }
     for (const pipelineKey of Object.keys(avgObj)) {
       avgObj[pipelineKey].data.durationString =
-        Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration)
+        utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration)
 
       avgObj[pipelineKey].data.durationAverage = Number(
         (
@@ -528,11 +527,11 @@ export class Program {
       )
 
       avgObj[pipelineKey].data.durationAverageString =
-        Utils.millisecondsToHumanReadableTime(
+        utils.millisecondsToHumanReadableTime(
           avgObj[pipelineKey].data.durationAverage
         )
 
-      avgObj[pipelineKey].data.durationDays = Utils.getMsAsDays(
+      avgObj[pipelineKey].data.durationDays = utils.getMsAsDays(
         avgObj[pipelineKey].data.duration
       )
     }
@@ -565,11 +564,11 @@ export class Program {
 
       return {
         duration: diff,
-        durationString: Utils.millisecondsToHumanReadableTime(diff),
+        durationString: utils.millisecondsToHumanReadableTime(diff),
         durationPerEstimate: diffPerEstimate,
         durationStringPerEstimate:
           diffPerEstimate !== undefined
-            ? Utils.millisecondsToHumanReadableTime(diffPerEstimate)
+            ? utils.millisecondsToHumanReadableTime(diffPerEstimate)
             : undefined,
         pipeline: prevEv.data.to_pipeline.name,
         event: `${prevEv.data.to_pipeline.name} to ${ev.data.to_pipeline.name}`,
@@ -606,7 +605,7 @@ export class Program {
 
     if (!response.ok) {
       const t = await response.text()
-      throw new Error('Failed to fetch ZenHub API: ' + t)
+      throw new Error(`Failed to fetch ZenHub API: ${t}`)
     }
 
     return response.json()
@@ -726,7 +725,7 @@ export class Program {
         const eventsTmp: Issue[] = item.issues
         const issues0: IIssue[] = eventsTmp.map((ee: Issue) => {
           const o: IIssue = {
-            number: Utils.issueNumberAsString(ee.number),
+            number: utils.issueNumberAsString(ee.number),
             estimateValue:
               ee.estimate !== null && ee.estimate !== undefined
                 ? Number(ee.estimate.value)
@@ -881,7 +880,7 @@ fragment currentWorkspace on Workspace {
 
     const err = res1?.errors?.map((e: any) => e.message) ?? []
     if (err.length > 0) {
-      const errr = new Error('Error: ' + err.join(' --- '))
+      const errr = new Error(`Error: ${err.join(' --- ')}`)
       // return Promise.reject(errr)
       throw errr
     }
@@ -1071,7 +1070,7 @@ fragment currentWorkspace on Workspace {
       let allMsg = msg
       for (const err of this._errorMessages) {
         console.error(err)
-        allMsg += '---' + err
+        allMsg += `---${err}`
       }
       throw new Error(allMsg)
     }
@@ -1278,34 +1277,32 @@ fragment currentWorkspace on Workspace {
     })
 
     let issueWithEventCount = 0
-    board.pipelinesConnection.forEach(
-      (pipelineConnect: IPipelinesConnection) => {
-        pipelineConnect.issues.forEach((issue: Issue) => {
-          // if(issue.number) {
-          // 	issue.events = issue.number;
-          // } else {
-          // 	const issueNumberBits = issue.htmlUrl?.split("/") || [];
-          // 	const issueNumber = issueNumberBits[issueNumberBits.length - 1];
-          // 	issue.events = this._eventsPerIssue[issueNumber] || [];
-          // }
-          let issueNumber: number
-          if (issue.number) {
-            issueNumber = issue.number
-          } else {
-            const issueNumberBits = issue.htmlUrl?.split('/') || [undefined]
-            issueNumber = Number(issueNumberBits[issueNumberBits.length - 1])
-          }
-          const issueEvents = issueNumber
-            ? this._eventsPerIssue[Utils.issueNumberAsString(issueNumber)] || []
-            : []
-          issue.events = issueEvents
+    for (const pipelineConnect of board.pipelinesConnection) {
+      for (const issue of pipelineConnect.issues) {
+        // if(issue.number) {
+        // 	issue.events = issue.number;
+        // } else {
+        // 	const issueNumberBits = issue.htmlUrl?.split("/") || [];
+        // 	const issueNumber = issueNumberBits[issueNumberBits.length - 1];
+        // 	issue.events = this._eventsPerIssue[issueNumber] || [];
+        // }
+        let issueNumber: number
+        if (issue.number) {
+          issueNumber = issue.number
+        } else {
+          const issueNumberBits = issue.htmlUrl?.split('/') || [undefined]
+          issueNumber = Number(issueNumberBits[issueNumberBits.length - 1])
+        }
+        const issueEvents = issueNumber
+          ? this._eventsPerIssue[utils.issueNumberAsString(issueNumber)] || []
+          : []
+        issue.events = issueEvents
 
-          if (issueEvents.length > 0) {
-            issueWithEventCount++
-          }
-        })
+        if (issueEvents.length > 0) {
+          issueWithEventCount++
+        }
       }
-    )
+    }
 
     fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
       encoding: 'utf8'
@@ -1318,7 +1315,7 @@ fragment currentWorkspace on Workspace {
     const completinList: number[] = chartData.map(c =>
       Number(c.completionTimeStr)
     )
-    const stats: IStatResult = StatHelper.getStats(completinList)
+    const stats: IStatResult = statHelper.getStats(completinList)
 
     const openedPerPipeline = this.getOpenedPerPipeline(
       avg,
@@ -1336,7 +1333,7 @@ fragment currentWorkspace on Workspace {
     const completinEstimateList: number[] = chartData
       .filter((cd: IControlChartItem) => cd.estimate > 0)
       .map(c => Number(c.completionTimeStr) / c.estimate)
-    const statsEstimate: IStatResult = StatHelper.getStats(
+    const statsEstimate: IStatResult = statHelper.getStats(
       completinEstimateList
     )
 
@@ -1503,7 +1500,7 @@ fragment currentWorkspace on Workspace {
       fullHTML
     )
 
-    const mark = `${Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`
+    const mark = `${utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`
     fs.writeFileSync(
       path.join(this._mainOutputFolder, 'main_report.md'),
       mark,
@@ -1539,7 +1536,7 @@ fragment currentWorkspace on Workspace {
 
     const strVal =
       this._estimateRemainingMs <= this._estimateRemainingPrveiousMs
-        ? `${Utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
+        ? `${utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
         : 'estimating...'
 
     console.log(`Remaining: ${strVal}`)
@@ -1547,7 +1544,7 @@ fragment currentWorkspace on Workspace {
 
   private getFromFile(): IWorkspace | null {
     // console.log(`Getting from file ${this._file}`)
-    if (!FileUtils.fileExists(this._file)) {
+    if (!fileUtils.fileExists(this._file)) {
       // console.log(`File doesn't exist`)
       return null
     }
@@ -1596,8 +1593,8 @@ fragment currentWorkspace on Workspace {
         : null
     })
     const res: IControlChartItem[] = tmp
-      .filter((r: IControlChartItem | null) => r !== null)
-      .map(r => r!.toObj())
+      .filter((r: ControlChartItem | null) => r !== null)
+      .map((r: ControlChartItem | null) => (r as ControlChartItem).toObj())
 
     res.sort((a: IControlChartItem, b: IControlChartItem) => {
       return a.comppleted.getTime() - b.comppleted.getTime()
@@ -1625,15 +1622,6 @@ fragment currentWorkspace on Workspace {
                       .map((l: any) => {
                         return `<tr>${headers
                           .map(lkey => {
-                            // const it = l[lkey]
-                            // const isArr = Array.isArray(it)
-                            // const val =
-                            //   !isArr ||
-                            //   it.every((r: any) => typeof r === 'string')
-                            //     ? it?.toString() || ''
-                            //     : this.generateTable(it)
-                            // return `<td>${val}</td>`
-
                             const specRes: string | undefined | null =
                               specFn && specFn(lkey, l)
                             return `<td>${
@@ -1727,14 +1715,14 @@ fragment currentWorkspace on Workspace {
 
     const firstDayOfMonthPosInWeek = firstDayOfMonth.getDay()
 
-    const firstDayOfFirstWeek: Date = Utils.addDay(
+    const firstDayOfFirstWeek: Date = utils.addDay(
       firstDayOfMonth,
       firstDayOfMonthPosInWeek * -1
     )
 
     let res = 1
     while (
-      date.getDate() > Utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()
+      date.getDate() > utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()
     ) {
       ++res
     }
@@ -1891,7 +1879,7 @@ fragment currentWorkspace on Workspace {
                     ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
                 </tbody>
             </table>`
-    // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
+    // return `<div> ${title ? `<h3>${title}</h3>` : ''}${tableStr} </div>`;
     return tableStr
   }
 
@@ -1937,7 +1925,7 @@ fragment currentWorkspace on Workspace {
     key: string,
     labelKey?: string
   ): Promise<string> {
-    // await this.generateChartFromObj("", evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
+    // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
     const items: any[] = csvPrAndCommits.map(c => {
       return {
         label: labelKey === undefined ? '' : c[labelKey],
@@ -1981,8 +1969,9 @@ fragment currentWorkspace on Workspace {
   private averageOBjects<T>(objects: T[], includeKeys: string[]): T {
     const result: any = {}
 
-    objects.forEach((obj: any) => {
-      Object.keys(obj).forEach(key => {
+    for (const obj of objects) {
+      const keys = Object.keys(obj as any) as (keyof T)[]
+      for (const key of keys) {
         if (Array.isArray(obj[key])) {
           result[key] = this.averageOBjects(obj[key], includeKeys)
         } else if (result[key] === undefined) {
@@ -1992,14 +1981,14 @@ fragment currentWorkspace on Workspace {
             result[key] += obj[key]
           }
         }
-      })
-    })
+      }
+    }
 
-    Object.keys(result).forEach(key => {
+    for (const key of Object.keys(result)) {
       if (typeof result[key] === 'number' && includeKeys.includes(key)) {
         result[key] /= objects.length
       }
-    })
+    }
 
     return result as T
   }
@@ -2068,7 +2057,7 @@ fragment currentWorkspace on Workspace {
       (res: number, it: IPrUser) => res + it.created,
       0
     )
-    uu.forEach((u: IPrUser) => {
+    for (const u of uu) {
       const othersCreated = totalCreated - u.created
 
       u.createdPerc =
@@ -2078,7 +2067,7 @@ fragment currentWorkspace on Workspace {
           ? Number((u.didReviewCount / othersCreated).toFixed(2))
           : 0
       u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2))
-    })
+    }
     return uu
   }
 
@@ -2242,9 +2231,11 @@ fragment currentWorkspace on Workspace {
     stats: IStatResult
   ): IOpenedPerPipeline[] {
     const fromPipelineIndex = this._pipelines.indexOf(
-      this._config.fromPipeline!
+      this._config.fromPipeline ?? ''
     )
-    const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline!)
+    const toPipelineIndex = this._pipelines.indexOf(
+      this._config.toPipeline ?? ''
+    )
 
     const totalMsAverageFromPipelineToPipeline =
       this.getTotalMsAverageFromPipelineToPipeline(

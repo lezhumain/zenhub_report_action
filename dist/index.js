@@ -38200,7 +38200,6 @@ exports.check_prs = check_prs;
 // eslint-disable-next-line import/named
 const axios_1 = __importDefault(__nccwpck_require__(7269));
 const fs = __importStar(__nccwpck_require__(3024));
-const models_1 = __nccwpck_require__(6099);
 const getPrAndCommits_1 = __nccwpck_require__(8194);
 function getWeekCount(dateFrom, dateTo) {
     return Number(((dateTo.getTime() - dateFrom.getTime()) / 1000 / 3600 / 24 / 7).toFixed(2));
@@ -38232,13 +38231,13 @@ async function getByURL(url) {
 // async function getCommitDailySummary(repoId: string): Promise<AxiosResponse> {
 //   return callGithubAPIByEndpoint('/stats/punch_card', repoId)
 // }
-/**
- * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
- * @returns {Promise<unknown>}
- */
-async function getLastYearSummary(repoId) {
-    return callGithubAPIByEndpoint('/stats/commit_activity', repoId);
-}
+// /**
+//  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
+//  * @returns {Promise<unknown>}
+//  */
+// async function getLastYearSummary(repoId: string): Promise<AxiosResponse> {
+//   return callGithubAPIByEndpoint('/stats/commit_activity', repoId)
+// }
 /**
  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-all-contributor-commit-activity
  * @returns {Promise<unknown>}
@@ -38279,28 +38278,41 @@ async function getPContributorsData(repoId) {
 function getContribFilename(repoId) {
     return `output/contribs_${repoId}.json`;
 }
-async function handleYearCommits(repoId, config, tryCount = 0) {
-    const yearCommitsResp = await getLastYearSummary(repoId);
-    const yearCommits = yearCommitsResp.data;
-    if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
-        console.warn(`Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`);
-    }
-    const resYearCommits = (Array.isArray(yearCommits) ? yearCommits : [])
-        .map(yc => {
-        const clone = Object.assign({}, yc);
-        delete clone.days;
-        return clone;
-    })
-        .filter(w => (config?.minDate === undefined ||
-        w.week * 1000 >= new Date(config.minDate).getTime()) &&
-        (config?.maxDate === undefined ||
-            w.week * 1000 <= new Date(config.maxDate).getTime())) || [];
-    if (resYearCommits.length === 0 && tryCount > 0) {
-        await models_1.Utils.waitForTimeout(1000);
-        return handleYearCommits(repoId, config, tryCount - 1);
-    }
-    return Promise.resolve(resYearCommits);
-}
+// async function handleYearCommits(
+//   repoId: string,
+//   config: { minDate: string; maxDate: string },
+//   tryCount = 0
+// ): Promise<unknown[]> {
+//   const yearCommitsResp = await getLastYearSummary(repoId)
+//   const yearCommits = yearCommitsResp.data
+//
+//   if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
+//     console.warn(
+//       `Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`
+//     )
+//   }
+//   const resYearCommits =
+//     (Array.isArray(yearCommits) ? yearCommits : [])
+//       .map(yc => {
+//         const clone = Object.assign({}, yc)
+//         delete clone.days
+//         return clone
+//       })
+//       .filter(
+//         w =>
+//           (config?.minDate === undefined ||
+//             w.week * 1000 >= new Date(config.minDate).getTime()) &&
+//           (config?.maxDate === undefined ||
+//             w.week * 1000 <= new Date(config.maxDate).getTime())
+//       ) || []
+//
+//   if (resYearCommits.length === 0 && tryCount > 0) {
+//     await utils.waitForTimeout(1000)
+//     return handleYearCommits(repoId, config, tryCount - 1)
+//   }
+//
+//   return Promise.resolve(resYearCommits)
+// }
 async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
     // console.log('pr resp 0')
     const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId);
@@ -38338,14 +38350,12 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
                 : [];
             const all_comments = comments.concat(review_comments);
             // console.log(`rr ${all_comments.length} comments for ${pr.url}`)
-            const commentators = Array.from(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            new Set(all_comments.map((comment) => comment.user.login)));
+            const commentators = Array.from(new Set(all_comments.map((comment) => comment.user.login)));
             const allCommitData = await (0, getPrAndCommits_1.fetchCommitsForPullRequest)(pr.number, prs[0].head.repo.name);
             const filteredCommit = allCommitData.filter((item) => {
                 const commitDate = new Date(item.commit.committer.date);
-                const created = commitDate.getTime();
-                return created >= minEpoch && created <= maxEpoch;
+                const created0 = commitDate.getTime();
+                return created0 >= minEpoch && created0 <= maxEpoch;
             });
             const obj = {
                 author,
@@ -38445,7 +38455,7 @@ class IssueFilter {
                 return (issue.labels !== undefined &&
                     issue.labels.map((la) => la.toLowerCase()).includes(low));
             });
-        const idShouldSkip = !!this._config.issuesToSkip?.includes(models_1.Utils.issueNumberAsNumber(issue.number));
+        const idShouldSkip = !!this._config.issuesToSkip?.includes(models_1.utils.issueNumberAsNumber(issue.number));
         const skip = !matchesLabel && idShouldSkip;
         return Promise.resolve(skip);
     };
@@ -38542,7 +38552,7 @@ async function fetchPullRequests(minDate, maxDate, repoId) {
             // 		const count = all.filter()
             // 	}
             // 	return res;
-            // }, { done: [], author: "" })
+            // }, { done: [], author: '' })
             return {
                 title: pr.title,
                 createdAt: pr.created_at,
@@ -38639,12 +38649,23 @@ async function getAllData(repos, config = { minDate: '2024-04-22', maxDate: '202
     }
     const all = [];
     for (const r of repos) {
-        const rres = await fetch_prs_for_repo(r, config).catch((err) => {
-            console.warn('err: ' + err.message);
-            return undefined;
-        });
-        if (rres !== undefined) {
-            all.push(rres);
+        // const rres:
+        //   | Record<string, { pr_count: number; commit_count: number }>
+        //   | undefined = await fetch_prs_for_repo(r, config).catch((err: any) => {
+        //   console.warn('err: ' + err.message)
+        //   return undefined
+        // })
+        // if (rres !== undefined) {
+        //   all.push(rres)
+        // }
+        try {
+            const rres = await fetch_prs_for_repo(r, config);
+            if (rres !== undefined) {
+                all.push(rres);
+            }
+        }
+        catch (err) {
+            console.warn('err: ', err.message);
         }
     }
     const summary = generateSummary(all);
@@ -38666,10 +38687,10 @@ async function getAllData(repos, config = { minDate: '2024-04-22', maxDate: '202
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.StatHelper = exports.ControlChartItem = exports.Utils = void 0;
+exports.statHelper = exports.ControlChartItem = exports.utils = void 0;
 const node_html_markdown_1 = __nccwpck_require__(8653);
 class Utils {
-    static millisecondsToHumanReadableTime(milliseconds) {
+    millisecondsToHumanReadableTime(milliseconds) {
         const seconds = Math.floor((milliseconds / 1000) % 60);
         const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);
         const hours = Math.floor((milliseconds / (1000 * 60 * 60)) % 24);
@@ -38684,20 +38705,20 @@ class Utils {
         const secondsStr = seconds < 10 ? `0${seconds}` : seconds;
         return `${monthsStr}${weeksStr}${daysStr}${hoursStr}:${minutesStr}:${secondsStr}`;
     }
-    static addDay(firstDayOfMonth, number) {
+    addDay(firstDayOfMonth, number) {
         const epoch = firstDayOfMonth.getTime();
-        return new Date(epoch + Utils.getDaysAsMs(number));
+        return new Date(epoch + this.getDaysAsMs(number));
     }
-    static getMsAsDays(ms) {
+    getMsAsDays(ms) {
         const trunced = Math.trunc(ms);
         const sigDigits = trunced.toString().length;
         const res = ms / 1000 / 60 / 60 / 24;
         return Number(res.toPrecision(sigDigits));
     }
-    static getDaysAsMs(days) {
+    getDaysAsMs(days) {
         return days * 1000 * 60 * 60 * 24;
     }
-    static htmlToMarkdown(fullHTML) {
+    htmlToMarkdown(fullHTML) {
         const mark = node_html_markdown_1.NodeHtmlMarkdown.translate(
         /* html */ fullHTML, 
         /* options (optional) */ {}, 
@@ -38705,23 +38726,23 @@ class Utils {
         /* customCodeBlockTranslators (optional) */ undefined);
         return mark;
     }
-    static isHex(str) {
+    isHex(str) {
         const hexRegex = /^[0-9A-Fa-f]+$/;
         return hexRegex.test(str);
     }
-    static issueNumberAsNumber(issueNumber) {
+    issueNumberAsNumber(issueNumber) {
         return Number(issueNumber.replace('#', ''));
     }
-    static issueNumberAsString(issueNumber) {
+    issueNumberAsString(issueNumber) {
         return `#${issueNumber.toFixed(0)}`;
     }
-    static async waitForTimeout(timeout) {
+    async waitForTimeout(timeout) {
         return new Promise(function (resolve) {
             setTimeout(resolve, timeout);
         });
     }
 }
-exports.Utils = Utils;
+exports.utils = new Utils();
 class ControlChartItem {
     _number;
     _htmlUrl;
@@ -38741,7 +38762,7 @@ class ControlChartItem {
         return this._comppleted.getTime() - this._started.getTime();
     }
     get completionTimeStr() {
-        // return Utils.millisecondsToHumanReadableTime(this.completionTime);
+        // return utils.millisecondsToHumanReadableTime(this.completionTime);
         return (this.completionTime / 1000 / 60 / 60 / 24).toFixed(0);
     }
     get number() {
@@ -38776,7 +38797,7 @@ class ControlChartItem {
 }
 exports.ControlChartItem = ControlChartItem;
 class StatHelper {
-    static getMedian(arr) {
+    getMedian(arr) {
         const middle = (arr.length + 1) / 2;
         const sorted = [...arr].sort((a, b) => a - b);
         const isEven = sorted.length % 2 === 0;
@@ -38784,17 +38805,17 @@ class StatHelper {
             ? (sorted[middle - 1.5] + sorted[middle - 0.5]) / 2
             : sorted[middle - 1];
     }
-    static getAverage(arr) {
+    getAverage(arr) {
         return arr.reduce((res, val) => res + val, 0) / arr.length;
     }
-    static getStats(arr) {
+    getStats(arr) {
         return {
-            average: StatHelper.getAverage(arr),
-            median: StatHelper.getMedian(arr)
+            average: this.getAverage(arr),
+            median: this.getMedian(arr)
         };
     }
 }
-exports.StatHelper = StatHelper;
+exports.statHelper = new StatHelper();
 
 
 /***/ }),
@@ -38831,8 +38852,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Program = exports.FileUtils = void 0;
-/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any,github/no-then */
+exports.Program = exports.fileUtils = void 0;
 const md5_1 = __importDefault(__nccwpck_require__(2296));
 const fs = __importStar(__nccwpck_require__(9896));
 const models_1 = __nccwpck_require__(6099);
@@ -38847,11 +38867,11 @@ const getPrAndCommits_1 = __nccwpck_require__(8194);
 const apiKey = process.env.API_KEY;
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class FileUtils {
-    static fileExists(filePath) {
+    fileExists(filePath) {
         return fs.existsSync(filePath);
     }
 }
-exports.FileUtils = FileUtils;
+exports.fileUtils = new FileUtils();
 class Program {
     _delim;
     _configHash;
@@ -38923,7 +38943,7 @@ class Program {
             release: ''
         };
         this._config = Object.assign(defaultConfig, config);
-        if (!models_1.Utils.isHex(this._config.workspaceId)) {
+        if (!models_1.utils.isHex(this._config.workspaceId)) {
             throw new Error('Bad workspace ID');
         }
         const currentFolder = process.cwd();
@@ -38941,14 +38961,13 @@ class Program {
                 fs.mkdirSync(targetFolder);
             }
         }
-        for (const key of Object.keys(this._config)) {
-            // @ts-ignore
-            if (!this._config[key]) {
-                // @ts-ignore
-                // this._config[key] = undefined;
-                delete this._config[key];
+        const partial = Object.assign({}, this._config);
+        for (const key of Object.keys(partial)) {
+            if (!partial[key]) {
+                delete partial[key];
             }
         }
+        this._config = partial;
         const str = JSON.stringify(this._config);
         this._configHash = (0, md5_1.default)(str);
         this._file = this._config.inputJsonFilename
@@ -39006,7 +39025,7 @@ class Program {
             ? issueObj.events
             : undefined;
         const events = existing ||
-            (await this.getEvents(issueObj.repositoryGhId, models_1.Utils.issueNumberAsNumber(issueNumber)).catch(err => {
+            (await this.getEvents(issueObj.repositoryGhId, models_1.utils.issueNumberAsNumber(issueNumber)).catch(err => {
                 this._errorMessages.push(err.message);
                 return [];
             }));
@@ -39079,7 +39098,7 @@ class Program {
                     data: {
                         count: 1,
                         duration: ev.duration,
-                        durationDays: models_1.Utils.getMsAsDays(ev.duration),
+                        durationDays: models_1.utils.getMsAsDays(ev.duration),
                         durationAverage: 0,
                         durationString: '',
                         durationAverageString: ''
@@ -39099,7 +39118,7 @@ class Program {
                                 itemEvents[itemEvents.length - 1]
                             ].filter(er => er.data.to_pipeline.name === ev.pipeline);
                             if (movedToEvs.length > 0 && movedToEvs[0].data.from_pipeline) {
-                                if (this.comparePipelines(movedToEvs[0].data.to_pipeline, movedToEvs[0].data.from_pipeline)) {
+                                if (this.comparePipelines(movedToEvs[0].data.to_pipeline.name, movedToEvs[0].data.from_pipeline.name)) {
                                     res.back++;
                                 }
                                 else {
@@ -39120,11 +39139,11 @@ class Program {
         }
         for (const pipelineKey of Object.keys(avgObj)) {
             avgObj[pipelineKey].data.durationString =
-                models_1.Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration);
+                models_1.utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration);
             avgObj[pipelineKey].data.durationAverage = Number((avgObj[pipelineKey].data.duration / avgObj[pipelineKey].data.count).toFixed(0));
             avgObj[pipelineKey].data.durationAverageString =
-                models_1.Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.durationAverage);
-            avgObj[pipelineKey].data.durationDays = models_1.Utils.getMsAsDays(avgObj[pipelineKey].data.duration);
+                models_1.utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.durationAverage);
+            avgObj[pipelineKey].data.durationDays = models_1.utils.getMsAsDays(avgObj[pipelineKey].data.duration);
         }
         return avgObj;
     }
@@ -39145,10 +39164,10 @@ class Program {
                 : undefined;
             return {
                 duration: diff,
-                durationString: models_1.Utils.millisecondsToHumanReadableTime(diff),
+                durationString: models_1.utils.millisecondsToHumanReadableTime(diff),
                 durationPerEstimate: diffPerEstimate,
                 durationStringPerEstimate: diffPerEstimate !== undefined
-                    ? models_1.Utils.millisecondsToHumanReadableTime(diffPerEstimate)
+                    ? models_1.utils.millisecondsToHumanReadableTime(diffPerEstimate)
                     : undefined,
                 pipeline: prevEv.data.to_pipeline.name,
                 event: `${prevEv.data.to_pipeline.name} to ${ev.data.to_pipeline.name}`,
@@ -39179,7 +39198,7 @@ class Program {
         });
         if (!response.ok) {
             const t = await response.text();
-            throw new Error('Failed to fetch ZenHub API: ' + t);
+            throw new Error(`Failed to fetch ZenHub API: ${t}`);
         }
         return response.json();
         // .then(data => {
@@ -39269,7 +39288,7 @@ class Program {
             const eventsTmp = item.issues;
             const issues0 = eventsTmp.map((ee) => {
                 const o = {
-                    number: models_1.Utils.issueNumberAsString(ee.number),
+                    number: models_1.utils.issueNumberAsString(ee.number),
                     estimateValue: ee.estimate !== null && ee.estimate !== undefined
                         ? Number(ee.estimate.value)
                         : undefined,
@@ -39386,7 +39405,7 @@ fragment currentWorkspace on Workspace {
         }
         const err = res1?.errors?.map((e) => e.message) ?? [];
         if (err.length > 0) {
-            const errr = new Error('Error: ' + err.join(' --- '));
+            const errr = new Error(`Error: ${err.join(' --- ')}`);
             // return Promise.reject(errr)
             throw errr;
         }
@@ -39506,7 +39525,7 @@ fragment currentWorkspace on Workspace {
             let allMsg = msg;
             for (const err of this._errorMessages) {
                 console.error(err);
-                allMsg += '---' + err;
+                allMsg += `---${err}`;
             }
             throw new Error(allMsg);
         }
@@ -39644,8 +39663,8 @@ fragment currentWorkspace on Workspace {
             console.warn(e.message);
         });
         let issueWithEventCount = 0;
-        board.pipelinesConnection.forEach((pipelineConnect) => {
-            pipelineConnect.issues.forEach((issue) => {
+        for (const pipelineConnect of board.pipelinesConnection) {
+            for (const issue of pipelineConnect.issues) {
                 // if(issue.number) {
                 // 	issue.events = issue.number;
                 // } else {
@@ -39662,14 +39681,14 @@ fragment currentWorkspace on Workspace {
                     issueNumber = Number(issueNumberBits[issueNumberBits.length - 1]);
                 }
                 const issueEvents = issueNumber
-                    ? this._eventsPerIssue[models_1.Utils.issueNumberAsString(issueNumber)] || []
+                    ? this._eventsPerIssue[models_1.utils.issueNumberAsString(issueNumber)] || []
                     : [];
                 issue.events = issueEvents;
                 if (issueEvents.length > 0) {
                     issueWithEventCount++;
                 }
-            });
-        });
+            }
+        }
         fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
             encoding: 'utf8'
         });
@@ -39677,7 +39696,7 @@ fragment currentWorkspace on Workspace {
         const chartData = this.getControlChartData(issues);
         // console.log(chartData)
         const completinList = chartData.map(c => Number(c.completionTimeStr));
-        const stats = models_1.StatHelper.getStats(completinList);
+        const stats = models_1.statHelper.getStats(completinList);
         const openedPerPipeline = this.getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats);
         // const chartWithEstimate: IControlChartItem[] = chartData.filter((cd: IControlChartItem) => cd.estimate > 0);
         // const completinListEstimate: number[] = chartWithEstimate.map((c: IControlChartItem) => Number(c.completionTimeStr));
@@ -39687,7 +39706,7 @@ fragment currentWorkspace on Workspace {
         const completinEstimateList = chartData
             .filter((cd) => cd.estimate > 0)
             .map(c => Number(c.completionTimeStr) / c.estimate);
-        const statsEstimate = models_1.StatHelper.getStats(completinEstimateList);
+        const statsEstimate = models_1.statHelper.getStats(completinEstimateList);
         const veloccity = this.getVelocity(chartData);
         // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
         const outs = this.findOutstandingIssues(allEvs).slice(0, 5);
@@ -39813,7 +39832,7 @@ fragment currentWorkspace on Workspace {
             ${this.generateTable(userMoves, undefined)}
         </section>`;
         this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
-        const mark = `${models_1.Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
+        const mark = `${models_1.utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
         fs.writeFileSync(path.join(this._mainOutputFolder, 'main_report.md'), mark, { encoding: 'utf8' });
         console.log(`ev count: ${allEvs.length}, issue count: ${issues.filter(iu => !iu.filtered).length}, issues handled: ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`);
         return Promise.resolve({
@@ -39834,13 +39853,13 @@ fragment currentWorkspace on Workspace {
             this._estimatingCache.push(timePerIssueMs * remainingCount);
         }
         const strVal = this._estimateRemainingMs <= this._estimateRemainingPrveiousMs
-            ? `${models_1.Utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
+            ? `${models_1.utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
             : 'estimating...';
         console.log(`Remaining: ${strVal}`);
     }
     getFromFile() {
         // console.log(`Getting from file ${this._file}`)
-        if (!FileUtils.fileExists(this._file)) {
+        if (!exports.fileUtils.fileExists(this._file)) {
             // console.log(`File doesn't exist`)
             return null;
         }
@@ -39878,7 +39897,7 @@ fragment currentWorkspace on Workspace {
         });
         const res = tmp
             .filter((r) => r !== null)
-            .map(r => r.toObj());
+            .map((r) => r.toObj());
         res.sort((a, b) => {
             return a.comppleted.getTime() - b.comppleted.getTime();
         });
@@ -39898,14 +39917,6 @@ fragment currentWorkspace on Workspace {
             .map((l) => {
             return `<tr>${headers
                 .map(lkey => {
-                // const it = l[lkey]
-                // const isArr = Array.isArray(it)
-                // const val =
-                //   !isArr ||
-                //   it.every((r: any) => typeof r === 'string')
-                //     ? it?.toString() || ''
-                //     : this.generateTable(it)
-                // return `<td>${val}</td>`
                 const specRes = specFn && specFn(lkey, l);
                 return `<td>${specRes !== undefined && specRes !== null
                     ? specRes
@@ -39978,9 +39989,9 @@ fragment currentWorkspace on Workspace {
         const firstDayOfMonth = new Date(date.getTime());
         firstDayOfMonth.setDate(1);
         const firstDayOfMonthPosInWeek = firstDayOfMonth.getDay();
-        const firstDayOfFirstWeek = models_1.Utils.addDay(firstDayOfMonth, firstDayOfMonthPosInWeek * -1);
+        const firstDayOfFirstWeek = models_1.utils.addDay(firstDayOfMonth, firstDayOfMonthPosInWeek * -1);
         let res = 1;
-        while (date.getDate() > models_1.Utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()) {
+        while (date.getDate() > models_1.utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()) {
             ++res;
         }
         return `${date.getMonth()}${res}`;
@@ -40059,7 +40070,7 @@ fragment currentWorkspace on Workspace {
                     ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
                 </tbody>
             </table>`;
-        // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
+        // return `<div> ${title ? `<h3>${title}</h3>` : ''}${tableStr} </div>`;
         return tableStr;
     }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -40089,7 +40100,7 @@ fragment currentWorkspace on Workspace {
         return Promise.resolve('');
     }
     async getChartGeneric(title, outputFile, csvPrAndCommits, key, labelKey) {
-        // await this.generateChartFromObj("", evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
+        // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
         const items = csvPrAndCommits.map(c => {
             return {
                 label: labelKey === undefined ? '' : c[labelKey],
@@ -40116,8 +40127,9 @@ fragment currentWorkspace on Workspace {
     }
     averageOBjects(objects, includeKeys) {
         const result = {};
-        objects.forEach((obj) => {
-            Object.keys(obj).forEach(key => {
+        for (const obj of objects) {
+            const keys = Object.keys(obj);
+            for (const key of keys) {
                 if (Array.isArray(obj[key])) {
                     result[key] = this.averageOBjects(obj[key], includeKeys);
                 }
@@ -40129,13 +40141,13 @@ fragment currentWorkspace on Workspace {
                         result[key] += obj[key];
                     }
                 }
-            });
-        });
-        Object.keys(result).forEach(key => {
+            }
+        }
+        for (const key of Object.keys(result)) {
             if (typeof result[key] === 'number' && includeKeys.includes(key)) {
                 result[key] /= objects.length;
             }
-        });
+        }
         return result;
     }
     getStatsHTML(stats, statsEstimate, veloccity, remainingDays) {
@@ -40193,7 +40205,7 @@ fragment currentWorkspace on Workspace {
             return res;
         }, []);
         const totalCreated = uu.reduce((res, it) => res + it.created, 0);
-        uu.forEach((u) => {
+        for (const u of uu) {
             const othersCreated = totalCreated - u.created;
             u.createdPerc =
                 totalCreated > 0 ? Number((u.created / totalCreated).toFixed(2)) : 0;
@@ -40202,7 +40214,7 @@ fragment currentWorkspace on Workspace {
                     ? Number((u.didReviewCount / othersCreated).toFixed(2))
                     : 0;
             u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2));
-        });
+        }
         return uu;
     }
     async getGithubData(repos) {
@@ -40310,8 +40322,8 @@ fragment currentWorkspace on Workspace {
         return days / daysSum;
     }
     getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats) {
-        const fromPipelineIndex = this._pipelines.indexOf(this._config.fromPipeline);
-        const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline);
+        const fromPipelineIndex = this._pipelines.indexOf(this._config.fromPipeline ?? '');
+        const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline ?? '');
         const totalMsAverageFromPipelineToPipeline = this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
         // console.log('')
         let openedTotals = 0;

@@ -1,4 +1,4 @@
-import { IGhEvent, IIssue, Utils } from './models'
+import { IGhEvent, IIssue, utils } from './models'
 import { IMainConfig } from './main_conf'
 
 export class IssueFilter {
@@ -16,7 +16,7 @@ export class IssueFilter {
       })
 
     const idShouldSkip = !!this._config.issuesToSkip?.includes(
-      Utils.issueNumberAsNumber(issue.number)
+      utils.issueNumberAsNumber(issue.number)
     )
     const skip = !matchesLabel && idShouldSkip
     return Promise.resolve(skip)

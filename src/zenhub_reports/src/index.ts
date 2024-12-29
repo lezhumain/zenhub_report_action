@@ -31,10 +31,10 @@ const argConfig: Partial<IMainConfig> = {
 
 for (const key of Object.keys(argConfig)) {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-expect-error
+  // @ts-ignore
   if (!argConfig[key]) {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
+    // @ts-ignore
     delete argConfig[key]
   }
 }

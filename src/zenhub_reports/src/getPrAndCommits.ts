@@ -8,13 +8,18 @@ interface PullRequest {
   user?: { login: string }
 }
 
-interface Commit {
+export interface Commit {
   author: {
     login: string
   }
   commit: {
     message: string
     author: {
+      name: string
+      email: string
+      date: string
+    }
+    committer: {
       name: string
       email: string
       date: string
@@ -129,7 +134,7 @@ async function fetchPullRequests(
         // 		const count = all.filter()
         // 	}
         // 	return res;
-        // }, { done: [], author: "" })
+        // }, { done: [], author: '' })
         return {
           title: pr.title,
           createdAt: pr.created_at,
@@ -307,14 +312,25 @@ export async function getAllData(
   }
   const all: Record<string, { pr_count: number; commit_count: number }>[] = []
   for (const r of repos) {
-    const rres:
-      | Record<string, { pr_count: number; commit_count: number }>
-      | undefined = await fetch_prs_for_repo(r, config).catch((err: any) => {
-      console.warn('err: ' + err.message)
-      return undefined
-    })
-    if (rres !== undefined) {
-      all.push(rres)
+    // const rres:
+    //   | Record<string, { pr_count: number; commit_count: number }>
+    //   | undefined = await fetch_prs_for_repo(r, config).catch((err: any) => {
+    //   console.warn('err: ' + err.message)
+    //   return undefined
+    // })
+    // if (rres !== undefined) {
+    //   all.push(rres)
+    // }
+    try {
+      const rres:
+        | Record<string, { pr_count: number; commit_count: number }>
+        | undefined = await fetch_prs_for_repo(r, config)
+
+      if (rres !== undefined) {
+        all.push(rres)
+      }
+    } catch (err: any) {
+      console.warn('err: ', err.message)
     }
   }
 

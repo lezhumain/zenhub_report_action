@@ -18,16 +18,16 @@ class MockMain {
   }
 
   static getTestConf(conf0: IMainConfig): IMainConfig {
-    const cconf = Object.assign({}, conf0)
-    const minDate = new Date(cconf.minDate as string)
+    const myConf = Object.assign({}, conf0)
+    const minDate = new Date(myConf.minDate as string)
     minDate.setDate(minDate.getDate() + 1)
-    cconf.inputJsonFilename = path.join(
+    myConf.inputJsonFilename = path.join(
       __dirname,
       'resources',
       'workspace_a74ef40adbe1806e2d9d5d00b209e801.json'
     )
-    cconf.maxDate = new Date(minDate.toISOString()).toISOString()
-    return cconf
+    myConf.maxDate = new Date(minDate.toISOString()).toISOString()
+    return myConf
   }
 }
 
@@ -94,7 +94,7 @@ describe('action', () => {
     expect(hsaErr).toBeFalsy()
     expect(runMock).toHaveReturned()
 
-    // Verify that all of the core library functions were called correctly
+    // Verify that all the core library functions were called correctly
     expect(debugMock).toHaveBeenNthCalledWith(1, `Got file ${myFile}`)
 
     expect(setOutputMock).toHaveBeenNthCalledWith(
@@ -147,7 +147,7 @@ describe('action', () => {
     expect(hsaErr).toBeFalsy()
     expect(runMock).toHaveReturned()
 
-    // Verify that all of the core library functions were called correctly
+    // Verify that all the core library functions were called correctly
     expect(debugMock).toHaveBeenNthCalledWith(1, `Got file ${myFile}`)
 
     expect(setOutputMock).toHaveBeenNthCalledWith(
