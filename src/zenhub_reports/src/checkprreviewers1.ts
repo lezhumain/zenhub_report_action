@@ -271,21 +271,26 @@ async function main(
         ? 0
         : Number((didReviewCount / shouldReviewCount).toFixed(2))
 
-    const created = summary.filter(s => s.author === user)
+    const createdPrs = summary.filter(s => s.author === user)
 
     const totalCommits: number = summary
       .map(c => c.commits.length)
       .reduce((res, item) => res + item, 0)
-    const averageCommitsPerWeek = weekCount > 0 ? totalCommits / weekCount : 0
+
+    const myCommits = createdPrs
+      .map(c => c.commits.length)
+      .reduce((res, item) => res + item, 0)
+
+    const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0
 
     res.users.push({
       user,
       shouldReviewCount,
       didReviewCount,
       reviewedPerc,
-      created: created.length,
-      createdPerc: summary.length > 0 ? created.length / summary.length : 0,
-      totalCommits,
+      created: createdPrs.length,
+      createdPerc: summary.length > 0 ? createdPrs.length / summary.length : 0,
+      totalCommits: myCommits,
       totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2))
     })
   }
