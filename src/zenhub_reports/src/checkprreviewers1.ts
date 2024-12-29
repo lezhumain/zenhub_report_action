@@ -273,9 +273,9 @@ async function main(
 
     const createdPrs = summary.filter(s => s.author === user)
 
-    const totalCommits: number = summary
-      .map(c => c.commits.length)
-      .reduce((res, item) => res + item, 0)
+    // const totalCommits: number = summary
+    //   .map(c => c.commits.length)
+    //   .reduce((res, item) => res + item, 0)
 
     const myCommits = createdPrs
       .map(c => c.commits.length)

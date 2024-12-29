@@ -1343,18 +1343,6 @@ fragment currentWorkspace on Workspace {
       ggdata: { summary: Record<string, any> }
     } = await this.getGithubData(repos)
 
-    const weekCount = this.getWeekCount()
-    for (const user of res.newAllD.users) {
-      const target = res.ggdata.summary[user.user]
-      if (!target) {
-        continue
-      }
-      user.totalCommitsPerWeek = Number(
-        (target.commit_count / weekCount).toFixed(2)
-      )
-    }
-
-    // const allD: ICheckPr[] = res.allD;
     const newAllD: ICheckPr = res.newAllD
 
     const allResult: IReport = {
