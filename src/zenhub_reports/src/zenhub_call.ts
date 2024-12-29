@@ -755,8 +755,11 @@ export class Program {
     last = 73
   ): Promise<IWorkspace> {
     // console.log('Getting board data')
+    console.log("Getting board")
     const base: IWorkspace = await this.getBoard(workspaceId, last)
+    console.log("Getting releases")
     this._config.releaseID = await this.getReleases(workspaceId)
+    console.log("PArsing stuff")
 
     for (const pieline of base.pipelinesConnection) {
       const pipelineID = pieline.id
@@ -1056,10 +1059,13 @@ fragment currentWorkspace on Workspace {
       const msg = process.env.API_KEY
         ? `Couldn't get board data for ${this._config.workspaceId}`
         : 'Need to export API_KEY'
+
+      let allMsg = msg
       for (const err of this._errorMessages) {
         console.error(err)
+        allMsg += "\n\t" + err
       }
-      throw new Error(msg)
+      throw new Error(allMsg)
     }
 
     const issues: IIssue[] = await this.getIssuesFromBoard(board)
