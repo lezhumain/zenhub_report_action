@@ -38136,7 +38136,7 @@ class Main {
             const res = await program.main(mainFilter.filterIssues, mainFilter.filterEvents);
             const file = 'zenhub_report.md';
             fs.writeFileSync(file, res.mark, { encoding: 'utf8' });
-            core.setOutput('markdownContent', res.mark);
+            // core.setOutput('markdownContent', res.mark)
         }
         catch (error) {
             // Fail the workflow run if an error occurs
@@ -38388,19 +38388,22 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
         const reviewedPerc = shouldReviewCount === 0
             ? 0
             : Number((didReviewCount / shouldReviewCount).toFixed(2));
-        const created = summary.filter(s => s.author === user);
-        const totalCommits = summary
+        const createdPrs = summary.filter(s => s.author === user);
+        // const totalCommits: number = summary
+        //   .map(c => c.commits.length)
+        //   .reduce((res, item) => res + item, 0)
+        const myCommits = createdPrs
             .map(c => c.commits.length)
             .reduce((res, item) => res + item, 0);
-        const averageCommitsPerWeek = weekCount > 0 ? totalCommits / weekCount : 0;
+        const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0;
         res.users.push({
             user,
             shouldReviewCount,
             didReviewCount,
             reviewedPerc,
-            created: created.length,
-            createdPerc: summary.length > 0 ? created.length / summary.length : 0,
-            totalCommits,
+            created: createdPrs.length,
+            createdPerc: summary.length > 0 ? createdPrs.length / summary.length : 0,
+            totalCommits: myCommits,
             totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2))
         });
     }
@@ -39677,15 +39680,6 @@ fragment currentWorkspace on Workspace {
         // // console.log(JSON.stringify(outs, null, 2));
         const repos = Array.from(new Set(issues.map(ii => ii.htmlUrl.split('/')[4])));
         const res = await this.getGithubData(repos);
-        const weekCount = this.getWeekCount();
-        for (const user of res.newAllD.users) {
-            const target = res.ggdata.summary[user.user];
-            if (!target) {
-                continue;
-            }
-            user.totalCommitsPerWeek = Number((target.commit_count / weekCount).toFixed(2));
-        }
-        // const allD: ICheckPr[] = res.allD;
         const newAllD = res.newAllD;
         const allResult = {
             chartTime: timeChartItems,
