@@ -38136,7 +38136,7 @@ class Main {
             const res = await program.main(mainFilter.filterIssues, mainFilter.filterEvents);
             const file = 'zenhub_report.md';
             fs.writeFileSync(file, res.mark, { encoding: 'utf8' });
-            // core.setOutput('markdownContent', res.mark)
+            core.setOutput('markdownContent', res.mark);
         }
         catch (error) {
             // Fail the workflow run if an error occurs
