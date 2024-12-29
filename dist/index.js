@@ -39379,7 +39379,9 @@ fragment currentWorkspace on Workspace {
         const res1 = await this.callZenhub(query, variables);
         const err = res1.errors?.map((e) => e.message) || [];
         if (err.length > 0) {
-            return Promise.reject(new Error(err.join('\n')));
+            const errr = new Error(err.join(' --- '));
+            // return Promise.reject(errr)
+            throw errr;
         }
         const finalRes = Object.assign({ totalIssues: 0 }, res1.data.workspace);
         finalRes.pipelinesConnection = this.mapPipelineConnec(finalRes);
