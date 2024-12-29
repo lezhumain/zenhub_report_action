@@ -875,7 +875,9 @@ fragment currentWorkspace on Workspace {
 
     const err = res1.errors?.map((e: any) => e.message) || []
     if (err.length > 0) {
-      return Promise.reject(new Error(err.join('\n')))
+      const errr = new Error(err.join(' --- '))
+      // return Promise.reject(errr)
+      throw errr
     }
 
     const finalRes: IWorkspace = Object.assign(
