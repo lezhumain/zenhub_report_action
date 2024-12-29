@@ -39835,8 +39835,9 @@ fragment currentWorkspace on Workspace {
             // console.log(`File doesn't exist`)
             return null;
         }
-        const content = fs.readFileSync(this._file, { encoding: 'utf8' });
+        console.log('Getting from file');
         try {
+            const content = fs.readFileSync(this._file, { encoding: 'utf8' });
             const obj = JSON.parse(content);
             // console.log(`Got existing`)
             if (obj.configHash !== this._configHash &&
