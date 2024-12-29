@@ -1544,7 +1544,7 @@ fragment currentWorkspace on Workspace {
       return null
     }
 
-    console.log("Getting from file")
+    console.log('Getting from file')
     try {
       const content = fs.readFileSync(this._file, { encoding: 'utf8' })
       const obj: IWorkspace = JSON.parse(content) as IWorkspace
