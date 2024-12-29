@@ -3,8 +3,8 @@ import get from 'axios'
 import { AxiosResponse } from 'axios'
 import { IGithubPR } from './igithubpr'
 import * as fs from 'node:fs'
-import { ICheckPr, Utils } from './models'
-import { fetchCommitsForPullRequest } from './getPrAndCommits'
+import { ICheckPr } from './models'
+import { Commit, fetchCommitsForPullRequest } from './getPrAndCommits'
 import { IPrSummary } from './zenhub_call'
 
 export function getWeekCount(dateFrom: Date, dateTo: Date): number {
@@ -47,13 +47,13 @@ async function getByURL<T>(url: string): Promise<T> {
 //   return callGithubAPIByEndpoint('/stats/punch_card', repoId)
 // }
 
-/**
- * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
- * @returns {Promise<unknown>}
- */
-async function getLastYearSummary(repoId: string): Promise<AxiosResponse> {
-  return callGithubAPIByEndpoint('/stats/commit_activity', repoId)
-}
+// /**
+//  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
+//  * @returns {Promise<unknown>}
+//  */
+// async function getLastYearSummary(repoId: string): Promise<AxiosResponse> {
+//   return callGithubAPIByEndpoint('/stats/commit_activity', repoId)
+// }
 
 /**
  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-all-contributor-commit-activity
@@ -102,41 +102,41 @@ function getContribFilename(repoId: string): string {
   return `output/contribs_${repoId}.json`
 }
 
-async function handleYearCommits(
-  repoId: string,
-  config: { minDate: string; maxDate: string },
-  tryCount = 0
-): Promise<unknown[]> {
-  const yearCommitsResp = await getLastYearSummary(repoId)
-  const yearCommits = yearCommitsResp.data
-
-  if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
-    console.warn(
-      `Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`
-    )
-  }
-  const resYearCommits =
-    (Array.isArray(yearCommits) ? yearCommits : [])
-      .map(yc => {
-        const clone = Object.assign({}, yc)
-        delete clone.days
-        return clone
-      })
-      .filter(
-        w =>
-          (config?.minDate === undefined ||
-            w.week * 1000 >= new Date(config.minDate).getTime()) &&
-          (config?.maxDate === undefined ||
-            w.week * 1000 <= new Date(config.maxDate).getTime())
-      ) || []
-
-  if (resYearCommits.length === 0 && tryCount > 0) {
-    await Utils.waitForTimeout(1000)
-    return handleYearCommits(repoId, config, tryCount - 1)
-  }
-
-  return Promise.resolve(resYearCommits)
-}
+// async function handleYearCommits(
+//   repoId: string,
+//   config: { minDate: string; maxDate: string },
+//   tryCount = 0
+// ): Promise<unknown[]> {
+//   const yearCommitsResp = await getLastYearSummary(repoId)
+//   const yearCommits = yearCommitsResp.data
+//
+//   if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
+//     console.warn(
+//       `Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`
+//     )
+//   }
+//   const resYearCommits =
+//     (Array.isArray(yearCommits) ? yearCommits : [])
+//       .map(yc => {
+//         const clone = Object.assign({}, yc)
+//         delete clone.days
+//         return clone
+//       })
+//       .filter(
+//         w =>
+//           (config?.minDate === undefined ||
+//             w.week * 1000 >= new Date(config.minDate).getTime()) &&
+//           (config?.maxDate === undefined ||
+//             w.week * 1000 <= new Date(config.maxDate).getTime())
+//       ) || []
+//
+//   if (resYearCommits.length === 0 && tryCount > 0) {
+//     await utils.waitForTimeout(1000)
+//     return handleYearCommits(repoId, config, tryCount - 1)
+//   }
+//
+//   return Promise.resolve(resYearCommits)
+// }
 
 async function main(
   repoId: string,
@@ -179,29 +179,32 @@ async function main(
 
       const author = pr.user.login
 
-      const comments: object[] = pr.comments_url
-        ? await getByURL<object[]>(pr.comments_url)
+      const comments = pr.comments_url
+        ? await getByURL<{ user: { login: string } }[]>(pr.comments_url)
         : []
       const review_comments = pr.review_comments_url
-        ? await getByURL<object[]>(pr.review_comments_url)
+        ? await getByURL<{ user: { login: string } }[]>(pr.review_comments_url)
         : []
 
-      const all_comments: object[] = comments.concat(review_comments)
+      const all_comments = comments.concat(review_comments)
       // console.log(`rr ${all_comments.length} comments for ${pr.url}`)
 
-      const commentators: any[] = Array.from(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        new Set(all_comments.map((comment: any) => comment.user.login))
+      const commentators: string[] = Array.from(
+        new Set(
+          all_comments.map(
+            (comment: { user: { login: string } }) => comment.user.login
+          )
+        )
       )
 
-      const allCommitData = await fetchCommitsForPullRequest(
+      const allCommitData: Commit[] = await fetchCommitsForPullRequest(
         pr.number,
         prs[0].head.repo.name
       )
-      const filteredCommit = allCommitData.filter((item: any) => {
+      const filteredCommit = allCommitData.filter((item: Commit) => {
         const commitDate = new Date(item.commit.committer.date)
-        const created = commitDate.getTime()
-        return created >= minEpoch && created <= maxEpoch
+        const created0 = commitDate.getTime()
+        return created0 >= minEpoch && created0 <= maxEpoch
       })
       const obj: IPrSummary = {
         author,
@@ -279,7 +282,7 @@ async function main(
 
     const myCommits = createdPrs
       .map(c => c.commits.length)
-      .reduce((res, item) => res + item, 0)
+      .reduce((res: number, item: number) => res + item, 0)
 
     const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0
 

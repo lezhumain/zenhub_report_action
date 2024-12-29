@@ -76,7 +76,8 @@ jobs:
       #
       #      - name: Build webpack
       #        id: build-webpack
-      #        #run: pwd && ls -alh src && ls -alh src/zenhub_reports && cd src/zenhub_reports/ && npx webpack && jq -r .pull_request.body <<< "$INPUT_GHEVENT"
+      #        #run: pwd && ls -alh src && ls -alh src/zenhub_reports \
+      #        # && cd src/zenhub_reports/ && npx webpack && jq -r .pull_request.body <<< "$INPUT_GHEVENT"
       #        run: echo "$REPO_ID"
       #        env:
       #          REPO_ID: ${{ github.event.repository.id }}

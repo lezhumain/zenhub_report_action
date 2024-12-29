@@ -5,7 +5,7 @@ import {
   IOpenedPerPipeline,
   Program
 } from '../src/zenhub_reports/src/zenhub_call'
-import { IIssue, IStatResult, Utils } from '../src/zenhub_reports/src/models'
+import { IIssue, IStatResult, utils } from '../src/zenhub_reports/src/models'
 import { IMainConfig, mainConfig } from '../src/zenhub_reports/src/main_conf'
 
 class ProgramMock extends Program {
@@ -51,9 +51,11 @@ class ProgramMock extends Program {
 
   getTotalMsAverageFromPipelineToPipelineFromConf(avg: IAVGItemMap): number {
     const fromPipelineIndex = this._pipelines.indexOf(
-      this._config.fromPipeline!
+      this._config.fromPipeline ?? ''
     )
-    const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline!)
+    const toPipelineIndex = this._pipelines.indexOf(
+      this._config.toPipeline ?? ''
+    )
     return super.getTotalMsAverageFromPipelineToPipeline(
       avg,
       fromPipelineIndex,
@@ -78,7 +80,7 @@ describe('action', () => {
     avg: IAVGItemMap,
     fromIndex: number,
     toIndex: number
-  ): void {
+  ): boolean {
     const avgMs: number = avg[Object.keys(avg)[0]].data.durationAverage
     const daySym: number = prog.getTotalMsAverageFromPipelineToPipeline(
       avg,
@@ -86,12 +88,13 @@ describe('action', () => {
       toIndex
     )
     expect(daySym).toEqual(avgMs * (toIndex - fromIndex))
+    return daySym === avgMs * (toIndex - fromIndex)
   }
 
   it('can get days', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -120,13 +123,13 @@ describe('action', () => {
       } as IAVGItem
     } as IAVGItemMap
 
-    testDays(avg, 0, 1)
+    expect(testDays(avg, 0, 1)).toBeTruthy()
   })
 
   it('can get days 1', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -167,13 +170,13 @@ describe('action', () => {
       } as IAVGItem
     } as IAVGItemMap
 
-    testDays(avg, 0, 1)
+    expect(testDays(avg, 0, 1)).toBeTruthy()
   })
 
   it('can get days 2', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -214,13 +217,13 @@ describe('action', () => {
       } as IAVGItem
     } as IAVGItemMap
 
-    testDays(avg, 0, 2)
+    expect(testDays(avg, 0, 2)).toBeTruthy()
   })
 
   it('can get days from conf', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -257,7 +260,7 @@ describe('action', () => {
   it('can get sum perc 0', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       Done: {
@@ -281,7 +284,7 @@ describe('action', () => {
   it('can get sum perc more than 0', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -319,7 +322,7 @@ describe('action', () => {
   it('can get sum perc more than 0 again', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -370,7 +373,7 @@ describe('action', () => {
   it('can get sum perc more than 1', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -422,7 +425,7 @@ describe('action', () => {
   it('can get sum perc more than les pipelines', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
@@ -474,7 +477,7 @@ describe('action', () => {
   it('works with empty pipeline list', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       Done: {
@@ -499,7 +502,7 @@ describe('action', () => {
   it('works with pipeline list', async () => {
     const durationDays = 2
     const count = 2
-    const duration = Utils.getDaysAsMs(durationDays)
+    const duration = utils.getDaysAsMs(durationDays)
 
     const avg: IAVGItemMap = {
       New: {
