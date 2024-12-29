@@ -6,9 +6,9 @@
 [![CodeQL](https://github.com/lezhumain/zenhub_report_action/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/lezhumain/zenhub_report_action/actions/workflows/codeql-analysis.yml)
 [![Coverage](./badges/coverage.svg)](./badges/coverage.svg)
 
-Based on: https://github.com/actions/typescript-action
+Based on: [actions/typescript-action](https://github.com/actions/typescript-action)
 
-Inspired by: https://github.com/github/issue-metrics
+Inspired by: [github/issue-metrics](https://github.com/github/issue-metrics)
 
 This is a GitHub Action that searches for issues/pull requests in a zenhub
 board, measures several metrics, and generates a report in form of a GitHub
@@ -131,16 +131,18 @@ this repository.
    trigger the workflow as shown in the
    [documentation](https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow).
 
-#### Authentication
+### Authentication
 
 This action can be configured to authenticate with Personal Access Token (PAT):
 
-##### Personal Access Token (PAT)
+#### Personal Access Token (PAT)
 
-| field          | required | default | description                                                                                                           |
-| -------------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `GH_API_TOKEN` | True     | `""`    | The GitHub Token used to scan the repository. Must have read access to all repository you are interested in scanning. |
-| `API_TOKEN`    | True     | `""`    | The Zenhub Token used to scan the repository.                                                                         |
+| field          | required | default | description                                    |
+| -------------- | -------- | ------- | ---------------------------------------------- |
+| `GH_API_TOKEN` | True     | `""`    | The GitHub Token used to scan the repository.  |
+| `API_TOKEN`    | True     | `""`    | The Zenhub Token used to scan the repository.  |
+
+GH_API_TOKEN Must have read access to all repository you are interested in scanning.
 
 ## Further Documentation
 

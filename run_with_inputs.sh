@@ -8,7 +8,7 @@ export INPUT_FROM_DATE="2024-06-06"
 export INPUT_TO_DATE="2024-06-13"
 export INPUT_FROM_PIPELINE="New Issues"
 export INPUT_TO_PIPELINE="Awaiting STAGING Release"
-export INPUT_RELEASE="2.19"
+export INPUT_RELEASE=""
 export LABEL=""
 
 node dist/index.js
