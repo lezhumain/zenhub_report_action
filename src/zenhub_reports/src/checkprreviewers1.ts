@@ -282,7 +282,7 @@ async function main(
 
     const myCommits = createdPrs
       .map(c => c.commits.length)
-      .reduce((res: number, item: number) => res + item, 0)
+      .reduce((res0: number, item: number) => res0 + item, 0)
 
     const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0
 

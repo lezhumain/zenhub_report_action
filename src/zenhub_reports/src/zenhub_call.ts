@@ -23,7 +23,7 @@ import {
 import * as path from 'node:path'
 import { IMainConfig } from './main_conf'
 import { check_prs, getWeekCount } from './checkprreviewers1'
-import { getAllData } from './getPrAndCommits'
+import { getAllData, IGgData } from './getPrAndCommits'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 // const reviewer_call = require('./check_pr_reviewers.js')
@@ -34,6 +34,23 @@ import { getAllData } from './getPrAndCommits'
 
 const apiKey = process.env.API_KEY
 // const repoId = '409231566'
+
+interface PipelineDataPrep {
+  pipeline: string
+  durationAverage: number
+  count: number
+  movedTo: number
+  movedBackTo: number
+}
+
+interface PipelineData {
+  pipeline: string // The name of the pipeline (currently an empty string)
+  durationAverage: number // The average duration (currently an empty string)
+  count: number // The total count (assuming countTotal is a number)
+  durationAveragePerc: number // The percentage of average duration (assuming percSum is a number)
+  durationAveragePercSum: number // The sum of average duration percentage (currently an empty string)
+  estimatedRemainingDays: number // The estimated remaining days (formatted as a string)
+}
 
 interface ICSVItem {
   duration: number
@@ -85,8 +102,8 @@ interface IHandleIssueResult {
 }
 
 interface IReport {
-  chartTime: any[]
-  chartCount: any[]
+  chartTime: object[]
+  chartCount: object[]
   statsIssue: IStatResult
   statsEstimate: IStatResult
   controlChartList: IControlChartItem[]
@@ -104,8 +121,8 @@ interface IReport {
 
 export interface IPrSummary {
   author: string
-  commentators: any[]
-  commits: any[]
+  commentators: string[]
+  commits: object[]
   url: string
 }
 
@@ -276,15 +293,15 @@ export class Program {
     title: string,
     evs: ICSVItem[],
     fileName: string,
-    param3: any
-  ): Promise<any[]> {
+    param3: { width: number; height: number }
+  ): Promise<object[]> {
     const csv = this.get_csv(evs)
     // await generateExcelPieChart(csv, 'output.xlsx', "Pie Chart Data", "D", "A");
     return this.generateChart(title, csv, fileName, param3)
   }
 
   private toCSV(
-    myArr: any[],
+    myArr: object[],
     withDate: boolean,
     title?: string,
     lastLineFn?: (delim: string) => string
@@ -306,7 +323,7 @@ export class Program {
       // for (const key of keys) {
       // 	csvData += arrItem[key] + this._delim;
       // }
-      csvData += `${keys.map(k => arrItem[k]).join(this._delim)}\n`
+      csvData += `${keys.map(k => (arrItem as any)[k]).join(this._delim)}\n`
     }
     if (lastLineFn) {
       csvData += lastLineFn(this._delim)
@@ -337,8 +354,8 @@ export class Program {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     outputFile: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    sizeObj: any
-  ): Promise<any[]> {
+    sizeObj: { width: number; height: number }
+  ): Promise<object[]> {
     return Promise.resolve([])
   }
 
@@ -540,7 +557,7 @@ export class Program {
   }
 
   private mapToUsefull(
-    move_events: any[],
+    move_events: IGhEvent[],
     estimateValue: number | undefined,
     issueObj: IIssue
   ): ICSVItem[] {
@@ -590,7 +607,7 @@ export class Program {
     return str
   }
 
-  private async callZenhub(query: string, variables: any): Promise<any> {
+  private async callZenhub<T>(query: string, variables: object): Promise<T> {
     // const endpoint = 'https://api.zenhub.io/graphql';
     const endpoint = 'https://api.zenhub.com/public/graphql'
 
@@ -608,13 +625,7 @@ export class Program {
       throw new Error(`Failed to fetch ZenHub API: ${t}`)
     }
 
-    return response.json()
-    // .then(data => {
-    // 	// console.log(data);
-    // })
-    // .catch(error => {
-    // 	console.error(error);
-    // })
+    return response.json() as Promise<T>
   }
 
   private async getEvents(
@@ -641,7 +652,7 @@ export class Program {
 
     const variables = { repositoryGhId, issueNumber }
 
-    const res = await this.callZenhub(query, variables)
+    const res = await this.callZenhub<any>(query, variables)
     const events: IGhEvent[] =
       (res.data?.issueByInfo.timelineItems.nodes as IGhEvent[]) || []
 
@@ -660,8 +671,8 @@ export class Program {
   }
 }`
     const variables = { workspaceId }
-    const res1 = await this.callZenhub(query, variables)
-    const res: any[] = res1.data.workspace.pipelinesConnection.nodes.map(
+    const res1 = await this.callZenhub<any>(query, variables)
+    const res: string[] = res1.data.workspace.pipelinesConnection.nodes.map(
       (res0: any) => res0.name
     )
     return Promise.resolve(res)
@@ -703,7 +714,7 @@ export class Program {
       variables.filters.labels = { in: labels }
     }
 
-    const res1 = await this.callZenhub(query, variables)
+    const res1 = await this.callZenhub<any>(query, variables)
     // const issues: Issue[] = res1.data.searchIssuesByPipeline.nodes.reduce((res: IIssue[], ee: Issue) => {
     // 	return res.concat([{
     // 		number: Number(ee.number),
@@ -732,8 +743,13 @@ export class Program {
                 : undefined,
             repositoryGhId: Number(ee.repository.ghId),
             pipelineName: item.name,
-            labels: ee.labels?.nodes?.map((n: any) => n.name) || undefined,
-            releases: ee.releases?.nodes?.map((n: any) => n.title) || undefined,
+            labels:
+              ee.labels?.nodes?.map((n: { name: string }) => n.name) ||
+              undefined,
+            releases:
+              ee.releases?.nodes?.map(
+                (n: { title: string; id: string }) => n.title
+              ) || undefined,
             events: ee.events,
             pullRequest: !!ee.pullRequest,
             htmlUrl: ee.htmlUrl,
@@ -818,12 +834,21 @@ fragment currentWorkspace on Workspace {
 
     const variables = { workspaceId }
 
-    const res1 = await this.callZenhub(query, variables)
-
-    const err = res1.errors?.map((e: any) => e.message) || []
+    let tmpRes = null
+    const errors: Error[] = []
+    try {
+      tmpRes = await this.callZenhub<any>(query, variables)
+      if (tmpRes.errors) {
+        errors.push(...tmpRes.errors.slice())
+      }
+    } catch (e) {
+      errors.push(e as Error)
+    }
+    const err = errors.map((e: Error) => e.message)
     if (err.length > 0) {
       return Promise.reject(new Error(err.join('\n')))
     }
+    const res1 = tmpRes
 
     const releases: string[] = Array.from(
       new Set(
@@ -873,12 +898,12 @@ fragment currentWorkspace on Workspace {
 
     let res1 = null
     try {
-      res1 = await this.callZenhub(query, variables)
+      res1 = await this.callZenhub<any>(query, variables)
     } catch (e) {
       res1 = { errors: [e] }
     }
 
-    const err = res1?.errors?.map((e: any) => e.message) ?? []
+    const err = res1?.errors?.map((e: Error) => e.message) ?? []
     if (err.length > 0) {
       const errr = new Error(`Error: ${err.join(' --- ')}`)
       // return Promise.reject(errr)
@@ -1182,24 +1207,33 @@ fragment currentWorkspace on Workspace {
     const movesUsers: string[] = Array.from(
       new Set(userMoves.map(um => um.user))
     )
-    const movesAvgArr: any[] = []
+    const movesAvgArr: object[] = []
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const movesAvg = movesUsers.reduce((res: any, item: string) => {
-      const objs = userMoves.filter(um => um.user === item)
-      const movedForward = objs.filter(oo => oo.isForward).length
+    const movesAvg: Record<
+      string,
+      { movedForward: number; movedBackward: number }
+    > = movesUsers.reduce(
+      (
+        res: Record<string, { movedForward: number; movedBackward: number }>,
+        item: string
+      ) => {
+        const objs = userMoves.filter(um => um.user === item)
+        const movedForward = objs.filter(oo => oo.isForward).length
 
-      res[item] = {
-        movedForward,
-        movedBackward: objs.length - movedForward
-      }
+        res[item] = {
+          movedForward,
+          movedBackward: objs.length - movedForward
+        }
 
-      movesAvgArr.push({
-        user: item,
-        ...res[item]
-      })
+        movesAvgArr.push({
+          user: item,
+          ...res[item]
+        })
 
-      return res
-    }, {})
+        return res
+      },
+      {}
+    )
 
     // @ts-ignore
     const avg: IAVGItemMap = this.getAverages(
@@ -1239,7 +1273,7 @@ fragment currentWorkspace on Workspace {
 
     const date = new Date()
 
-    const timeChartItems: any[] = await this.generateChartFromObj(
+    const timeChartItems: object[] = await this.generateChartFromObj(
       `Time spent in pipelines on ${date.toISOString()} (${handledCount} issues)`,
       evs,
       this._config.outputImageFilename,
@@ -1256,12 +1290,14 @@ fragment currentWorkspace on Workspace {
     })
     // console.log(JSON.stringify(avg, null, 2))
 
-    const countChartItems: any[] = Object.keys(avg).map((pipeline: string) => {
-      return {
-        label: pipeline,
-        data: avg[pipeline].issueCount
-      } as any
-    })
+    const countChartItems: object[] = Object.keys(avg).map(
+      (pipeline: string) => {
+        return {
+          label: pipeline,
+          data: avg[pipeline].issueCount
+        } as any
+      }
+    )
     // console.log(`Handled ${handledCount} issues`)
 
     await this.doGenerateChartFromObj(
@@ -1390,13 +1426,10 @@ fragment currentWorkspace on Workspace {
 
     this.generateHTML(outs)
 
-    const remainingEstimatedDays: any[] = this.getRemainingEstimatedDays(
-      avg,
-      openedPerPipeline,
-      stats
-    )
+    const remainingEstimatedDays: PipelineData[] =
+      this.getRemainingEstimatedDays(avg, openedPerPipeline, stats)
     const openedPerPipeline0: { pipeline: string; opened: number }[] =
-      remainingEstimatedDays.slice(0, -1).map((e: any) => {
+      remainingEstimatedDays.slice(0, -1).map((e: PipelineData) => {
         return {
           pipeline: e.pipeline,
           opened: e.count
@@ -1603,7 +1636,7 @@ fragment currentWorkspace on Workspace {
   }
 
   private generateTable(
-    arr: any[],
+    arr: object[],
     specFn?: (key: string, item: any) => string | null,
     tableWidth?: string
   ): string {
@@ -1638,7 +1671,9 @@ fragment currentWorkspace on Workspace {
     return html
   }
 
-  private csvDataToChartItems(csvData: string): any[] {
+  private csvDataToChartItems(
+    csvData: string
+  ): { label: string; data: number }[] {
     const rows: string[][] = csvData
       .split('\n')
       .map(row => row.split(','))
@@ -1649,7 +1684,7 @@ fragment currentWorkspace on Workspace {
       return {
         label: r[0],
         data: Number(r[3])
-      } as any
+      } as { label: string; data: number }
     })
   }
 
@@ -1850,7 +1885,7 @@ fragment currentWorkspace on Workspace {
         return clone
       }
     )
-    report.userReviewStats = userReviewStatsAnon as any
+    report.userReviewStats = userReviewStatsAnon.map(r => Object.assign({} as IPrReviewStat, r))
     const csvPrAndCommits = this.toCSV(userReviewStatsAnon, false)
 
     return {
@@ -1918,53 +1953,53 @@ fragment currentWorkspace on Workspace {
     return Promise.resolve('')
   }
 
-  private async getChartGeneric(
-    title: string,
-    outputFile: string,
-    csvPrAndCommits: any[],
-    key: string,
-    labelKey?: string
-  ): Promise<string> {
-    // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
-    const items: any[] = csvPrAndCommits.map(c => {
-      return {
-        label: labelKey === undefined ? '' : c[labelKey],
-        data: c[key]
-      } as any
-    })
-    return this.doGenerateChartFromObj(title, items, outputFile, {
-      width: 1600,
-      height: 1200
-    })
-  }
-
-  private async generateChartFromArray(
-    imgFiles: any[],
-    dataq: any[],
-    sizePerc: number
-  ): Promise<string> {
-    if (sizePerc < 0) {
-      sizePerc *= 100
-    }
-    const res: string[] = []
-    for (const dat of imgFiles) {
-      const b64img: string = await this.getChartGeneric(
-        dat.title,
-        dat.path,
-        dataq,
-        dat.key,
-        dat.labelKey
-      )
-      res.push(
-        `<!--<img style="width: ${sizePerc}%" title="${dat.title}" src="${dat.path.replace(/output./, '')}">-->`
-      )
-      // const b64img: string = fs.readFileSync(dat.path, { encoding: "base64" });
-      res.push(
-        `<img style="width: ${sizePerc}%" title="${dat.title}" src="data:image/png;base64,${b64img}">`
-      )
-    }
-    return res.join('')
-  }
+  // private async getChartGeneric(
+  //   title: string,
+  //   outputFile: string,
+  //   csvPrAndCommits: object[],
+  //   key: string,
+  //   labelKey?: string
+  // ): Promise<string> {
+  //   // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
+  //   const items: object[] = csvPrAndCommits.map(c => {
+  //     return {
+  //       label: labelKey === undefined ? '' : c[labelKey],
+  //       data: c[key]
+  //     } as any
+  //   })
+  //   return this.doGenerateChartFromObj(title, items, outputFile, {
+  //     width: 1600,
+  //     height: 1200
+  //   })
+  // }
+  //
+  // private async generateChartFromArray(
+  //   imgFiles: any[],
+  //   dataq: object[],
+  //   sizePerc: number
+  // ): Promise<string> {
+  //   if (sizePerc < 0) {
+  //     sizePerc *= 100
+  //   }
+  //   const res: string[] = []
+  //   for (const dat of imgFiles) {
+  //     const b64img: string = await this.getChartGeneric(
+  //       dat.title,
+  //       dat.path,
+  //       dataq,
+  //       dat.key,
+  //       dat.labelKey
+  //     )
+  //     res.push(
+  //       `<!--<img style="width: ${sizePerc}%" title="${dat.title}" src="${dat.path.replace(/output./, '')}">-->`
+  //     )
+  //     // const b64img: string = fs.readFileSync(dat.path, { encoding: "base64" });
+  //     res.push(
+  //       `<img style="width: ${sizePerc}%" title="${dat.title}" src="data:image/png;base64,${b64img}">`
+  //     )
+  //   }
+  //   return res.join('')
+  // }
 
   private averageOBjects<T>(objects: T[], includeKeys: string[]): T {
     const result: any = {}
@@ -2071,22 +2106,25 @@ fragment currentWorkspace on Workspace {
     return uu
   }
 
-  private async getGithubData(repos: string[]): Promise<any> {
+  private async getGithubData(
+    repos: string[]
+  ): Promise<{ allD: ICheckPr[]; newAllD: ICheckPr; ggdata: IGgData }> {
     // console.log(`[getGithubData]: ${repos?.join(',')}`)
 
     const allD: ICheckPr[] = []
     for (const repo of repos) {
-      const d: ICheckPr = (await check_prs(repo, this._config as any).catch(
-        (err: Error) => {
-          const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
-          console.warn(msg)
-          fs.writeFileSync('github_error.txt', msg, { encoding: 'utf8' })
-          return {
-            summary: [],
-            users: []
-          }
+      const d: ICheckPr = (await check_prs(
+        repo,
+        this._config as { minDate: string; maxDate: string }
+      ).catch((err: Error) => {
+        const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
+        console.warn(msg)
+        fs.writeFileSync('github_error.txt', msg, { encoding: 'utf8' })
+        return {
+          summary: [],
+          users: []
         }
-      )) as ICheckPr
+      })) as ICheckPr
       allD.push(d)
     }
 
@@ -2102,7 +2140,7 @@ fragment currentWorkspace on Workspace {
       )
     )
     const usersAvg = users.reduce(
-      (res: any, us: string) => {
+      (res: { users: IPrUser[]; summary: ISummary[] }, us: string) => {
         // @ts-ignore
         const prUs: IPrUser[] = prUsers.filter((u: IPrUser) => u.user === us)
 
@@ -2132,10 +2170,10 @@ fragment currentWorkspace on Workspace {
     newAllD.users = this.averageUsers(usersAvg.users)
     newAllD.summary = usersAvg.summary
 
-    const ggdata = await getAllData(
+    const ggdata: IGgData = await getAllData(
       repos,
       this.config.minDate && this.config.maxDate
-        ? (this.config as any)
+        ? (this.config as { minDate: string; maxDate: string })
         : undefined
     )
     // eslint-disable-next-line no-debugger
@@ -2357,8 +2395,8 @@ fragment currentWorkspace on Workspace {
     avg: IAVGItemMap,
     openedPerPipeline: IOpenedPerPipeline[],
     stats: IStatResult
-  ): any[] {
-    const remainingEstimatedDays: NonNullable<any[]> = Object.keys(avg)
+  ): PipelineData[] {
+    const remainingEstimatedDays: PipelineDataPrep[] = Object.keys(avg)
       .map(l => {
         const openedItem = openedPerPipeline.find(
           (opp: IOpenedPerPipeline) => opp.pipeline === l
@@ -2373,20 +2411,31 @@ fragment currentWorkspace on Workspace {
             }
           : null
       })
-      .filter(r => !!r)
+      .filter(r => r !== null)
     const tot = remainingEstimatedDays.reduce(
-      (res0: number, item: any) => res0 + item.durationAverage,
+      (res0: number, item: PipelineDataPrep) => res0 + item.durationAverage,
       0
     )
+
+    const myResult: PipelineData[] = []
     for (const item of remainingEstimatedDays) {
-      item.durationAveragePerc = item.durationAverage / tot
+      const newObj: PipelineData = {
+        pipeline: item.pipeline,
+        durationAverage: item.durationAverage,
+        count: item.count,
+        durationAveragePerc: item.durationAverage / tot,
+        durationAveragePercSum: 0,
+        estimatedRemainingDays: 0
+      }
+      myResult.push(newObj)
     }
-    const sum = this.getTotalMsAverageFromPipelineToPipelineConfig(avg)
+
+    const sum: number = this.getTotalMsAverageFromPipelineToPipelineConfig(avg)
     let percSum = 0
     let countTotal = 0
     let remainingTotal = 0
-    for (let i = remainingEstimatedDays.length - 1; i >= 0; --i) {
-      const iItem = remainingEstimatedDays[i]
+    for (let i = myResult.length - 1; i >= 0; --i) {
+      const iItem = myResult[i]
       countTotal += iItem.count
 
       iItem.durationAveragePercSum =
@@ -2404,35 +2453,35 @@ fragment currentWorkspace on Workspace {
 
       remainingTotal += iItem.estimatedRemainingDays
     }
-    remainingEstimatedDays.push({
+    myResult.push({
       pipeline: '',
-      durationAverage: '',
+      durationAverage: 0,
       count: countTotal,
       durationAveragePerc: percSum,
-      durationAveragePercSum: '',
-      estimatedRemainingDays: remainingTotal.toFixed(1)
-    } as any)
+      durationAveragePercSum: 0,
+      estimatedRemainingDays: Number(remainingTotal.toFixed(1))
+    })
 
-    return remainingEstimatedDays
+    return myResult
   }
 
   protected async doGenerateChartFromObj(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     s: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    countChartItems: any[],
+    countChartItems: object[],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     s2: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    param4: any
+    param4: { width: number; height: number }
   ): Promise<string> {
     return Promise.resolve('')
   }
 
-  private getWeekCount(): number {
-    return getWeekCount(
-      new Date(this._config.minDate ?? 0),
-      new Date(this._config.maxDate ?? 0)
-    )
-  }
+  // private getWeekCount(): number {
+  //   return getWeekCount(
+  //     new Date(this._config.minDate ?? 0),
+  //     new Date(this._config.maxDate ?? 0)
+  //   )
+  // }
 }

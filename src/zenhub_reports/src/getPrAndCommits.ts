@@ -300,13 +300,15 @@ function generateSummary(
   return obj
 }
 
+export interface IGgData {
+  all: Record<string, { pr_count: number; commit_count: number }>[]
+  summary: Record<string, { pr_count: number; commit_count: number }>
+}
+
 export async function getAllData(
   repos?: string[],
   config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
-): Promise<{
-  all: Record<string, { pr_count: number; commit_count: number }>[]
-  summary: Record<string, { pr_count: number; commit_count: number }>
-}> {
+): Promise<IGgData> {
   if (repos === undefined) {
     repos = ['BrowserPuppeteerTests', 'CucuVAPI']
   }
