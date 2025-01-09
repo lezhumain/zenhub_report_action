@@ -38141,7 +38141,7 @@ class Main {
         catch (error) {
             // Fail the workflow run if an error occurs
             if (error instanceof Error) {
-                console.warn(`Main Error: ${error.message}`);
+                // console.warn(`Main Error: ${error.message}`)
                 core.setFailed(error.message);
             }
         }
@@ -39645,7 +39645,7 @@ fragment currentWorkspace on Workspace {
             if (!e.message.includes("Cannot find module 'canvas'")) {
                 throw e;
             }
-            console.warn(e.message);
+            // console.warn(e.message)
             return [];
         });
         // console.log(JSON.stringify(avg, null, 2))
@@ -39660,7 +39660,7 @@ fragment currentWorkspace on Workspace {
             if (!e.message.includes("Cannot find module 'canvas'")) {
                 throw e;
             }
-            console.warn(e.message);
+            // console.warn(e.message)
         });
         let issueWithEventCount = 0;
         for (const pipelineConnect of board.pipelinesConnection) {
@@ -39754,7 +39754,7 @@ fragment currentWorkspace on Workspace {
             if (!e.message.includes("Cannot find module 'canvas'")) {
                 throw e;
             }
-            console.warn(e.message);
+            // console.warn(e.message)
         }
         const baseTableFn = (issueNumberKey) => {
             return (key, item) => {
@@ -40223,7 +40223,7 @@ fragment currentWorkspace on Workspace {
         for (const repo of repos) {
             const d = (await (0, checkprreviewers1_1.check_prs)(repo, this._config).catch((err) => {
                 const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`;
-                console.warn(msg);
+                // console.warn(msg)
                 fs.writeFileSync('github_error.txt', msg, { encoding: 'utf8' });
                 return {
                     summary: [],
