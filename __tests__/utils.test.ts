@@ -3,7 +3,7 @@
  * Unit tests for the action's entrypoint, src/index.ts
  */
 
-import { utils, Utils } from '../src/zenhub_reports/src/models'
+import { utils } from '../src/zenhub_reports/src/models'
 
 describe('index', () => {
   it('should display 1s in human readable time', async () => {
