@@ -1251,7 +1251,7 @@ fragment currentWorkspace on Workspace {
       if (!e.message.includes("Cannot find module 'canvas'")) {
         throw e
       }
-      console.warn(e.message)
+      // console.warn(e.message)
       return []
     })
     // console.log(JSON.stringify(avg, null, 2))
@@ -1273,7 +1273,7 @@ fragment currentWorkspace on Workspace {
       if (!e.message.includes("Cannot find module 'canvas'")) {
         throw e
       }
-      console.warn(e.message)
+      // console.warn(e.message)
     })
 
     let issueWithEventCount = 0
@@ -1411,7 +1411,7 @@ fragment currentWorkspace on Workspace {
       if (!e.message.includes("Cannot find module 'canvas'")) {
         throw e
       }
-      console.warn(e.message)
+      // console.warn(e.message)
     }
 
     const baseTableFn = (
@@ -2079,7 +2079,7 @@ fragment currentWorkspace on Workspace {
       const d: ICheckPr = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
           const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
-          console.warn(msg)
+          // console.warn(msg)
           fs.writeFileSync('github_error.txt', msg, { encoding: 'utf8' })
           return {
             summary: [],
