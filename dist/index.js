@@ -38361,7 +38361,8 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
                 author,
                 commentators,
                 url: pr.html_url,
-                commits: filteredCommit
+                commits: filteredCommit,
+                commentCount: all_comments.length
             };
             // console.log('obj===')
             // console.log(obj)
@@ -38404,8 +38405,11 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
         //   .reduce((res, item) => res + item, 0)
         const myCommits = createdPrs
             .map(c => c.commits.length)
-            .reduce((res, item) => res + item, 0);
+            .reduce((res0, item) => res0 + item, 0);
         const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0;
+        const totalComments = createdPrs.reduce((resC, item) => {
+            return resC + item.commentCount;
+        }, 0);
         res.users.push({
             user,
             shouldReviewCount,
@@ -38414,7 +38418,9 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
             created: createdPrs.length,
             createdPerc: summary.length > 0 ? createdPrs.length / summary.length : 0,
             totalCommits: myCommits,
-            totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2))
+            totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2)),
+            totalCommentsInPr: totalComments,
+            totalCommentsPerPr: totalComments / createdPrs.length
         });
     }
     return Promise.resolve(res);
@@ -38649,15 +38655,6 @@ async function getAllData(repos, config = { minDate: '2024-04-22', maxDate: '202
     }
     const all = [];
     for (const r of repos) {
-        // const rres:
-        //   | Record<string, { pr_count: number; commit_count: number }>
-        //   | undefined = await fetch_prs_for_repo(r, config).catch((err: any) => {
-        //   console.warn('err: ' + err.message)
-        //   return undefined
-        // })
-        // if (rres !== undefined) {
-        //   all.push(rres)
-        // }
         try {
             const rres = await fetch_prs_for_repo(r, config);
             if (rres !== undefined) {
@@ -38853,6 +38850,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Program = exports.fileUtils = void 0;
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const md5_1 = __importDefault(__nccwpck_require__(2296));
 const fs = __importStar(__nccwpck_require__(9896));
 const models_1 = __nccwpck_require__(6099);
@@ -40201,6 +40199,7 @@ fragment currentWorkspace on Workspace {
                 existing.didReviewCount += us.didReviewCount;
                 existing.totalCommits += us.totalCommits;
                 existing.totalCommitsPerWeek += us.totalCommitsPerWeek;
+                existing.totalCommentsInPr += us.totalCommentsInPr;
             }
             return res;
         }, []);
@@ -40214,6 +40213,8 @@ fragment currentWorkspace on Workspace {
                     ? Number((u.didReviewCount / othersCreated).toFixed(2))
                     : 0;
             u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2));
+            u.totalCommentsPerPr =
+                u.created > 0 ? Number((u.totalCommentsInPr / u.created).toFixed(2)) : 0;
         }
         return uu;
     }
