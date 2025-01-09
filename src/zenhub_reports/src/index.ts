@@ -4,7 +4,7 @@ import { IMainConfig, mainConfig } from './main_conf'
 
 const current = new Date(new Date().toDateString())
 const minus1month = new Date(current)
-minus1month.setMonth(minus1month.getMonth() - 3)
+minus1month.setMonth(minus1month.getMonth() - 1)
 
 export const config0: IMainConfig = Object.assign({}, mainConfig)
 config0.workspaceId = process.env.WORKSPACE_ID || ''

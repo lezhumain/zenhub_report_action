@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import md5 from 'md5'
 import * as fs from 'fs'
 import {
@@ -107,6 +108,7 @@ export interface IPrSummary {
   commentators: any[]
   commits: any[]
   url: string
+  commentCount: number
 }
 
 export interface IProgramResult {
@@ -2040,7 +2042,7 @@ fragment currentWorkspace on Workspace {
       // return  {
       // 	user:
       // } as IPrUser;
-      const existing = res.find(a => a.user === us.user)
+      const existing: IPrUser | undefined = res.find(a => a.user === us.user)
       if (!existing) {
         res.push(Object.assign({}, us))
       } else {
@@ -2049,6 +2051,7 @@ fragment currentWorkspace on Workspace {
         existing.didReviewCount += us.didReviewCount
         existing.totalCommits += us.totalCommits
         existing.totalCommitsPerWeek += us.totalCommitsPerWeek
+        existing.totalCommentsInPr += us.totalCommentsInPr
       }
       return res
     }, [])
@@ -2067,6 +2070,8 @@ fragment currentWorkspace on Workspace {
           ? Number((u.didReviewCount / othersCreated).toFixed(2))
           : 0
       u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2))
+      u.totalCommentsPerPr =
+        u.created > 0 ? Number((u.totalCommentsInPr / u.created).toFixed(2)) : 0
     }
     return uu
   }

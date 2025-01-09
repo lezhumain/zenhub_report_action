@@ -312,15 +312,6 @@ export async function getAllData(
   }
   const all: Record<string, { pr_count: number; commit_count: number }>[] = []
   for (const r of repos) {
-    // const rres:
-    //   | Record<string, { pr_count: number; commit_count: number }>
-    //   | undefined = await fetch_prs_for_repo(r, config).catch((err: any) => {
-    //   console.warn('err: ' + err.message)
-    //   return undefined
-    // })
-    // if (rres !== undefined) {
-    //   all.push(rres)
-    // }
     try {
       const rres:
         | Record<string, { pr_count: number; commit_count: number }>

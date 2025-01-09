@@ -317,6 +317,8 @@ export interface IPrUser extends IPrReviewStat {
   // createdPerc: number
   totalCommits: number
   totalCommitsPerWeek: number
+  totalCommentsInPr: number
+  totalCommentsPerPr: number
 }
 
 export interface IPrReviewStat {

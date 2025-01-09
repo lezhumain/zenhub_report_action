@@ -210,7 +210,8 @@ async function main(
         author,
         commentators,
         url: pr.html_url,
-        commits: filteredCommit
+        commits: filteredCommit,
+        commentCount: all_comments.length
       }
 
       // console.log('obj===')
@@ -282,9 +283,16 @@ async function main(
 
     const myCommits = createdPrs
       .map(c => c.commits.length)
-      .reduce((res: number, item: number) => res + item, 0)
+      .reduce((res0: number, item: number) => res0 + item, 0)
 
     const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0
+
+    const totalComments: number = createdPrs.reduce(
+      (resC: number, item: IPrSummary) => {
+        return resC + item.commentCount
+      },
+      0
+    )
 
     res.users.push({
       user,
@@ -294,7 +302,9 @@ async function main(
       created: createdPrs.length,
       createdPerc: summary.length > 0 ? createdPrs.length / summary.length : 0,
       totalCommits: myCommits,
-      totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2))
+      totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2)),
+      totalCommentsInPr: totalComments,
+      totalCommentsPerPr: totalComments / createdPrs.length
     })
   }
 
