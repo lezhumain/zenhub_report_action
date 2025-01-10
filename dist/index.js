@@ -40285,14 +40285,24 @@ fragment currentWorkspace on Workspace {
         const newAllD = this.getNewAllD(githubDataRes);
         const githubUsers = Array.from(new Set(newAllD.users.map((nu) => nu.user)));
         for (const githubUser of githubUsers) {
-            const userIssues = issues.filter((iss) => iss.handled && iss.author === githubUser);
+            // const userIssues = issues.filter(
+            //   (iss: IIssue) =>
+            //     iss.events && iss.events?.length > 0 && iss.author === githubUser
+            // )
+            const userIssues = issues.filter((iss) => iss.author === githubUser &&
+                (!this.config.minDate ||
+                    new Date(iss.createdAt).getTime() >=
+                        new Date(this.config.minDate).getTime()));
             const target = newAllD.users.find((us) => us.user === githubUser);
             if (target !== undefined) {
                 target.issueCreated = userIssues.length;
             }
         }
         for (const githubUser of githubUsers) {
-            const userIssues = issues.filter((iss) => iss.handled && iss.author === githubUser);
+            const userIssues = issues.filter((iss) => iss.author === githubUser &&
+                (!this.config.minDate ||
+                    new Date(iss.createdAt).getTime() >=
+                        new Date(this.config.minDate).getTime()));
             const target = newAllD.users.find((us) => us.user === githubUser);
             if (target !== undefined) {
                 target.issueCreated = userIssues.length;
