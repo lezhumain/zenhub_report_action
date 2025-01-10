@@ -2220,8 +2220,16 @@ fragment currentWorkspace on Workspace {
     )
 
     for (const githubUser of githubUsers) {
+      // const userIssues = issues.filter(
+      //   (iss: IIssue) =>
+      //     iss.events && iss.events?.length > 0 && iss.author === githubUser
+      // )
       const userIssues = issues.filter(
-        (iss: IIssue) => iss.handled && iss.author === githubUser
+        (iss: IIssue) =>
+          iss.author === githubUser &&
+          (!this.config.minDate ||
+            new Date(iss.createdAt).getTime() >=
+              new Date(this.config.minDate).getTime())
       )
       const target: IPrUser | undefined = newAllD.users.find(
         (us: IPrUser) => us.user === githubUser
@@ -2233,7 +2241,11 @@ fragment currentWorkspace on Workspace {
 
     for (const githubUser of githubUsers) {
       const userIssues = issues.filter(
-        (iss: IIssue) => iss.handled && iss.author === githubUser
+        (iss: IIssue) =>
+          iss.author === githubUser &&
+          (!this.config.minDate ||
+            new Date(iss.createdAt).getTime() >=
+              new Date(this.config.minDate).getTime())
       )
       const target: IPrUser | undefined = newAllD.users.find(
         (us: IPrUser) => us.user === githubUser

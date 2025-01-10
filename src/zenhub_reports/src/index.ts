@@ -4,9 +4,10 @@ import { IMainConfig, mainConfig } from './main_conf'
 
 const current = new Date(new Date().toDateString())
 // current.setMonth(current.getMonth() - 4)
-const minus1month = new Date(current)
-minus1month.setMonth(minus1month.getMonth() - 1)
+// const minus1month = new Date(current)
+// minus1month.setMonth(minus1month.getMonth() - 4)
 // const minus1month = new Date(current.getTime() - 14 * 24 * 60 * 60 * 1000)
+const minus1month = new Date('08/09/2024')
 
 export const config0: IMainConfig = Object.assign({}, mainConfig)
 config0.workspaceId = process.env.WORKSPACE_ID || ''
