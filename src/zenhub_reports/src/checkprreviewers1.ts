@@ -26,7 +26,7 @@ const callGithubAPIByEndpoint = async (
   repoId: string
 ): Promise<AxiosResponse> => {
   // GitHub API endpoint for pull requests
-  if (!endpoint.startsWith('/')) {
+  if (!endpoint.startsWith('/') && endpoint.length > 0) {
     endpoint = `/${endpoint}`
   }
   const owner = 'whitespace-software'
@@ -54,6 +54,10 @@ async function getByURL<T>(url: string): Promise<T> {
 // async function getLastYearSummary(repoId: string): Promise<AxiosResponse> {
 //   return callGithubAPIByEndpoint('/stats/commit_activity', repoId)
 // }
+
+export async function getRepoInfo(repoName: string): Promise<AxiosResponse> {
+  return callGithubAPIByEndpoint('', repoName)
+}
 
 /**
  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-all-contributor-commit-activity

@@ -3,8 +3,10 @@ import { IssueFilter } from './filters'
 import { IMainConfig, mainConfig } from './main_conf'
 
 const current = new Date(new Date().toDateString())
+// current.setMonth(current.getMonth() - 4)
 const minus1month = new Date(current)
 minus1month.setMonth(minus1month.getMonth() - 1)
+// const minus1month = new Date(current.getTime() - 14 * 24 * 60 * 60 * 1000)
 
 export const config0: IMainConfig = Object.assign({}, mainConfig)
 config0.workspaceId = process.env.WORKSPACE_ID || ''
@@ -21,7 +23,8 @@ const argConfig: Partial<IMainConfig> = {
   maxDate: args[2] || undefined,
   labels: args[3] ? JSON.parse(args[3]) : undefined,
   skipRepos: args[4] ? JSON.parse(args[4]) : undefined,
-  includeRepos: args[5] ? JSON.parse(args[5]) : undefined,
+  // includeRepos: args[5] ? JSON.parse(args[5]) : ['BrowserPuppeteerTests', "CucuVAPI"],
+  includeRepos: args[5] ? JSON.parse(args[5]) : [409231566],
   issuesToSkip: args[6] ? JSON.parse(args[6]) : undefined,
   fromPipeline: args[7] || undefined,
   toPipeline: args[8] || undefined,

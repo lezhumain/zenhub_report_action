@@ -221,6 +221,7 @@ async function fetch_prs_for_repo(
     const stats: Record<string, { pr_count: number; commit_count: number }> =
       makeStats(pullRequests)
     // console.log(JSON.stringify(stats, null, 2))
+    console.log('Got stats')
     return Promise.resolve(stats)
   } catch (e) {
     console.error('Error fetching pull requests:', e)
@@ -312,12 +313,15 @@ export async function getAllData(
   }
   const all: Record<string, { pr_count: number; commit_count: number }>[] = []
   for (const r of repos) {
+    console.log(`Getting pr and commit data for ${r}`) // Log the result
+
     try {
       const rres:
         | Record<string, { pr_count: number; commit_count: number }>
         | undefined = await fetch_prs_for_repo(r, config)
 
-      if (rres !== undefined) {
+      if (rres !== undefined && Object.keys(rres).length > 0) {
+        console.log(`[getAllData] pushing rres ${JSON.stringify(rres)}`) // Log the result
         all.push(rres)
       }
     } catch (err: any) {

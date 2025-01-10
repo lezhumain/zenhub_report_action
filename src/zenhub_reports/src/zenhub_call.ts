@@ -23,8 +23,9 @@ import {
 } from './models'
 import * as path from 'node:path'
 import { IMainConfig } from './main_conf'
-import { check_prs, getWeekCount } from './checkprreviewers1'
+import { check_prs, getRepoInfo, getWeekCount } from './checkprreviewers1'
 import { getAllData } from './getPrAndCommits'
+import { AxiosResponse } from 'axios'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 // const reviewer_call = require('./check_pr_reviewers.js')
@@ -2079,8 +2080,20 @@ fragment currentWorkspace on Workspace {
   private async getGithubData(repos: string[]): Promise<any> {
     // console.log(`[getGithubData]: ${repos?.join(',')}`)
 
+    const targetRepoNames: string[] = []
+
     const allD: ICheckPr[] = []
     for (const repo of repos) {
+      const repoData: AxiosResponse<any> = await getRepoInfo(repo)
+      const repoId = repoData.data.id
+      if (
+        this._config.includeRepos.length > 0 &&
+        !this._config.includeRepos.includes(repoId)
+      ) {
+        continue
+      }
+
+      targetRepoNames.push(repo)
       const d: ICheckPr = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
           const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
@@ -2138,11 +2151,12 @@ fragment currentWorkspace on Workspace {
     newAllD.summary = usersAvg.summary
 
     const ggdata = await getAllData(
-      repos,
+      targetRepoNames,
       this.config.minDate && this.config.maxDate
         ? (this.config as any)
         : undefined
     )
+
     // eslint-disable-next-line no-debugger
     // debugger
 
