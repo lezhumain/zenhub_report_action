@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // eslint-disable-next-line import/named
 import get from 'axios'
 import { AxiosResponse } from 'axios'
@@ -6,6 +7,7 @@ import * as fs from 'node:fs'
 import { ICheckPr } from './models'
 import { Commit, fetchCommitsForPullRequest } from './getPrAndCommits'
 import { IPrSummary } from './zenhub_call'
+import { filterDateBetweenConfig } from './utils'
 
 export function getWeekCount(dateFrom: Date, dateTo: Date): number {
   return Number(
@@ -26,11 +28,17 @@ const callGithubAPIByEndpoint = async (
   repoId: string
 ): Promise<AxiosResponse> => {
   // GitHub API endpoint for pull requests
-  if (!endpoint.startsWith('/') && endpoint.length > 0) {
+  if (
+    !endpoint.startsWith('/') &&
+    endpoint.length > 0 &&
+    !endpoint.startsWith('http')
+  ) {
     endpoint = `/${endpoint}`
   }
   const owner = 'whitespace-software'
-  const url = `https://api.github.com/repos/${owner}/${repoId}${endpoint}` // pulls
+  const url = endpoint.startsWith('http')
+    ? endpoint
+    : `https://api.github.com/repos/${owner}/${repoId}${endpoint}` // pulls
   return callGithubAPIByURL(url)
 }
 
@@ -38,22 +46,6 @@ async function getByURL<T>(url: string): Promise<T> {
   const resp: AxiosResponse = await callGithubAPIByURL(url)
   return Promise.resolve(resp.data)
 }
-
-// /**
-//  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-hourly-commit-count-for-each-day
-//  * @returns {Promise<unknown>}
-//  */
-// async function getCommitDailySummary(repoId: string): Promise<AxiosResponse> {
-//   return callGithubAPIByEndpoint('/stats/punch_card', repoId)
-// }
-
-// /**
-//  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
-//  * @returns {Promise<unknown>}
-//  */
-// async function getLastYearSummary(repoId: string): Promise<AxiosResponse> {
-//   return callGithubAPIByEndpoint('/stats/commit_activity', repoId)
-// }
 
 export async function getRepoInfo(repoName: string): Promise<AxiosResponse> {
   return callGithubAPIByEndpoint('', repoName)
@@ -69,7 +61,6 @@ async function getPContributorsData(repoId: string): Promise<AxiosResponse> {
     const content = fs.readFileSync(savedName, { encoding: 'utf8' })
     if (content) {
       return Promise.resolve({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: (JSON.parse(content) as never[]).map((e: any) => {
           e.incomplete = true
           return e
@@ -96,66 +87,81 @@ async function getPContributorsData(repoId: string): Promise<AxiosResponse> {
   return res
 }
 
-// interface IPrResponse {
-//   user: object
-//   draft: boolean
-//   created_at: string
-// }
-
 function getContribFilename(repoId: string): string {
   return `output/contribs_${repoId}.json`
 }
 
-// async function handleYearCommits(
-//   repoId: string,
-//   config: { minDate: string; maxDate: string },
-//   tryCount = 0
-// ): Promise<unknown[]> {
-//   const yearCommitsResp = await getLastYearSummary(repoId)
-//   const yearCommits = yearCommitsResp.data
-//
-//   if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
-//     console.warn(
-//       `Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`
-//     )
-//   }
-//   const resYearCommits =
-//     (Array.isArray(yearCommits) ? yearCommits : [])
-//       .map(yc => {
-//         const clone = Object.assign({}, yc)
-//         delete clone.days
-//         return clone
-//       })
-//       .filter(
-//         w =>
-//           (config?.minDate === undefined ||
-//             w.week * 1000 >= new Date(config.minDate).getTime()) &&
-//           (config?.maxDate === undefined ||
-//             w.week * 1000 <= new Date(config.maxDate).getTime())
-//       ) || []
-//
-//   if (resYearCommits.length === 0 && tryCount > 0) {
-//     await utils.waitForTimeout(1000)
-//     return handleYearCommits(repoId, config, tryCount - 1)
-//   }
-//
-//   return Promise.resolve(resYearCommits)
-// }
+async function getPRs(
+  repoName: string,
+  minDate: string,
+  maxDate: string,
+  beforeDate?: string
+): Promise<IGithubPR[]> {
+  // const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoName)
+
+  let urlTmp = `https://api.github.com/search/issues?q=repo:whitespace-software/${repoName}+is:pr`
+  if (!beforeDate) {
+    // urlTmp += `+created:<${beforeDate}`
+    beforeDate = maxDate
+  }
+  urlTmp += `+created:${encodeURIComponent('<')}${beforeDate}`
+
+  const url = urlTmp
+  const prsResponse = (await callGithubAPIByEndpoint(
+    url,
+    repoName
+  )) as any as AxiosResponse<IGithubPR[]>
+  // return Promise.resolve([])
+
+  console.log('pr resp 1')
+
+  const prs0: any = prsResponse.data
+  const prs: IGithubPR[] = prs0.items
+
+  const filtered = prs.filter((prr: IGithubPR) => {
+    const isDateOk: boolean = filterDateBetweenConfig(
+      prr.created_at,
+      minDate,
+      maxDate
+    )
+    return isDateOk
+  })
+
+  const min = new Date(minDate)
+  if (prs.length === 30 && filtered.length > 0) {
+    const before: string = prs[prs.length - 1].created_at
+    // if (before !== beforeDate && (new Date(before)).getTime() > min.getTime()) {
+    //   const newPrs = await getPRs(repoName, minDate, maxDate, before)
+    //   filtered.push(...newPrs)
+    // }
+    if (before !== beforeDate && new Date(before).getTime() > min.getTime()) {
+      console.log(`Getting before ${beforeDate}`)
+      const rr: IGithubPR[] = await getPRs(repoName, minDate, maxDate, before)
+      return Promise.resolve(filtered.concat(rr))
+    }
+  }
+
+  return Promise.resolve(filtered)
+}
 
 async function main(
-  repoId: string,
-  config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
+  repoName: string,
+  config = {
+    minDate: '2024-04-22',
+    maxDate: '2024-05-22',
+    includeRepos: [] as string[]
+  }
 ): Promise<ICheckPr> {
   // console.log('pr resp 0')
-  const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId)
-  // console.log('pr resp 1')
-
-  const prs: IGithubPR[] = prsResponse.data
+  const prs: IGithubPR[] = await getPRs(
+    repoName,
+    config.minDate,
+    config.maxDate
+  )
 
   // const openedPrs = prs.filter(p => p.state === 'open' && !p.draft)
   // const openedPrs: IGithubPR[] = prs.filter((p: IPrResponse) => !p.draft)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res: { summary: any[]; users: any[]; yearCommits: any[] } = {
     summary: [],
     users: [],
@@ -168,7 +174,6 @@ async function main(
   // console.log('prs')
   // console.log(JSON.stringify(prs, null, 2))
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const summary: IPrSummary[] = []
 
   // for (const pr of openedPrs) {
@@ -184,7 +189,9 @@ async function main(
       const author = pr.user.login
 
       const comments = pr.comments_url
-        ? await getByURL<{ user: { login: string } }[]>(pr.comments_url)
+        ? await getByURL<{ user: { login: string } }[]>(
+            pr.comments_url.replace('/issues/', '/pulls/')
+          )
         : []
       const review_comments = pr.review_comments_url
         ? await getByURL<{ user: { login: string } }[]>(pr.review_comments_url)
@@ -203,7 +210,7 @@ async function main(
 
       const allCommitData: Commit[] = await fetchCommitsForPullRequest(
         pr.number,
-        prs[0].head.repo.name
+        repoName
       )
       const filteredCommit = allCommitData.filter((item: Commit) => {
         const commitDate = new Date(item.commit.committer.date)
@@ -239,28 +246,6 @@ async function main(
       }, [])
     )
   )
-
-  // console.log('pr resp 3')
-
-  const contribsResp: AxiosResponse = await getPContributorsData(repoId)
-  const contribs: {
-    authorName: string
-    weeks: { w: number }[]
-    incomplete?: boolean
-  }[] =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    contribsResp.data.filter((r: any) => r.total > 0)
-
-  if (contribs.length > 0) {
-    fs.writeFileSync(
-      getContribFilename(repoId),
-      JSON.stringify(contribs, null, 2),
-      { encoding: 'utf8' }
-    )
-  }
-
-  // console.log('pr resp 4')
-  // console.log(`Everyone: ${everyone.join(',')}`)
 
   const weekCount = getWeekCount(
     new Date(config.minDate),
@@ -316,10 +301,10 @@ async function main(
 }
 
 export async function check_prs(
-  repoId: string,
-  config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
+  repoName: string,
+  config = { minDate: '2024-04-22', maxDate: '2024-05-22', includeRepos: [] }
 ): Promise<ICheckPr> {
-  return main(repoId, config)
+  return main(repoName, config)
 }
 
 // if (module.parent !== null) {

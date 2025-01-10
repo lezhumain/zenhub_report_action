@@ -11,7 +11,7 @@ minus1month.setMonth(minus1month.getMonth() - 1)
 export const config0: IMainConfig = Object.assign({}, mainConfig)
 config0.workspaceId = process.env.WORKSPACE_ID || ''
 config0.includeRepos = process.env.REPO_ID
-  ? process.env.REPO_ID.split(',').map(r => Number(r.trim()))
+  ? process.env.REPO_ID.split(',').map(m => Number(m))
   : []
 config0.minDate = minus1month.toISOString()
 config0.maxDate = current.toISOString()

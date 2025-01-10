@@ -42,6 +42,7 @@ export interface IIssueEvent {
   number: string
   estimateValue: { value: number }
   repositoryGhId: number
+  repositoryGhName: string
   createdAt: string
 }
 
@@ -64,12 +65,14 @@ export interface IIssue {
   number: string
   estimateValue?: number
   repositoryGhId: number
+  repositoryGhName: string
   pipelineName: string
   labels?: string[]
   releases?: string[]
   pullRequest: boolean
   htmlUrl: string
   createdAt: Date
+  author: string
 }
 
 export interface IWorkspace {
@@ -111,6 +114,7 @@ export interface Issue {
   htmlUrl: string
   pullRequest?: boolean
   createdAt: string
+  user: { login: string }
 }
 
 export interface IControlChartItem {
@@ -309,16 +313,11 @@ export interface ISummary {
 }
 
 export interface IPrUser extends IPrReviewStat {
-  // user: string
-  // shouldReviewCount: number
-  // didReviewCount: number
-  // reviewedPerc: number
-  // created: number
-  // createdPerc: number
   totalCommits: number
   totalCommitsPerWeek: number
   totalCommentsInPr: number
   totalCommentsPerPr: number
+  issueCreated: number
 }
 
 export interface IPrReviewStat {
