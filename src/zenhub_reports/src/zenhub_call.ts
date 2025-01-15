@@ -1683,14 +1683,14 @@ fragment currentWorkspace on Workspace {
     newAllD.users = this.averageUsers(usersAvg.users)
     newAllD.summary = usersAvg.summary
 
-    const ggdata = await getAllData(
-      targetRepoNames,
-      this.config.minDate && this.config.maxDate
-        ? (this.config as any)
-        : undefined
-    )
+    // const ggdata = await getAllData(
+    //   targetRepoNames,
+    //   this.config.minDate && this.config.maxDate
+    //     ? (this.config as any)
+    //     : undefined
+    // )
 
-    return Promise.resolve({ allD, newAllD, ggdata })
+    return Promise.resolve({ allD, newAllD, ggdata: undefined })
   }
 
   private addRepoProps(item: ISarchIssuesByPipeline): ISarchIssuesByPipeline {
