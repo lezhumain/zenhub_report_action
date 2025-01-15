@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any,github/no-then */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import md5 from 'md5'
 import * as fs from 'fs'
 import {
@@ -9,9 +9,7 @@ import {
   IWorkspace,
   IGhEvent,
   ControlChartItem,
-  Utils,
   IStatResult,
-  StatHelper,
   IVelocity,
   IVelocityItem,
   ISarchIssuesByPipeline,
@@ -19,12 +17,15 @@ import {
   ISummary,
   IPrUser,
   IPrReviewStat,
-  IOpenedIssue
+  IOpenedIssue,
+  utils,
+  statHelper
 } from './models'
 import * as path from 'node:path'
 import { IMainConfig } from './main_conf'
-import { check_prs } from './checkprreviewers1'
+import { check_prs, getRepoInfo, getWeekCount } from './checkprreviewers1'
 import { getAllData } from './getPrAndCommits'
+import { AxiosResponse } from 'axios'
 
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 // const reviewer_call = require('./check_pr_reviewers.js')
@@ -69,11 +70,12 @@ export interface IAVGItemMap {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-export class FileUtils {
-  static fileExists(filePath: string): boolean {
+class FileUtils {
+  fileExists(filePath: string): boolean {
     return fs.existsSync(filePath)
   }
 }
+export const fileUtils = new FileUtils()
 
 interface IHandleIssueResult {
   csvItems: ICSVItem[]
@@ -102,10 +104,12 @@ interface IReport {
   userMoves: IUserMove[]
 }
 
-interface IPrSummary {
+export interface IPrSummary {
   author: string
-  commentators: string[]
+  commentators: any[]
+  commits: any[]
   url: string
+  commentCount: number
 }
 
 export interface IProgramResult {
@@ -188,6 +192,9 @@ export class Program {
             }
             createdAt
             pullRequest
+            user {
+              login
+            }
           }
         }`
 
@@ -215,7 +222,7 @@ export class Program {
     }
     this._config = Object.assign(defaultConfig, config)
 
-    if (!Utils.isHex(this._config.workspaceId)) {
+    if (!utils.isHex(this._config.workspaceId)) {
       throw new Error('Bad workspace ID')
     }
 
@@ -248,14 +255,13 @@ export class Program {
       }
     }
 
-    for (const key of Object.keys(this._config)) {
-      // @ts-ignore
-      if (!this._config[key]) {
-        // @ts-ignore
-        // this._config[key] = undefined;
-        delete this._config[key]
+    const partial: Partial<IMainConfig> = Object.assign({}, this._config)
+    for (const key of Object.keys(partial) as (keyof IMainConfig)[]) {
+      if (!partial[key]) {
+        delete partial[key]
       }
     }
+    this._config = partial as IMainConfig
 
     const str = JSON.stringify(this._config)
     this._configHash = md5(str)
@@ -319,7 +325,6 @@ export class Program {
     const date = new Date()
 
     const all: ICSVResult = this.getAllCSV(report, date)
-
     const mainCSV = `${all.csvChart}\n\n${all.csvOutstanding}\n\n${all.velocityList}\n\n${all.mainList}\n\n${all.csvPrAndCommits}`
     fs.writeFileSync(
       path.join(this._mainOutputFolder, 'main_report.csv'),
@@ -359,7 +364,7 @@ export class Program {
       existing ||
       (await this.getEvents(
         issueObj.repositoryGhId,
-        Utils.issueNumberAsNumber(issueNumber)
+        utils.issueNumberAsNumber(issueNumber)
       ).catch(err => {
         this._errorMessages.push(err.message)
         return []
@@ -467,7 +472,7 @@ export class Program {
           data: {
             count: 1,
             duration: ev.duration,
-            durationDays: Utils.getMsAsDays(ev.duration),
+            durationDays: utils.getMsAsDays(ev.duration),
             durationAverage: 0,
             durationString: '',
             durationAverageString: ''
@@ -495,8 +500,8 @@ export class Program {
                 if (movedToEvs.length > 0 && movedToEvs[0].data.from_pipeline) {
                   if (
                     this.comparePipelines(
-                      movedToEvs[0].data.to_pipeline,
-                      movedToEvs[0].data.from_pipeline
+                      movedToEvs[0].data.to_pipeline.name,
+                      movedToEvs[0].data.from_pipeline.name
                     )
                   ) {
                     res.back++
@@ -519,7 +524,7 @@ export class Program {
     }
     for (const pipelineKey of Object.keys(avgObj)) {
       avgObj[pipelineKey].data.durationString =
-        Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration)
+        utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration)
 
       avgObj[pipelineKey].data.durationAverage = Number(
         (
@@ -528,11 +533,11 @@ export class Program {
       )
 
       avgObj[pipelineKey].data.durationAverageString =
-        Utils.millisecondsToHumanReadableTime(
+        utils.millisecondsToHumanReadableTime(
           avgObj[pipelineKey].data.durationAverage
         )
 
-      avgObj[pipelineKey].data.durationDays = Utils.getMsAsDays(
+      avgObj[pipelineKey].data.durationDays = utils.getMsAsDays(
         avgObj[pipelineKey].data.duration
       )
     }
@@ -565,11 +570,11 @@ export class Program {
 
       return {
         duration: diff,
-        durationString: Utils.millisecondsToHumanReadableTime(diff),
+        durationString: utils.millisecondsToHumanReadableTime(diff),
         durationPerEstimate: diffPerEstimate,
         durationStringPerEstimate:
           diffPerEstimate !== undefined
-            ? Utils.millisecondsToHumanReadableTime(diffPerEstimate)
+            ? utils.millisecondsToHumanReadableTime(diffPerEstimate)
             : undefined,
         pipeline: prevEv.data.to_pipeline.name,
         event: `${prevEv.data.to_pipeline.name} to ${ev.data.to_pipeline.name}`,
@@ -605,7 +610,8 @@ export class Program {
     })
 
     if (!response.ok) {
-      throw new Error('Failed to fetch ZenHub API')
+      const t = await response.text()
+      throw new Error(`Failed to fetch ZenHub API: ${t}`)
     }
 
     return response.json()
@@ -725,19 +731,21 @@ export class Program {
         const eventsTmp: Issue[] = item.issues
         const issues0: IIssue[] = eventsTmp.map((ee: Issue) => {
           const o: IIssue = {
-            number: Utils.issueNumberAsString(ee.number),
+            number: utils.issueNumberAsString(ee.number),
             estimateValue:
               ee.estimate !== null && ee.estimate !== undefined
                 ? Number(ee.estimate.value)
                 : undefined,
             repositoryGhId: Number(ee.repository.ghId),
+            repositoryGhName: ee.repository.name,
             pipelineName: item.name,
             labels: ee.labels?.nodes?.map((n: any) => n.name) || undefined,
             releases: ee.releases?.nodes?.map((n: any) => n.title) || undefined,
             events: ee.events,
             pullRequest: !!ee.pullRequest,
             htmlUrl: ee.htmlUrl,
-            createdAt: new Date(ee.createdAt)
+            createdAt: new Date(ee.createdAt),
+            author: ee.user.login
           } as IIssue
           return o
         })
@@ -755,8 +763,11 @@ export class Program {
     last = 73
   ): Promise<IWorkspace> {
     // console.log('Getting board data')
+    console.log('Getting board')
     const base: IWorkspace = await this.getBoard(workspaceId, last)
+    console.log('Getting releases')
     this._config.releaseID = await this.getReleases(workspaceId)
+    console.log('PArsing stuff')
 
     for (const pieline of base.pipelinesConnection) {
       const pipelineID = pieline.id
@@ -868,11 +879,18 @@ fragment currentWorkspace on Workspace {
 
     const variables = { workspaceId }
 
-    const res1 = await this.callZenhub(query, variables)
+    let res1 = null
+    try {
+      res1 = await this.callZenhub(query, variables)
+    } catch (e) {
+      res1 = { errors: [e] }
+    }
 
-    const err = res1.errors?.map((e: any) => e.message) || []
+    const err = res1?.errors?.map((e: any) => e.message) ?? []
     if (err.length > 0) {
-      return Promise.reject(new Error(err.join('\n')))
+      const errr = new Error(`Error: ${err.join(' --- ')}`)
+      // return Promise.reject(errr)
+      throw errr
     }
 
     const finalRes: IWorkspace = Object.assign(
@@ -1026,517 +1044,6 @@ fragment currentWorkspace on Workspace {
     return flat.data.filter((ff: ICSVItem) => ff.duration > avg)
   }
 
-  async main(
-    skipIssueIfFn?: (issue: IIssue) => Promise<boolean>,
-    skipEventIfFn?: (issue: IGhEvent) => Promise<boolean>
-  ): Promise<IProgramResult> {
-    // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
-    // this._pipelines = pipelines
-    //
-    // const issues = await this.getIssues(this._config.workspaceId)
-    // 	.catch((err) => {
-    // 		this._errorMessages.push(err.message);
-    // 		return [];
-    // 	});
-
-    // const board: IWorkspace = await this.getBoardFull(this._config.workspaceId);
-    const board: IWorkspace | null =
-      this.getFromFile() ||
-      (await this.getBoardFull(this._config.workspaceId, this._config.maxCount) // this.getBoard(this._config.workspaceId)
-        .then((b: IWorkspace) => {
-          b.configHash = this._configHash
-          return b
-        })
-        .catch(err => {
-          this._errorMessages.push(err.message)
-          return null
-        }))
-
-    if (board === null) {
-      const msg = process.env.API_KEY
-        ? `Couldn't get board data for ${this._config.workspaceId}`
-        : 'Need to export API_KEY'
-      for (const err of this._errorMessages) {
-        console.error(err)
-      }
-      throw new Error(msg)
-    }
-
-    const issues: IIssue[] = await this.getIssuesFromBoard(board)
-    // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
-    const pipelines: string[] = await this.getPipelinesFromBoard(board)
-    this._pipelines = pipelines
-
-    this._startTimestamp = Date.now()
-
-    const allEvs: ICSVItem[][] = []
-    let handledCount = 0
-    for (let i = 0; i < issues.length; ++i) {
-      console.clear()
-      if (this._errorMessages.length > 0) {
-        console.log(this._errorMessages.join('\n'))
-      }
-      const handledPerc = i / issues.length
-      console.log(
-        `${i} / ${issues.length} (${(handledPerc * 100).toFixed(1)}%)`
-      )
-
-      this.printRemaining(i, issues.length)
-
-      const issue: IIssue = issues[i]
-
-      if (
-        !!issue.pullRequest !== !!this._config.pullRequest ||
-        (this._config.labels &&
-          this._config.labels.length > 0 &&
-          !issue.labels?.some(la =>
-            this._config.labels?.includes(la.toLowerCase())
-          )) ||
-        (this._config.skipRepos.length > 0 &&
-          this._config.skipRepos.includes(issue.repositoryGhId)) ||
-        (this._config.includeRepos.length > 0 &&
-          !this._config.includeRepos.includes(issue.repositoryGhId)) ||
-        (!!this._config.release &&
-          !issue.releases?.includes(this._config.release)) ||
-        (skipIssueIfFn !== undefined && (await skipIssueIfFn(issue)))
-      ) {
-        issue.filtered = true
-        continue
-      }
-
-      // if (this._config.maxCount > 0 && handledCount === this._config.maxCount) {
-      // 	break;
-      // }
-
-      const handleIssueResult: IHandleIssueResult = await this.handleIssue(
-        issue,
-        skipEventIfFn,
-        false,
-        this._config.fromPipeline,
-        this._config.toPipeline
-      )
-
-      const evs: ICSVItem[] = handleIssueResult.csvItems
-      if (evs.length > 0) {
-        allEvs.push(evs)
-        issue.handled = true
-        handledCount++
-      }
-
-      this._eventsPerIssue[issue.number] = handleIssueResult.events
-    }
-    // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
-
-    const remainingOpenedIssues: IOpenedIssue[] = issues.filter(
-      iu => !iu.completed && !iu.filtered
-    ) as IOpenedIssue[]
-
-    const userMoves: IUserMove[] = []
-    // for (const iss of remainingOpenedIssues) {
-    for (const iss of issues.filter(iii => iii.handled)) {
-      // TODO
-      const events: IGhEvent[] | undefined = this._eventsPerIssue[iss.number]
-      const last = events ? events[events.length - 1] : undefined
-      const user = last?.data.github_user?.login
-      if (!last || !user) {
-        continue
-      }
-
-      const pipelineCompare = this.comparePipelines(
-        iss.pipelineName,
-        last.data.from_pipeline.name
-      )
-
-      if (pipelineCompare === 0) {
-        continue
-      }
-
-      userMoves.push({
-        user,
-        currentPipeline: iss.pipelineName,
-        previousPipeline: last.data.from_pipeline.name,
-        issueNumber: iss.number,
-        isForward: pipelineCompare > 0,
-        date: last.createdAt
-      } as IUserMove)
-
-      // iss.lastEventData = last.createdAt
-      // iss.previousPipeline = last.data.from_pipeline.name
-      // iss.isForward = pipelineCompare < 0
-      // iss.user = user
-    }
-
-    const movesUsers: string[] = Array.from(
-      new Set(userMoves.map(um => um.user))
-    )
-    const movesAvgArr: any[] = []
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const movesAvg = movesUsers.reduce((res: any, item: string) => {
-      const objs = userMoves.filter(um => um.user === item)
-      const movedForward = objs.filter(oo => oo.isForward).length
-
-      res[item] = {
-        movedForward,
-        movedBackward: objs.length - movedForward
-      }
-
-      movesAvgArr.push({
-        user: item,
-        ...res[item]
-      })
-
-      return res
-    }, {})
-
-    // @ts-ignore
-    const avg: IAVGItemMap = this.getAverages(
-      [].concat(...(allEvs as any)),
-      remainingOpenedIssues
-    )
-    for (const pipeline of Object.keys(avg)) {
-      // TODO use all pipelines
-      avg[pipeline].issueCount = issues.filter(
-        is => is.pipelineName === pipeline && !is.filtered
-      ).length
-      // avg[pipeline].openedIssueCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length
-    }
-
-    const openedPipelines = Array.from(
-      new Set(remainingOpenedIssues.map(r => r.pipelineName))
-    )
-
-    fs.writeFileSync(
-      this._config.outputJsonFilename.replace('.json', '_averages.json'),
-      JSON.stringify(avg, null, 2),
-      { encoding: 'utf8' }
-    )
-
-    const evs: ICSVItem[] = Object.keys(avg).map((pipeline: string) => {
-      const avgPipeline: IAVGItem = avg[pipeline]
-      return {
-        duration: avgPipeline.data.duration,
-        durationString: avgPipeline.data.durationString,
-        durationPerEstimate: undefined,
-        durationStringPerEstimate: undefined,
-        pipeline,
-        event: '',
-        number: ''
-      } as ICSVItem
-    })
-
-    const date = new Date()
-
-    const timeChartItems: any[] = await this.generateChartFromObj(
-      `Time spent in pipelines on ${date.toISOString()} (${handledCount} issues)`,
-      evs,
-      this._config.outputImageFilename,
-      {
-        width: 1600,
-        height: 1200
-      }
-    ).catch(e => {
-      if (!e.message.includes("Cannot find module 'canvas'")) {
-        throw e
-      }
-      console.warn(e.message)
-      return []
-    })
-    // console.log(JSON.stringify(avg, null, 2))
-
-    const countChartItems: any[] = Object.keys(avg).map((pipeline: string) => {
-      return {
-        label: pipeline,
-        data: avg[pipeline].issueCount
-      } as any
-    })
-    // console.log(`Handled ${handledCount} issues`)
-
-    await this.doGenerateChartFromObj(
-      `Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`,
-      countChartItems,
-      this._config.outputImageFilename.replace('.png', '_issues.png'),
-      { width: 1600, height: 1200 }
-    ).catch(e => {
-      if (!e.message.includes("Cannot find module 'canvas'")) {
-        throw e
-      }
-      console.warn(e.message)
-    })
-
-    let issueWithEventCount = 0
-    board.pipelinesConnection.forEach(
-      (pipelineConnect: IPipelinesConnection) => {
-        pipelineConnect.issues.forEach((issue: Issue) => {
-          // if(issue.number) {
-          // 	issue.events = issue.number;
-          // } else {
-          // 	const issueNumberBits = issue.htmlUrl?.split("/") || [];
-          // 	const issueNumber = issueNumberBits[issueNumberBits.length - 1];
-          // 	issue.events = this._eventsPerIssue[issueNumber] || [];
-          // }
-          let issueNumber: number
-          if (issue.number) {
-            issueNumber = issue.number
-          } else {
-            const issueNumberBits = issue.htmlUrl?.split('/') || [undefined]
-            issueNumber = Number(issueNumberBits[issueNumberBits.length - 1])
-          }
-          const issueEvents = issueNumber
-            ? this._eventsPerIssue[Utils.issueNumberAsString(issueNumber)] || []
-            : []
-          issue.events = issueEvents
-
-          if (issueEvents.length > 0) {
-            issueWithEventCount++
-          }
-        })
-      }
-    )
-
-    fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
-      encoding: 'utf8'
-    })
-    // console.log(`Wrote file ${this._file}`)
-
-    const chartData: IControlChartItem[] = this.getControlChartData(issues)
-    // console.log(chartData)
-
-    const completinList: number[] = chartData.map(c =>
-      Number(c.completionTimeStr)
-    )
-    const stats: IStatResult = StatHelper.getStats(completinList)
-
-    const openedPerPipeline = this.getOpenedPerPipeline(
-      avg,
-      openedPipelines,
-      remainingOpenedIssues,
-      stats
-    )
-
-    // const chartWithEstimate: IControlChartItem[] = chartData.filter((cd: IControlChartItem) => cd.estimate > 0);
-    // const completinListEstimate: number[] = chartWithEstimate.map((c: IControlChartItem) => Number(c.completionTimeStr));
-    // const completionTot: number = completinListEstimate.reduce((res: number, item: number) => res + item, 0);
-    // const estimateTot: number = chartWithEstimate.reduce((res: number, item: IControlChartItem) => res + item.estimate, 0);
-    // const averagePerEstimate: number = completionTot / estimateTot;
-
-    const completinEstimateList: number[] = chartData
-      .filter((cd: IControlChartItem) => cd.estimate > 0)
-      .map(c => Number(c.completionTimeStr) / c.estimate)
-    const statsEstimate: IStatResult = StatHelper.getStats(
-      completinEstimateList
-    )
-
-    const veloccity: IVelocity = this.getVelocity(chartData)
-
-    // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
-
-    const outs: ICSVItem[] = this.findOutstandingIssues(allEvs).slice(0, 5)
-    // // console.log(JSON.stringify(outs, null, 2));
-
-    const allRepos: string[] = issues
-      .filter((ii: IIssue) => ii.handled)
-      .map((ii: IIssue) => ii.htmlUrl.split('/')[4])
-
-    const repos: string[] = Array.from(
-      new Set([].concat(...(allRepos as any[])))
-    )
-
-    // const allD: ICheckPr[] = await Promise.all(
-    // 	repos.map(repo => {
-    // 		return reviewer_call.check_prs(repo, this._config).catch((err: Error) => {
-    // 			console.error(err.message);
-    // 			return {
-    // 				summary: [],
-    // 				users:[]
-    // 			};
-    // 		}) as ICheckPr;
-    // 	})
-    // );
-
-    // console.log('Getting pr data')
-    const res: {
-      allD: ICheckPr[]
-      newAllD: ICheckPr
-      ggdata: { summary: Record<string, any> }
-    } = await this.getGithubData(repos)
-
-    const weekCount = this.getWeekCount()
-    for (const user of res.newAllD.users) {
-      const target = res.ggdata.summary[user.user]
-      if (!target) {
-        continue
-      }
-      user.totalCommits = target.commit_count
-      user.created = target.pr_count
-      user.createdPerc = target.pr_perc
-      user.totalCommitsPerWeek = Number(
-        (target.commit_count / weekCount).toFixed(2)
-      )
-    }
-
-    // const allD: ICheckPr[] = res.allD;
-    const newAllD: ICheckPr = res.newAllD
-
-    const allResult: IReport = {
-      chartTime: timeChartItems,
-      chartCount: countChartItems,
-      statsIssue: stats,
-      statsEstimate,
-      controlChartList: chartData,
-      outstandingItems: outs,
-      velocity: veloccity,
-      avg,
-      prList: newAllD.summary as any as IPrSummary[],
-      // userReviewStats: d.users as IPrUser[]
-      userReviewStats: newAllD.users as IPrReviewStat[],
-      remainingOpenedIssues,
-      userMoves
-    } as IReport
-
-    const ccsv = this.generateAllCSV('', allResult)
-    fs.writeFileSync(
-      this._config.outputJsonFilename,
-      JSON.stringify(allResult, null, 2),
-      { encoding: 'utf8' }
-    ) // done at the end
-
-    const remainingOpenedIssuesCleaned: IIssue[] = remainingOpenedIssues.map(
-      (f: IIssue) => {
-        const clone = Object.assign({}, f)
-        delete clone.handled
-        clone.estimateValue = clone.estimateValue || 0
-        return clone
-      }
-    )
-
-    this.generateHTML(outs)
-
-    const remainingEstimatedDays: any[] = this.getRemainingEstimatedDays(
-      avg,
-      openedPerPipeline,
-      stats
-    )
-    const openedPerPipeline0: { pipeline: string; opened: number }[] =
-      remainingEstimatedDays.slice(0, -1).map((e: any) => {
-        return {
-          pipeline: e.pipeline,
-          opened: e.count
-        }
-      })
-
-    try {
-      this.addStatsHTML(stats, statsEstimate, veloccity)
-      this.addControlChartListHTML(chartData)
-      this.writeMoreHTML()
-    } catch (e: any) {
-      if (!e.message.includes("Cannot find module 'canvas'")) {
-        throw e
-      }
-      console.warn(e.message)
-    }
-
-    const baseTableFn = (
-      issueNumberKey: string
-    ): ((key: string, item: any) => string | null) => {
-      return (key: string, item: any): string | null => {
-        const itemStr = item[key] as string
-        if (key === issueNumberKey && itemStr.startsWith('#')) {
-          const url = (item as IControlChartItem).htmlUrl
-          return `<a href="${url}">${itemStr}</a>`
-        } else if (key === 'htmlUrl') {
-          return ''
-        }
-        return null
-      }
-    }
-
-    const fullHTML =
-      `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
-      `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
-      `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2>` +
-      `<h2>Releases: ${this._config.release || ''}</h2>` +
-      `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
-      `<section>
-          <h3>Cool stats</h3>
-              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
-          </section>` +
-      `<section>
-            <h3>Control chart list</h3>
-              ${this.generateTable(chartData, baseTableFn('number'))}
-            <div>
-                ${await this.getControlChartHTML(chartData)}
-            </div>
-        </section>` +
-      `<section>
-          <h3>Outstanding issues</h3>
-          ${this.generateTable(outs, baseTableFn('number'))}
-        </section>` +
-      `<section>
-            <h3>Velocity list</h3>
-            ${this.generateTableFromCSV(ccsv.velocityList)}
-            <div>
-                ${await this.getVeloctiyChart(veloccity)}
-            </div>
-        </section>` +
-      `<section>
-            <h3>Main list</h3>
-            <div style="overflow-x: scroll;">
-                ${this.generateTableFromCSV(ccsv.mainList)}
-            </div>
-            <div>
-                ${await this.getMainChartHTML(avg)}
-            </div>
-        </section>` +
-      `<section>
-            <h3>Commits and PRs list</h3>
-            ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
-            <div>
-                ${await this.getCommitsChartHTML(allResult.userReviewStats)}
-            </div>
-        </section>` +
-      `<section>
-            <h3>Remaining opened issues</h3>
-            ${this.generateTable(remainingOpenedIssuesCleaned, baseTableFn('number'))}
-        </section>` +
-      `<section>
-            <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
-            <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline0, 100)}
-            </div>
-        </section>` +
-      `<section>
-            <h3>Movements summary</h3>
-            ${this.generateTable(movesAvgArr, undefined)}
-        </section>` +
-      `<section>
-            <h3>Movements</h3>
-            ${this.generateTable(userMoves, undefined)}
-        </section>`
-
-    this.updateHTML(
-      path.join(__dirname, 'main_report.html'),
-      path.join(this._mainOutputFolder, 'main_index.html'),
-      '__CONTROL_CHART_TABLE__',
-      fullHTML
-    )
-
-    const mark = `${Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`
-    fs.writeFileSync(
-      path.join(this._mainOutputFolder, 'main_report.md'),
-      mark,
-      { encoding: 'utf8' }
-    )
-
-    console.log(
-      `ev count: ${allEvs.length}, issue count: ${issues.filter(iu => !iu.filtered).length}, issues handled: ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`
-    )
-    return Promise.resolve({
-      mark,
-      allResult
-    } as IProgramResult)
-  }
-
   private printRemaining(i: number, length: number): void {
     const elapsedMs: number = Date.now() - this._startTimestamp
     const remainingCount = length - i
@@ -1557,7 +1064,7 @@ fragment currentWorkspace on Workspace {
 
     const strVal =
       this._estimateRemainingMs <= this._estimateRemainingPrveiousMs
-        ? `${Utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
+        ? `${utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
         : 'estimating...'
 
     console.log(`Remaining: ${strVal}`)
@@ -1565,13 +1072,14 @@ fragment currentWorkspace on Workspace {
 
   private getFromFile(): IWorkspace | null {
     // console.log(`Getting from file ${this._file}`)
-    if (!FileUtils.fileExists(this._file)) {
+    if (!fileUtils.fileExists(this._file)) {
       // console.log(`File doesn't exist`)
       return null
     }
 
-    const content = fs.readFileSync(this._file, { encoding: 'utf8' })
+    console.log('Getting from file')
     try {
+      const content = fs.readFileSync(this._file, { encoding: 'utf8' })
       const obj: IWorkspace = JSON.parse(content) as IWorkspace
       // console.log(`Got existing`)
       if (
@@ -1613,8 +1121,8 @@ fragment currentWorkspace on Workspace {
         : null
     })
     const res: IControlChartItem[] = tmp
-      .filter((r: IControlChartItem | null) => r !== null)
-      .map(r => r!.toObj())
+      .filter((r: ControlChartItem | null) => r !== null)
+      .map((r: ControlChartItem | null) => (r as ControlChartItem).toObj())
 
     res.sort((a: IControlChartItem, b: IControlChartItem) => {
       return a.comppleted.getTime() - b.comppleted.getTime()
@@ -1642,15 +1150,6 @@ fragment currentWorkspace on Workspace {
                       .map((l: any) => {
                         return `<tr>${headers
                           .map(lkey => {
-                            // const it = l[lkey]
-                            // const isArr = Array.isArray(it)
-                            // const val =
-                            //   !isArr ||
-                            //   it.every((r: any) => typeof r === 'string')
-                            //     ? it?.toString() || ''
-                            //     : this.generateTable(it)
-                            // return `<td>${val}</td>`
-
                             const specRes: string | undefined | null =
                               specFn && specFn(lkey, l)
                             return `<td>${
@@ -1722,7 +1221,6 @@ fragment currentWorkspace on Workspace {
         res[0] += it.count
         res[1] += it.estimate
 
-        // @ts-ignore
         it.key = item
         res[2].push(it)
         return res
@@ -1744,14 +1242,14 @@ fragment currentWorkspace on Workspace {
 
     const firstDayOfMonthPosInWeek = firstDayOfMonth.getDay()
 
-    const firstDayOfFirstWeek: Date = Utils.addDay(
+    const firstDayOfFirstWeek: Date = utils.addDay(
       firstDayOfMonth,
       firstDayOfMonthPosInWeek * -1
     )
 
     let res = 1
     while (
-      date.getDate() > Utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()
+      date.getDate() > utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()
     ) {
       ++res
     }
@@ -1908,7 +1406,7 @@ fragment currentWorkspace on Workspace {
                     ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
                 </tbody>
             </table>`
-    // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
+    // return `<div> ${title ? `<h3>${title}</h3>` : ''}${tableStr} </div>`;
     return tableStr
   }
 
@@ -1954,7 +1452,7 @@ fragment currentWorkspace on Workspace {
     key: string,
     labelKey?: string
   ): Promise<string> {
-    // await this.generateChartFromObj("", evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
+    // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
     const items: any[] = csvPrAndCommits.map(c => {
       return {
         label: labelKey === undefined ? '' : c[labelKey],
@@ -1998,8 +1496,9 @@ fragment currentWorkspace on Workspace {
   private averageOBjects<T>(objects: T[], includeKeys: string[]): T {
     const result: any = {}
 
-    objects.forEach((obj: any) => {
-      Object.keys(obj).forEach(key => {
+    for (const obj of objects) {
+      const keys = Object.keys(obj as any) as (keyof T)[]
+      for (const key of keys) {
         if (Array.isArray(obj[key])) {
           result[key] = this.averageOBjects(obj[key], includeKeys)
         } else if (result[key] === undefined) {
@@ -2009,14 +1508,14 @@ fragment currentWorkspace on Workspace {
             result[key] += obj[key]
           }
         }
-      })
-    })
+      }
+    }
 
-    Object.keys(result).forEach(key => {
+    for (const key of Object.keys(result)) {
       if (typeof result[key] === 'number' && includeKeys.includes(key)) {
         result[key] /= objects.length
       }
-    })
+    }
 
     return result as T
   }
@@ -2068,7 +1567,7 @@ fragment currentWorkspace on Workspace {
       // return  {
       // 	user:
       // } as IPrUser;
-      const existing = res.find(a => a.user === us.user)
+      const existing: IPrUser | undefined = res.find(a => a.user === us.user)
       if (!existing) {
         res.push(Object.assign({}, us))
       } else {
@@ -2077,6 +1576,7 @@ fragment currentWorkspace on Workspace {
         existing.didReviewCount += us.didReviewCount
         existing.totalCommits += us.totalCommits
         existing.totalCommitsPerWeek += us.totalCommitsPerWeek
+        existing.totalCommentsInPr += us.totalCommentsInPr
       }
       return res
     }, [])
@@ -2085,24 +1585,49 @@ fragment currentWorkspace on Workspace {
       (res: number, it: IPrUser) => res + it.created,
       0
     )
-    uu.forEach((u: IPrUser) => {
+    for (const u of uu) {
       const othersCreated = totalCreated - u.created
 
-      u.createdPerc = Number((u.created / totalCreated).toFixed(2))
-      u.reviewedPerc = Number((u.didReviewCount / othersCreated).toFixed(2))
-    })
+      u.createdPerc =
+        totalCreated > 0 ? Number((u.created / totalCreated).toFixed(2)) : 0
+      u.reviewedPerc =
+        othersCreated > 0
+          ? Number((u.didReviewCount / othersCreated).toFixed(2))
+          : 0
+      u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2))
+      u.totalCommentsPerPr =
+        u.created > 0 ? Number((u.totalCommentsInPr / u.created).toFixed(2)) : 0
+    }
     return uu
   }
 
-  private async getGithubData(repos: string[]): Promise<any> {
+  private async getGithubData(allRepoNames: string[]): Promise<any> {
     // console.log(`[getGithubData]: ${repos?.join(',')}`)
 
+    const targetRepoNames: string[] =
+      this.config.includeRepos.length > 0 ? [] : allRepoNames
+
+    if (this.config.includeRepos.length > 0) {
+      // get include repo names
+      for (const repo of allRepoNames) {
+        const repoData: AxiosResponse<any> = await getRepoInfo(repo)
+        const repoId: number = repoData.data.id
+        if (
+          this._config.includeRepos.length > 0 &&
+          !this._config.includeRepos.includes(repoId)
+        ) {
+          continue
+        }
+        targetRepoNames.push(repo)
+      }
+    }
+
     const allD: ICheckPr[] = []
-    for (const repo of repos) {
-      const d = (await check_prs(repo, this._config as any).catch(
+    for (const repo of targetRepoNames) {
+      const d: ICheckPr = (await check_prs(repo, this._config as any).catch(
         (err: Error) => {
           const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`
-          console.warn(msg)
+          // console.warn(msg)
           fs.writeFileSync('github_error.txt', msg, { encoding: 'utf8' })
           return {
             summary: [],
@@ -2110,7 +1635,10 @@ fragment currentWorkspace on Workspace {
           }
         }
       )) as ICheckPr
-      allD.push(d)
+
+      if (Object.values(d).some(arr => arr.length > 0)) {
+        allD.push(d)
+      }
     }
 
     // @ts-ignore
@@ -2119,13 +1647,9 @@ fragment currentWorkspace on Workspace {
       ...allD.map((ad: ICheckPr) => ad.users)
     )
 
-    // @ts-ignore
     const users: string[] = Array.from(
       new Set(
-        [].concat(
-          // @ts-ignore
-          ...allD.map((f: ICheckPr) => f.users.map((au: IPrUser) => au.user))
-        )
+        allD.map((f: ICheckPr) => f.users.map((au: IPrUser) => au.user)).flat()
       )
     )
     const usersAvg = users.reduce(
@@ -2159,23 +1683,14 @@ fragment currentWorkspace on Workspace {
     newAllD.users = this.averageUsers(usersAvg.users)
     newAllD.summary = usersAvg.summary
 
-    const ggdata = await getAllData(
-      repos,
-      this.config.minDate && this.config.maxDate
-        ? (this.config as any)
-        : undefined
-    )
-    // eslint-disable-next-line no-debugger
-    // debugger
+    // const ggdata = await getAllData(
+    //   targetRepoNames,
+    //   this.config.minDate && this.config.maxDate
+    //     ? (this.config as any)
+    //     : undefined
+    // )
 
-    // TODO year commit
-
-    // const d: ICheckPr = newAllD;
-    //
-    // // const tb = this.averageOBjects(d.users, ["reviewedPerc", "createdPerc"]);
-    // const dUsers: IPrUser[] = this.averageUsers(d.users);
-
-    return Promise.resolve({ allD, newAllD, ggdata })
+    return Promise.resolve({ allD, newAllD, ggdata: undefined })
   }
 
   private addRepoProps(item: ISarchIssuesByPipeline): ISarchIssuesByPipeline {
@@ -2258,9 +1773,11 @@ fragment currentWorkspace on Workspace {
     stats: IStatResult
   ): IOpenedPerPipeline[] {
     const fromPipelineIndex = this._pipelines.indexOf(
-      this._config.fromPipeline!
+      this._config.fromPipeline ?? ''
     )
-    const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline!)
+    const toPipelineIndex = this._pipelines.indexOf(
+      this._config.toPipeline ?? ''
+    )
 
     const totalMsAverageFromPipelineToPipeline =
       this.getTotalMsAverageFromPipelineToPipeline(
@@ -2455,13 +1972,546 @@ fragment currentWorkspace on Workspace {
   }
 
   private getWeekCount(): number {
-    return (
-      (new Date(this._config.maxDate ?? 0).getTime() -
-        new Date(this._config.minDate ?? 0).getTime()) /
-      1000 /
-      3600 /
-      24 /
-      7
+    return getWeekCount(
+      new Date(this._config.minDate ?? 0),
+      new Date(this._config.maxDate ?? 0)
     )
+  }
+
+  async main(
+    skipIssueIfFn?: (issue: IIssue) => Promise<boolean>,
+    skipEventIfFn?: (issue: IGhEvent) => Promise<boolean>
+  ): Promise<IProgramResult> {
+    const board: IWorkspace | null =
+      this.getFromFile() ||
+      (await this.getBoardFull(this._config.workspaceId, this._config.maxCount) // this.getBoard(this._config.workspaceId)
+        .then((b: IWorkspace) => {
+          b.configHash = this._configHash
+          return b
+        })
+        .catch(err => {
+          this._errorMessages.push(err.message)
+          return null
+        }))
+
+    if (board === null) {
+      const msg = process.env.API_KEY
+        ? `Couldn't get board data for ${this._config.workspaceId}`
+        : 'Need to export API_KEY'
+
+      let allMsg = msg
+      for (const err of this._errorMessages) {
+        console.error(err)
+        allMsg += `---${err}`
+      }
+      throw new Error(allMsg)
+    }
+
+    const issuesRes = await this.getSortedIssues(
+      board,
+      skipIssueIfFn,
+      skipEventIfFn
+    )
+    const issues = issuesRes.sorted
+    const allEvs = issuesRes.allEvs
+    const handledCount = issuesRes.handledCount
+
+    const remainingOpenedIssues: IOpenedIssue[] = issues.filter(
+      iu => !iu.completed && !iu.filtered
+    ) as IOpenedIssue[]
+
+    const userMoves: IUserMove[] = []
+    // for (const iss of remainingOpenedIssues) {
+    for (const iss of issues.filter(iii => iii.handled)) {
+      // TODO
+      const events: IGhEvent[] | undefined = this._eventsPerIssue[iss.number]
+      const last = events ? events[events.length - 1] : undefined
+      const user = last?.data.github_user?.login
+      if (!last || !user) {
+        continue
+      }
+
+      const pipelineCompare = this.comparePipelines(
+        iss.pipelineName,
+        last.data.from_pipeline.name
+      )
+
+      if (pipelineCompare === 0) {
+        continue
+      }
+
+      userMoves.push({
+        user,
+        currentPipeline: iss.pipelineName,
+        previousPipeline: last.data.from_pipeline.name,
+        issueNumber: iss.number,
+        isForward: pipelineCompare > 0,
+        date: last.createdAt
+      } as IUserMove)
+    }
+
+    const movesUsers: string[] = Array.from(
+      new Set(userMoves.map(um => um.user))
+    )
+    const movesAvgArr: any[] = []
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const movesAvg = movesUsers.reduce((res: any, item: string) => {
+      const objs = userMoves.filter(um => um.user === item)
+      const movedForward = objs.filter(oo => oo.isForward).length
+
+      res[item] = {
+        movedForward,
+        movedBackward: objs.length - movedForward
+      }
+
+      movesAvgArr.push({
+        user: item,
+        ...res[item]
+      })
+
+      return res
+    }, {})
+
+    // @ts-ignore
+    const avg: IAVGItemMap = this.getAverages(
+      [].concat(...(allEvs as any)),
+      remainingOpenedIssues
+    )
+    for (const pipeline of Object.keys(avg)) {
+      // TODO use all pipelines
+      avg[pipeline].issueCount = issues.filter(
+        is => is.pipelineName === pipeline && !is.filtered
+      ).length
+      // avg[pipeline].openedIssueCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length
+    }
+
+    const openedPipelines = Array.from(
+      new Set(remainingOpenedIssues.map(r => r.pipelineName))
+    )
+
+    fs.writeFileSync(
+      this._config.outputJsonFilename.replace('.json', '_averages.json'),
+      JSON.stringify(avg, null, 2),
+      { encoding: 'utf8' }
+    )
+
+    const evs: ICSVItem[] = Object.keys(avg).map((pipeline: string) => {
+      const avgPipeline: IAVGItem = avg[pipeline]
+      return {
+        duration: avgPipeline.data.duration,
+        durationString: avgPipeline.data.durationString,
+        durationPerEstimate: undefined,
+        durationStringPerEstimate: undefined,
+        pipeline,
+        event: '',
+        number: ''
+      } as ICSVItem
+    })
+
+    const date = new Date()
+
+    const timeChartItems: any[] = await this.generateChartFromObj(
+      `Time spent in pipelines on ${date.toISOString()} (${handledCount} issues)`,
+      evs,
+      this._config.outputImageFilename,
+      {
+        width: 1600,
+        height: 1200
+      }
+    ).catch(e => {
+      if (!e.message.includes("Cannot find module 'canvas'")) {
+        throw e
+      }
+      // console.warn(e.message)
+      return []
+    })
+    // console.log(JSON.stringify(avg, null, 2))
+
+    const countChartItems: any[] = Object.keys(avg).map((pipeline: string) => {
+      return {
+        label: pipeline,
+        data: avg[pipeline].issueCount
+      } as any
+    })
+    // console.log(`Handled ${handledCount} issues`)
+
+    await this.doGenerateChartFromObj(
+      `Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`,
+      countChartItems,
+      this._config.outputImageFilename.replace('.png', '_issues.png'),
+      { width: 1600, height: 1200 }
+    ).catch(e => {
+      if (!e.message.includes("Cannot find module 'canvas'")) {
+        throw e
+      }
+      // console.warn(e.message)
+    })
+
+    let issueWithEventCount = 0
+    for (const pipelineConnect of board.pipelinesConnection) {
+      for (const issue of pipelineConnect.issues) {
+        let issueNumber: number
+        if (issue.number) {
+          issueNumber = issue.number
+        } else {
+          const issueNumberBits = issue.htmlUrl?.split('/') || [undefined]
+          issueNumber = Number(issueNumberBits[issueNumberBits.length - 1])
+        }
+        const issueEvents = issueNumber
+          ? this._eventsPerIssue[utils.issueNumberAsString(issueNumber)] || []
+          : []
+        issue.events = issueEvents
+
+        if (issueEvents.length > 0) {
+          issueWithEventCount++
+        }
+      }
+    }
+
+    fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
+      encoding: 'utf8'
+    })
+    // console.log(`Wrote file ${this._file}`)
+
+    const chartData: IControlChartItem[] = this.getControlChartData(issues)
+    // console.log(chartData)
+
+    const completinList: number[] = chartData.map(c =>
+      Number(c.completionTimeStr)
+    )
+    const stats: IStatResult = statHelper.getStats(completinList)
+
+    const openedPerPipeline = this.getOpenedPerPipeline(
+      avg,
+      openedPipelines,
+      remainingOpenedIssues,
+      stats
+    )
+
+    const completinEstimateList: number[] = chartData
+      .filter((cd: IControlChartItem) => cd.estimate > 0)
+      .map(c => Number(c.completionTimeStr) / c.estimate)
+    const statsEstimate: IStatResult = statHelper.getStats(
+      completinEstimateList
+    )
+
+    const veloccity: IVelocity = this.getVelocity(chartData)
+
+    // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
+
+    const outs: ICSVItem[] = this.findOutstandingIssues(allEvs).slice(0, 5)
+    // // console.log(JSON.stringify(outs, null, 2));
+
+    const repos: string[] = Array.from(
+      new Set(issues.map(ii => ii.htmlUrl.split('/')[4]))
+    )
+
+    const githubDataRes: {
+      allD: ICheckPr[]
+      newAllD: ICheckPr
+      ggdata: { summary: Record<string, any> }
+    } = await this.getGithubData(repos)
+
+    // const newAllD: ICheckPr = githubDataRes.newAllD
+    const newAllD: ICheckPr = this.getNewAllD(githubDataRes)
+
+    const githubUsers: string[] = Array.from(
+      new Set(newAllD.users.map((nu: IPrUser) => nu.user))
+    )
+
+    for (const githubUser of githubUsers) {
+      // const userIssues = issues.filter(
+      //   (iss: IIssue) =>
+      //     iss.events && iss.events?.length > 0 && iss.author === githubUser
+      // )
+      const userIssues = issues.filter(
+        (iss: IIssue) =>
+          iss.author === githubUser &&
+          (!this.config.minDate ||
+            new Date(iss.createdAt).getTime() >=
+              new Date(this.config.minDate).getTime())
+      )
+      const target: IPrUser | undefined = newAllD.users.find(
+        (us: IPrUser) => us.user === githubUser
+      )
+      if (target !== undefined) {
+        target.issueCreated = userIssues.length
+      }
+    }
+
+    for (const githubUser of githubUsers) {
+      const userIssues = issues.filter(
+        (iss: IIssue) =>
+          iss.author === githubUser &&
+          (!this.config.minDate ||
+            new Date(iss.createdAt).getTime() >=
+              new Date(this.config.minDate).getTime())
+      )
+      const target: IPrUser | undefined = newAllD.users.find(
+        (us: IPrUser) => us.user === githubUser
+      )
+      if (target !== undefined) {
+        target.issueCreated = userIssues.length
+      }
+    }
+
+    const allResult: IReport = {
+      chartTime: timeChartItems,
+      chartCount: countChartItems,
+      statsIssue: stats,
+      statsEstimate,
+      controlChartList: chartData,
+      outstandingItems: outs,
+      velocity: veloccity,
+      avg,
+      prList: newAllD.summary as any as IPrSummary[],
+      // userReviewStats: d.users as IPrUser[]
+      userReviewStats: newAllD.users as IPrReviewStat[],
+      remainingOpenedIssues,
+      userMoves
+    } as IReport
+
+    const ccsv = this.generateAllCSV('', allResult)
+    fs.writeFileSync(
+      this._config.outputJsonFilename,
+      JSON.stringify(allResult, null, 2),
+      { encoding: 'utf8' }
+    ) // done at the end
+
+    const remainingOpenedIssuesCleaned: IIssue[] = remainingOpenedIssues.map(
+      (f: IIssue) => {
+        const clone = Object.assign({}, f)
+        delete clone.handled
+        clone.estimateValue = clone.estimateValue || 0
+        return clone
+      }
+    )
+
+    this.generateHTML(outs)
+
+    const remainingEstimatedDays: any[] = this.getRemainingEstimatedDays(
+      avg,
+      openedPerPipeline,
+      stats
+    )
+    const openedPerPipeline0: { pipeline: string; opened: number }[] =
+      remainingEstimatedDays.slice(0, -1).map((e: any) => {
+        return {
+          pipeline: e.pipeline,
+          opened: e.count
+        }
+      })
+
+    try {
+      this.addStatsHTML(stats, statsEstimate, veloccity)
+      this.addControlChartListHTML(chartData)
+      this.writeMoreHTML()
+    } catch (e: any) {
+      if (!e.message.includes("Cannot find module 'canvas'")) {
+        throw e
+      }
+      // console.warn(e.message)
+    }
+
+    const baseTableFn = (
+      issueNumberKey: string
+    ): ((key: string, item: any) => string | null) => {
+      return (key: string, item: any): string | null => {
+        const itemStr = item[key] as string
+        if (key === issueNumberKey && itemStr.startsWith('#')) {
+          const url = (item as IControlChartItem).htmlUrl
+          return `<a href="${url}">${itemStr}</a>`
+        } else if (key === 'htmlUrl') {
+          return ''
+        }
+        return null
+      }
+    }
+
+    const fullHTML =
+      `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
+      `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
+      `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2>` +
+      `<h2>Releases: ${this._config.release || ''}</h2>` +
+      `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
+      `<section>
+          <h3>Cool stats</h3>
+              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
+          </section>` +
+      `<section>
+            <h3>Control chart list</h3>
+              ${this.generateTable(chartData, baseTableFn('number'))}
+            <div>
+                ${await this.getControlChartHTML(chartData)}
+            </div>
+        </section>` +
+      `<section>
+          <h3>Outstanding issues</h3>
+          ${this.generateTable(outs, baseTableFn('number'))}
+        </section>` +
+      `<section>
+            <h3>Velocity list</h3>
+            ${this.generateTableFromCSV(ccsv.velocityList)}
+            <div>
+                ${await this.getVeloctiyChart(veloccity)}
+            </div>
+        </section>` +
+      `<section>
+            <h3>Main list</h3>
+            <div style="overflow-x: scroll;">
+                ${this.generateTableFromCSV(ccsv.mainList)}
+            </div>
+            <div>
+                ${await this.getMainChartHTML(avg)}
+            </div>
+        </section>` +
+      `<section>
+            <h3>Commits and PRs list</h3>
+            ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
+            <div>
+                ${await this.getCommitsChartHTML(allResult.userReviewStats)}
+            </div>
+        </section>` +
+      `<section>
+            <h3>Remaining opened issues</h3>
+            ${this.generateTable(remainingOpenedIssuesCleaned, baseTableFn('number'))}
+        </section>` +
+      `<section>
+            <h3>Remaining opened issues per pipeline</h3>
+            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
+            <div>
+                ${await this.getOpenedChartHTML(openedPerPipeline0, 100)}
+            </div>
+        </section>` +
+      `<section>
+            <h3>Movements summary</h3>
+            ${this.generateTable(movesAvgArr, undefined)}
+        </section>` +
+      `<section>
+            <h3>Movements</h3>
+            ${this.generateTable(userMoves, undefined)}
+        </section>`
+
+    this.updateHTML(
+      path.join(__dirname, 'main_report.html'),
+      path.join(this._mainOutputFolder, 'main_index.html'),
+      '__CONTROL_CHART_TABLE__',
+      fullHTML
+    )
+
+    const mark = `${utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`
+    fs.writeFileSync(
+      path.join(this._mainOutputFolder, 'main_report.md'),
+      mark,
+      { encoding: 'utf8' }
+    )
+
+    console.log(
+      `ev count: ${allEvs.length}, issue count: ${issues.filter(iu => !iu.filtered).length}, issues handled: ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`
+    )
+    return Promise.resolve({
+      mark,
+      allResult
+    } as IProgramResult)
+  }
+
+  private getNewAllD(githubDataRes: {
+    allD: ICheckPr[]
+    newAllD: ICheckPr
+    ggdata: { summary: Record<string, any> }
+  }): ICheckPr {
+    return githubDataRes.newAllD
+    // const first =
+    //   githubDataRes.ggdata.summary[Object.keys(githubDataRes.ggdata.summary)[0]]
+    //
+    // const users: IPrUser[] = [
+    //   {
+    //     user: Object.keys(summary)[0],
+    //     created: first.pr_count,
+    //     totalCommits: 0,
+    //     totalCommitsPerWeek: 0,
+    //     totalCommentsInPr: 0,
+    //     totalCommentsPerPr: 0,
+    //     issueCreated: 0,
+    //     shouldReviewCount: 0,
+    //     didReviewCount: 0,
+    //     reviewedPerc: 0,
+    //     createdPerc: 0
+    //   }
+    // ]
+  }
+
+  async getSortedIssues(
+    board: IWorkspace,
+    skipIssueIfFn?: (issue: IIssue) => Promise<boolean>,
+    skipEventIfFn?: (issue: IGhEvent) => Promise<boolean>
+  ): Promise<{ sorted: IIssue[]; handledCount: number; allEvs: ICSVItem[][] }> {
+    const issues: IIssue[] = await this.getIssuesFromBoard(board)
+    // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
+    const pipelines: string[] = await this.getPipelinesFromBoard(board)
+    this._pipelines = pipelines
+
+    this._startTimestamp = Date.now()
+
+    const allEvs: ICSVItem[][] = []
+    let handledCount = 0
+    for (let i = 0; i < issues.length; ++i) {
+      console.clear()
+      if (this._errorMessages.length > 0) {
+        console.log(this._errorMessages.join('\n'))
+      }
+      const handledPerc = i / issues.length
+      console.log(
+        `${i} / ${issues.length} (${(handledPerc * 100).toFixed(1)}%)`
+      )
+
+      this.printRemaining(i, issues.length)
+
+      const issue: IIssue = issues[i]
+
+      if (
+        !!issue.pullRequest !== !!this._config.pullRequest ||
+        (this._config.labels &&
+          this._config.labels.length > 0 &&
+          !issue.labels?.some(la =>
+            this._config.labels?.includes(la.toLowerCase())
+          )) ||
+        (this._config.skipRepos.length > 0 &&
+          this._config.skipRepos.includes(issue.repositoryGhId)) ||
+        (this._config.includeRepos.length > 0 &&
+          !this._config.includeRepos.includes(issue.repositoryGhId)) ||
+        (!!this._config.release &&
+          !issue.releases?.includes(this._config.release)) ||
+        (skipIssueIfFn !== undefined && (await skipIssueIfFn(issue)))
+      ) {
+        issue.filtered = true
+        continue
+      }
+
+      const handleIssueResult: IHandleIssueResult = await this.handleIssue(
+        issue,
+        skipEventIfFn,
+        false,
+        this._config.fromPipeline,
+        this._config.toPipeline
+      )
+
+      const evs: ICSVItem[] = handleIssueResult.csvItems
+      if (evs.length > 0) {
+        allEvs.push(evs)
+        issue.handled = true
+        handledCount++
+      }
+
+      this._eventsPerIssue[issue.number] = handleIssueResult.events
+    }
+    // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
+
+    const sorted: IIssue[] = issues.slice()
+    sorted.sort((a: IIssue, b: IIssue) => {
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    })
+
+    return { sorted, handledCount, allEvs }
   }
 }

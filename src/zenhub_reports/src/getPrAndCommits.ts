@@ -1,20 +1,28 @@
-/* eslint-disable no-tabs */
+/* eslint-disable no-tabs,@typescript-eslint/no-explicit-any */
 
 // Define interfaces for Pull Request and Commit
+
 interface PullRequest {
   title: string
   created_at: string
   number: number // Renamed from number to pr_number
   user?: { login: string }
+  head?: { repo: { id: number } }
+  id: number
 }
 
-interface Commit {
+export interface Commit {
   author: {
     login: string
   }
   commit: {
     message: string
     author: {
+      name: string
+      email: string
+      date: string
+    }
+    committer: {
       name: string
       email: string
       date: string
@@ -33,36 +41,51 @@ const owner = process.env.GH_REPO_OWNER // Replace with the repository owner's u
 // const repo = 'BrowserPuppeteerTests' // Replace with the repository name
 const token = process.env.GH_API_KEY // Replace with your GitHub personal access token
 
-const currentDate = new Date()
-const oneWeekAgo = new Date(currentDate)
-// const currentDateEpoch = currentDate.getTime()
-// const oneWeekAgoEpoch = oneWeekAgo.getTime()
-oneWeekAgo.setDate(currentDate.getDate() - 7)
-// const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
-// const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
+function filterPulls(
+  pulls: any[],
+  includeRepos: number[],
+  oneWeekAgo: Date,
+  currentDate: Date
+): PullRequest[] {
+  if (pulls.length === 0) {
+    return []
+  }
 
-// const specificAuthor = 'author_username' // Replace with the specific author's username
+  // const repoURL = pulls[0].repository_url
+  // const repoBits = repoURL.split('/')
+  // const repoName = repoBits[repoBits.length - 1]
+  // if (includeRepos.length > 0 && !includeRepos.includes(repoName)) {
+  //   return []
+  // }
+
+  return pulls.filter((p: PullRequest) => {
+    const depoch = new Date(p.created_at).getTime()
+    const res = depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime()
+    return res
+  })
+}
 
 async function fetchPullRequestsOnly(
   minDate: string,
   maxDate: string,
-  repoId: string,
-  page = 1
+  repoName: string,
+  includeRepos: number[] = [],
+  page = 1,
+  beforeDate?: string
 ): Promise<PullRequest[]> {
-  const sinceP = minDate
-  const untilP = maxDate
+  let urlTmp = `https://api.github.com/search/issues?q=repo:${owner}/${repoName}+is:pr`
+  urlTmp += `+created:<${beforeDate ?? maxDate}`
 
-  const url = `https://api.github.com/repos/${owner}/${repoId}/pulls`
-  const params = new URLSearchParams({
-    state: 'all',
-    sort: 'created',
-    direction: 'desc',
-    sinceP,
-    untilP
-  })
+  // if (!beforeDate) {
+  //   urlTmp += `+created:${encodeURIComponent('<=')}${maxDate}+created:${encodeURIComponent('>')}${minDate}`
+  // } else {
+  //   urlTmp += `+created:${encodeURIComponent('<')}${beforeDate}`
+  // }
+
+  const url = urlTmp
 
   try {
-    const response = await fetch(`${url}?${params}`, {
+    const response = await fetch(`${url}`, {
       headers: {
         Authorization: `token ${token}`,
         Accept: 'application/vnd.github.v3+json'
@@ -76,27 +99,57 @@ async function fetchPullRequestsOnly(
     // const sinceD = oneWeekAgo
     // const untilD = currentDate
 
-    const pulls: PullRequest[] = await response.json()
-    const pullsFiltered: PullRequest[] = pulls.filter((p: PullRequest) => {
-      const depoch = new Date(p.created_at).getTime()
-      const res =
-        depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime()
-      return res
-    })
+    const oneWeekAgo = new Date(minDate)
+    const currentDate = new Date(maxDate)
 
-    if (pulls.length === pullsFiltered.length) {
-      const newFiltered = await fetchPullRequestsOnly(
-        minDate,
-        maxDate,
-        repoId,
-        page + 1
-      )
-      pullsFiltered.push(...newFiltered)
+    const pullsAndObj: any = await response.json()
+    const pullsAndMore: PullRequest[] = pullsAndObj.items
+    pullsAndMore.sort((a: PullRequest, b: PullRequest) => {
+      // return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      return a.number - b.number
+    })
+    const pulls = pullsAndMore.filter((ppp: any) => !!ppp.pull_request)
+    const pullsFiltered: PullRequest[] = filterPulls(
+      pulls,
+      includeRepos,
+      oneWeekAgo,
+      currentDate
+    )
+
+    // if (pulls.length > 0 && pulls.length === pullsFiltered.length) {
+    // if (pullsAndMore.length === 30 && pullsFiltered.length > 0) {
+    if (pullsAndMore.length === 30) {
+      // const befDate = new Date(pullsAndMore[0].created_at).toISOString().split('T')[0]
+      const befDate = pullsAndMore[0].created_at
+      if (
+        befDate !== beforeDate &&
+        new Date(befDate).getTime() >= oneWeekAgo.getTime()
+      ) {
+        const newFiltered = await fetchPullRequestsOnly(
+          minDate,
+          maxDate,
+          repoName,
+          includeRepos,
+          page + 1,
+          befDate
+        )
+
+        // pullsFiltered.push(...newFiltered)
+        for (const rrr of newFiltered) {
+          if (!pullsFiltered.some(pf => pf.number === rrr.number)) {
+            pullsFiltered.push(rrr)
+          }
+        }
+        console.log(`Total pulls: ${pullsFiltered.length}`)
+      }
     }
 
     return pullsFiltered // Return the result as an object
-  } catch (error) {
-    console.error('Error fetching pull requests only:', error)
+  } catch (error: any) {
+    // console.error('Error fetching pull requests only:', error)
+    console.error(
+      `Error fetching pull requests only: ${error.message} (${url}, page ${page})`
+    )
     return [] // Return an empty array in case of error
   }
 }
@@ -104,26 +157,20 @@ async function fetchPullRequestsOnly(
 async function fetchPullRequests(
   minDate: string,
   maxDate: string,
-  repoId: string
+  repoName: string,
+  includeRepos: number[]
 ): Promise<PullRequestWithCommits[]> {
   try {
     const pulls: PullRequest[] = await fetchPullRequestsOnly(
       minDate,
       maxDate,
-      repoId
+      repoName,
+      includeRepos
     )
     const pullRequestsWithCommits: PullRequestWithCommits[] = await Promise.all(
       pulls.map(async pr => {
-        const commits = await fetchCommitsForPullRequest(pr.number, repoId) // Updated to pr_number
-        // const allAuthors = Array.from(new Set(commits.map(c => c.author?.login)))
-        // const mainAuthor = commits.reduce((res: { done: string[], author: string }, item: Commit, all: Commit[]) => {
-        // 	const auth = item.author?.login
-        // 	if(!res.done.includes(auth)) {
-        // 		res.done.push(auth);
-        // 		const count = all.filter()
-        // 	}
-        // 	return res;
-        // }, { done: [], author: "" })
+        const commits = await fetchCommitsForPullRequest(pr.number, repoName) // Updated to pr_number
+
         return {
           title: pr.title,
           createdAt: pr.created_at,
@@ -135,14 +182,14 @@ async function fetchPullRequests(
       })
     )
 
-    return pullRequestsWithCommits // Return the result as an object
+    return Promise.resolve(pullRequestsWithCommits) // Return the result as an object
   } catch (error) {
     console.error('Error fetching pull requests:', error)
     return [] // Return an empty array in case of error
   }
 }
 
-async function fetchCommitsForPullRequest(
+export async function fetchCommitsForPullRequest(
   prNumber: number,
   repoId: string
 ): Promise<Commit[]> {
@@ -161,8 +208,10 @@ async function fetchCommitsForPullRequest(
 
     const commits: Commit[] = await response.json()
     return commits
-  } catch (error) {
-    console.error(`Error fetching commits for PR #${prNumber}:`, error)
+  } catch (error: any) {
+    console.error(
+      `Error fetching commits for PR #${prNumber}: ${error.message} (${url})`
+    )
     return []
   }
 }
@@ -193,7 +242,11 @@ function makeStats(
 
 async function fetch_prs_for_repo(
   repoId: string,
-  config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
+  config = {
+    minDate: '2024-04-22',
+    maxDate: '2024-05-22',
+    includeRepos: [] as number[]
+  }
 ): Promise<
   Record<string, { pr_count: number; commit_count: number }> | undefined
 > {
@@ -202,12 +255,14 @@ async function fetch_prs_for_repo(
     const pullRequests = await fetchPullRequests(
       config.minDate,
       config.maxDate,
-      repoId
+      repoId,
+      config.includeRepos
     )
     console.log(pullRequests) // Log the result
     const stats: Record<string, { pr_count: number; commit_count: number }> =
       makeStats(pullRequests)
     // console.log(JSON.stringify(stats, null, 2))
+    console.log('Got stats')
     return Promise.resolve(stats)
   } catch (e) {
     console.error('Error fetching pull requests:', e)
@@ -289,7 +344,11 @@ function generateSummary(
 
 export async function getAllData(
   repos?: string[],
-  config = { minDate: '2024-04-22', maxDate: '2024-05-22' }
+  config = {
+    minDate: '2024-04-22',
+    maxDate: '2024-05-22',
+    includeRepos: [] as number[]
+  }
 ): Promise<{
   all: Record<string, { pr_count: number; commit_count: number }>[]
   summary: Record<string, { pr_count: number; commit_count: number }>
@@ -299,11 +358,18 @@ export async function getAllData(
   }
   const all: Record<string, { pr_count: number; commit_count: number }>[] = []
   for (const r of repos) {
-    const rres:
-      | Record<string, { pr_count: number; commit_count: number }>
-      | undefined = await fetch_prs_for_repo(r, config)
-    if (rres !== undefined) {
-      all.push(rres)
+    console.log(`Getting pr and commit data for ${r}`) // Log the result
+
+    try {
+      const rres:
+        | Record<string, { pr_count: number; commit_count: number }>
+        | undefined = await fetch_prs_for_repo(r, config)
+
+      if (rres !== undefined && Object.keys(rres).length > 0) {
+        all.push(rres)
+      }
+    } catch (err: any) {
+      console.warn('err: ', err.message)
     }
   }
 

@@ -109,7 +109,7 @@ class Main implements IMain {
     } catch (error) {
       // Fail the workflow run if an error occurs
       if (error instanceof Error) {
-        console.warn(`Main Error: ${error.message}`)
+        // console.warn(`Main Error: ${error.message}`)
         core.setFailed(error.message)
       }
     } finally {

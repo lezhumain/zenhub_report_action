@@ -1,8 +1,40 @@
 import { NodeHtmlMarkdown } from 'node-html-markdown'
 
+interface GithubModels_Workspace {
+  id: number // The ID of the workspace
+  name: string // The name of the workspace
+  mongo_id: string // The MongoDB ID of the workspace
+}
+
+interface GithubModels_Repository {
+  id: number // The ID of the repository
+  name: string // The name of the repository
+  gh_id: number // The GitHub ID of the repository
+}
+
+interface GithubModels_Pipeline {
+  id: number // The ID of the pipeline
+  name: string // The name of the pipeline
+}
+
+interface GithubModels_Organization {
+  id: number // The ID of the organization
+  login: string // The login name of the organization
+  avatar_url: string // The URL of the organization's avatar
+}
+
+export interface GithubModels_Data {
+  workspace: GithubModels_Workspace // The workspace object
+  repository: GithubModels_Repository // The repository object
+  to_pipeline: GithubModels_Pipeline // The target pipeline object
+  organization: GithubModels_Organization // The organization object
+  from_pipeline: GithubModels_Pipeline // The source pipeline object
+  github_user?: { login: string }
+}
+
 export interface IGhEvent {
   type: string
-  data: any
+  data: GithubModels_Data
   createdAt: string
 }
 
@@ -10,6 +42,7 @@ export interface IIssueEvent {
   number: string
   estimateValue: { value: number }
   repositoryGhId: number
+  repositoryGhName: string
   createdAt: string
 }
 
@@ -32,12 +65,14 @@ export interface IIssue {
   number: string
   estimateValue?: number
   repositoryGhId: number
+  repositoryGhName: string
   pipelineName: string
   labels?: string[]
   releases?: string[]
   pullRequest: boolean
   htmlUrl: string
   createdAt: Date
+  author: string
 }
 
 export interface IWorkspace {
@@ -79,6 +114,7 @@ export interface Issue {
   htmlUrl: string
   pullRequest?: boolean
   createdAt: string
+  user: { login: string }
 }
 
 export interface IControlChartItem {
@@ -91,8 +127,8 @@ export interface IControlChartItem {
   htmlUrl: string
 }
 
-export class Utils {
-  static millisecondsToHumanReadableTime(milliseconds: number): string {
+class Utils {
+  millisecondsToHumanReadableTime(milliseconds: number): string {
     const seconds = Math.floor((milliseconds / 1000) % 60)
     const minutes = Math.floor((milliseconds / (1000 * 60)) % 60)
     const hours = Math.floor((milliseconds / (1000 * 60 * 60)) % 24)
@@ -110,12 +146,12 @@ export class Utils {
     return `${monthsStr}${weeksStr}${daysStr}${hoursStr}:${minutesStr}:${secondsStr}`
   }
 
-  static addDay(firstDayOfMonth: Date, number: number): Date {
+  addDay(firstDayOfMonth: Date, number: number): Date {
     const epoch = firstDayOfMonth.getTime()
-    return new Date(epoch + Utils.getDaysAsMs(number))
+    return new Date(epoch + this.getDaysAsMs(number))
   }
 
-  static getMsAsDays(ms: number): number {
+  getMsAsDays(ms: number): number {
     const trunced: number = Math.trunc(ms)
     const sigDigits: number = trunced.toString().length
     const res = ms / 1000 / 60 / 60 / 24
@@ -123,11 +159,11 @@ export class Utils {
     return Number(res.toPrecision(sigDigits))
   }
 
-  static getDaysAsMs(days: number): number {
+  getDaysAsMs(days: number): number {
     return days * 1000 * 60 * 60 * 24
   }
 
-  static htmlToMarkdown(fullHTML: string): string {
+  htmlToMarkdown(fullHTML: string): string {
     const mark = NodeHtmlMarkdown.translate(
       /* html */ fullHTML,
       /* options (optional) */ {},
@@ -137,25 +173,26 @@ export class Utils {
     return mark
   }
 
-  static isHex(str: string): boolean {
+  isHex(str: string): boolean {
     const hexRegex = /^[0-9A-Fa-f]+$/
     return hexRegex.test(str)
   }
 
-  static issueNumberAsNumber(issueNumber: string): number {
+  issueNumberAsNumber(issueNumber: string): number {
     return Number(issueNumber.replace('#', ''))
   }
 
-  static issueNumberAsString(issueNumber: number): string {
+  issueNumberAsString(issueNumber: number): string {
     return `#${issueNumber.toFixed(0)}`
   }
 
-  static async waitForTimeout(timeout: number): Promise<void> {
+  async waitForTimeout(timeout: number): Promise<void> {
     return new Promise(function (resolve) {
       setTimeout(resolve, timeout)
     })
   }
 }
+export const utils = new Utils()
 
 export class ControlChartItem implements IControlChartItem {
   private readonly _started: Date
@@ -179,7 +216,7 @@ export class ControlChartItem implements IControlChartItem {
   }
 
   get completionTimeStr(): string {
-    // return Utils.millisecondsToHumanReadableTime(this.completionTime);
+    // return utils.millisecondsToHumanReadableTime(this.completionTime);
     return (this.completionTime / 1000 / 60 / 60 / 24).toFixed(0)
   }
 
@@ -227,8 +264,8 @@ export interface IStatResult {
   average: number
 }
 
-export class StatHelper {
-  private static getMedian(arr: number[]): number {
+class StatHelper {
+  private getMedian(arr: number[]): number {
     const middle = (arr.length + 1) / 2
     const sorted = [...arr].sort((a, b) => a - b)
     const isEven = sorted.length % 2 === 0
@@ -237,17 +274,18 @@ export class StatHelper {
       : sorted[middle - 1]
   }
 
-  private static getAverage(arr: number[]): number {
+  private getAverage(arr: number[]): number {
     return arr.reduce((res: number, val: number) => res + val, 0) / arr.length
   }
 
-  static getStats(arr: number[]): IStatResult {
+  getStats(arr: number[]): IStatResult {
     return {
-      average: StatHelper.getAverage(arr),
-      median: StatHelper.getMedian(arr)
+      average: this.getAverage(arr),
+      median: this.getMedian(arr)
     }
   }
 }
+export const statHelper = new StatHelper()
 
 export interface IVelocityItem {
   estimate: number
@@ -275,14 +313,11 @@ export interface ISummary {
 }
 
 export interface IPrUser extends IPrReviewStat {
-  // user: string
-  // shouldReviewCount: number
-  // didReviewCount: number
-  // reviewedPerc: number
-  // created: number
-  // createdPerc: number
   totalCommits: number
   totalCommitsPerWeek: number
+  totalCommentsInPr: number
+  totalCommentsPerPr: number
+  issueCreated: number
 }
 
 export interface IPrReviewStat {

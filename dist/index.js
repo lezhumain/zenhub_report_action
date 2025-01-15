@@ -38141,7 +38141,7 @@ class Main {
         catch (error) {
             // Fail the workflow run if an error occurs
             if (error instanceof Error) {
-                console.warn(`Main Error: ${error.message}`);
+                // console.warn(`Main Error: ${error.message}`)
                 core.setFailed(error.message);
             }
         }
@@ -38195,13 +38195,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getWeekCount = getWeekCount;
+exports.getRepoInfo = getRepoInfo;
 exports.check_prs = check_prs;
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // eslint-disable-next-line import/named
 const axios_1 = __importDefault(__nccwpck_require__(7269));
 const fs = __importStar(__nccwpck_require__(3024));
-const models_1 = __nccwpck_require__(6099);
-// GitHub repository owner and name
-// const repo = 'BrowserPuppeteerTests'
+const getPrAndCommits_1 = __nccwpck_require__(8194);
+const utils_1 = __nccwpck_require__(1252);
+function getWeekCount(dateFrom, dateTo) {
+    return Number(((dateTo.getTime() - dateFrom.getTime()) / 1000 / 3600 / 24 / 7).toFixed(2));
+}
 const callGithubAPIByURL = async (apiUrl) => {
     return (0, axios_1.default)(apiUrl, {
         headers: {
@@ -38211,30 +38216,23 @@ const callGithubAPIByURL = async (apiUrl) => {
 };
 const callGithubAPIByEndpoint = async (endpoint, repoId) => {
     // GitHub API endpoint for pull requests
-    if (!endpoint.startsWith('/')) {
+    if (!endpoint.startsWith('/') &&
+        endpoint.length > 0 &&
+        !endpoint.startsWith('http')) {
         endpoint = `/${endpoint}`;
     }
     const owner = 'whitespace-software';
-    const url = `https://api.github.com/repos/${owner}/${repoId}${endpoint}`; // pulls
+    const url = endpoint.startsWith('http')
+        ? endpoint
+        : `https://api.github.com/repos/${owner}/${repoId}${endpoint}`; // pulls
     return callGithubAPIByURL(url);
 };
 async function getByURL(url) {
     const resp = await callGithubAPIByURL(url);
     return Promise.resolve(resp.data);
 }
-// /**
-//  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-hourly-commit-count-for-each-day
-//  * @returns {Promise<unknown>}
-//  */
-// async function getCommitDailySummary(repoId: string): Promise<AxiosResponse> {
-//   return callGithubAPIByEndpoint('/stats/punch_card', repoId)
-// }
-/**
- * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-the-last-year-of-commit-activity
- * @returns {Promise<unknown>}
- */
-async function getLastYearSummary(repoId) {
-    return callGithubAPIByEndpoint('/stats/commit_activity', repoId);
+async function getRepoInfo(repoName) {
+    return callGithubAPIByEndpoint('', repoName);
 }
 /**
  * See: https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28#get-all-contributor-commit-activity
@@ -38246,7 +38244,6 @@ async function getPContributorsData(repoId) {
         const content = fs.readFileSync(savedName, { encoding: 'utf8' });
         if (content) {
             return Promise.resolve({
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 data: JSON.parse(content).map((e) => {
                     e.incomplete = true;
                     return e;
@@ -38268,44 +38265,51 @@ async function getPContributorsData(repoId) {
         : [];
     return res;
 }
-// interface IPrResponse {
-//   user: object
-//   draft: boolean
-//   created_at: string
-// }
 function getContribFilename(repoId) {
     return `output/contribs_${repoId}.json`;
 }
-async function handleYearCommits(repoId, config, tryCount = 0) {
-    const yearCommitsResp = await getLastYearSummary(repoId);
-    const yearCommits = yearCommitsResp.data;
-    if (!Array.isArray(yearCommits) && Object.keys(yearCommits).length > 0) {
-        console.warn(`Need to handle yearCommits\n${JSON.stringify(yearCommits, null, 2)}`);
+async function getPRs(repoName, minDate, maxDate, beforeDate) {
+    // const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoName)
+    let urlTmp = `https://api.github.com/search/issues?q=repo:whitespace-software/${repoName}+is:pr`;
+    if (!beforeDate) {
+        // urlTmp += `+created:<${beforeDate}`
+        beforeDate = maxDate;
     }
-    const resYearCommits = (Array.isArray(yearCommits) ? yearCommits : [])
-        .map(yc => {
-        const clone = Object.assign({}, yc);
-        delete clone.days;
-        return clone;
-    })
-        .filter(w => (config?.minDate === undefined ||
-        w.week * 1000 >= new Date(config.minDate).getTime()) &&
-        (config?.maxDate === undefined ||
-            w.week * 1000 <= new Date(config.maxDate).getTime())) || [];
-    if (resYearCommits.length === 0 && tryCount > 0) {
-        await models_1.Utils.waitForTimeout(1000);
-        return handleYearCommits(repoId, config, tryCount - 1);
+    urlTmp += `+created:${encodeURIComponent('<')}${beforeDate}`;
+    const url = urlTmp;
+    const prsResponse = (await callGithubAPIByEndpoint(url, repoName));
+    // return Promise.resolve([])
+    console.log('pr resp 1');
+    const prs0 = prsResponse.data;
+    const prs = prs0.items;
+    const filtered = prs.filter((prr) => {
+        const isDateOk = (0, utils_1.filterDateBetweenConfig)(prr.created_at, minDate, maxDate);
+        return isDateOk;
+    });
+    const min = new Date(minDate);
+    if (prs.length === 30 && filtered.length > 0) {
+        const before = prs[prs.length - 1].created_at;
+        // if (before !== beforeDate && (new Date(before)).getTime() > min.getTime()) {
+        //   const newPrs = await getPRs(repoName, minDate, maxDate, before)
+        //   filtered.push(...newPrs)
+        // }
+        if (before !== beforeDate && new Date(before).getTime() > min.getTime()) {
+            console.log(`Getting before ${beforeDate}`);
+            const rr = await getPRs(repoName, minDate, maxDate, before);
+            return Promise.resolve(filtered.concat(rr));
+        }
     }
-    return Promise.resolve(resYearCommits);
+    return Promise.resolve(filtered);
 }
-async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+async function main(repoName, config = {
+    minDate: '2024-04-22',
+    maxDate: '2024-05-22',
+    includeRepos: []
+}) {
     // console.log('pr resp 0')
-    const prsResponse = await callGithubAPIByEndpoint('pulls?state=all', repoId);
-    // console.log('pr resp 1')
-    const prs = prsResponse.data;
+    const prs = await getPRs(repoName, config.minDate, config.maxDate);
     // const openedPrs = prs.filter(p => p.state === 'open' && !p.draft)
     // const openedPrs: IGithubPR[] = prs.filter((p: IPrResponse) => !p.draft)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = {
         summary: [],
         users: [],
@@ -38315,7 +38319,6 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
     const maxEpoch = new Date(config.maxDate).getTime();
     // console.log('prs')
     // console.log(JSON.stringify(prs, null, 2))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const summary = [];
     // for (const pr of openedPrs) {
     for (const pr of prs) {
@@ -38328,20 +38331,26 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
             // console.log('Within timespan')
             const author = pr.user.login;
             const comments = pr.comments_url
-                ? await getByURL(pr.comments_url)
+                ? await getByURL(pr.comments_url.replace('/issues/', '/pulls/'))
                 : [];
             const review_comments = pr.review_comments_url
                 ? await getByURL(pr.review_comments_url)
                 : [];
             const all_comments = comments.concat(review_comments);
             // console.log(`rr ${all_comments.length} comments for ${pr.url}`)
-            const commentators = Array.from(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            new Set(all_comments.map((comment) => comment.user.login)));
+            const commentators = Array.from(new Set(all_comments.map((comment) => comment.user.login)));
+            const allCommitData = await (0, getPrAndCommits_1.fetchCommitsForPullRequest)(pr.number, repoName);
+            const filteredCommit = allCommitData.filter((item) => {
+                const commitDate = new Date(item.commit.committer.date);
+                const created0 = commitDate.getTime();
+                return created0 >= minEpoch && created0 <= maxEpoch;
+            });
             const obj = {
                 author,
                 commentators,
-                url: pr.html_url
+                url: pr.html_url,
+                commits: filteredCommit,
+                commentCount: all_comments.length
             };
             // console.log('obj===')
             // console.log(obj)
@@ -38359,63 +38368,43 @@ async function main(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-
         acc.push(...summaryItem.commentators);
         return acc;
     }, [])));
-    // console.log('pr resp 3')
-    const contribsResp = await getPContributorsData(repoId);
-    const contribs = 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    contribsResp.data.filter((r) => r.total > 0);
-    if (contribs.length > 0) {
-        fs.writeFileSync(getContribFilename(repoId), JSON.stringify(contribs, null, 2), { encoding: 'utf8' });
-    }
-    // console.log('pr resp 4')
-    // console.log(`Everyone: ${everyone.join(',')}`)
+    const weekCount = getWeekCount(new Date(config.minDate), new Date(config.maxDate));
     for (const user of everyone) {
         // TODO single loop
         const otherPrs = summary.filter(s => s.author !== user);
         const shouldReviewCount = otherPrs.length;
         const didReviewCount = otherPrs.filter(op => op.commentators.includes(user)).length;
-        const reviewedPerc = Number((didReviewCount / shouldReviewCount).toFixed(2));
-        const contrib = contribs.find(c => c.authorName === user);
-        // copied
-        const filteredWeeks = contrib?.weeks.filter(w => (config.minDate === undefined ||
-            w.w * 1000 >= new Date(config.minDate).getTime()) &&
-            (config.maxDate === undefined ||
-                w.w * 1000 <= new Date(config.maxDate).getTime())) || [];
-        const totalCommits = filteredWeeks.reduce(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (res0, cw) => res0 + cw.c, 0);
-        const averageCommitsPerWeek = Number((filteredWeeks.length > 0
-            ? totalCommits / filteredWeeks.length
-            : 0).toFixed(2));
-        const created = summary.filter(s => s.author === user);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const reviewedPerc = shouldReviewCount === 0
+            ? 0
+            : Number((didReviewCount / shouldReviewCount).toFixed(2));
+        const createdPrs = summary.filter(s => s.author === user);
+        // const totalCommits: number = summary
+        //   .map(c => c.commits.length)
+        //   .reduce((res, item) => res + item, 0)
+        const myCommits = createdPrs
+            .map(c => c.commits.length)
+            .reduce((res0, item) => res0 + item, 0);
+        const averageCommitsPerWeek = weekCount > 0 ? myCommits / weekCount : 0;
+        const totalComments = createdPrs.reduce((resC, item) => {
+            return resC + item.commentCount;
+        }, 0);
         res.users.push({
             user,
             shouldReviewCount,
             didReviewCount,
             reviewedPerc,
-            created: created.length,
-            createdPerc: created.length / summary.length,
-            totalCommits,
-            totalCommitsPerWeek: averageCommitsPerWeek
+            created: createdPrs.length,
+            createdPerc: summary.length > 0 ? createdPrs.length / summary.length : 0,
+            totalCommits: myCommits,
+            totalCommitsPerWeek: Number(averageCommitsPerWeek.toFixed(2)),
+            totalCommentsInPr: totalComments,
+            totalCommentsPerPr: totalComments / createdPrs.length
         });
-    }
-    // const dailyCommitsResp = await getCommitDailySummary(repoId)
-    // const dailyCommits = dailyCommitsResp.data
-    // console.log('pr resp 5')
-    // console.log('pr resp 6')
-    // console.log(JSON.stringify(yearCommits, null, 2))
-    try {
-        res.yearCommits = await handleYearCommits(repoId, config, 3);
-    }
-    catch (e) {
-        console.error(e.message);
-        throw e;
     }
     return Promise.resolve(res);
 }
-async function check_prs(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
-    return main(repoId, config);
+async function check_prs(repoName, config = { minDate: '2024-04-22', maxDate: '2024-05-22', includeRepos: [] }) {
+    return main(repoName, config);
 }
 // if (module.parent !== null) {
 //   module.exports = {
@@ -38450,7 +38439,7 @@ class IssueFilter {
                 return (issue.labels !== undefined &&
                     issue.labels.map((la) => la.toLowerCase()).includes(low));
             });
-        const idShouldSkip = !!this._config.issuesToSkip?.includes(models_1.Utils.issueNumberAsNumber(issue.number));
+        const idShouldSkip = !!this._config.issuesToSkip?.includes(models_1.utils.issueNumberAsNumber(issue.number));
         const skip = !matchesLabel && idShouldSkip;
         return Promise.resolve(skip);
     };
@@ -38476,33 +38465,40 @@ exports.IssueFilter = IssueFilter;
 
 "use strict";
 
-/* eslint-disable no-tabs */
+/* eslint-disable no-tabs,@typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fetchCommitsForPullRequest = fetchCommitsForPullRequest;
 exports.getAllData = getAllData;
 const owner = process.env.GH_REPO_OWNER; // Replace with the repository owner's username or organization name
 // const repo = 'BrowserPuppeteerTests' // Replace with the repository name
 const token = process.env.GH_API_KEY; // Replace with your GitHub personal access token
-const currentDate = new Date();
-const oneWeekAgo = new Date(currentDate);
-// const currentDateEpoch = currentDate.getTime()
-// const oneWeekAgoEpoch = oneWeekAgo.getTime()
-oneWeekAgo.setDate(currentDate.getDate() - 7);
-// const since = oneWeekAgo.toISOString() // Replace with your start date in ISO 8601 format
-// const until = currentDate.toISOString() // Replace with your end date in ISO 8601 format
-// const specificAuthor = 'author_username' // Replace with the specific author's username
-async function fetchPullRequestsOnly(minDate, maxDate, repoId, page = 1) {
-    const sinceP = minDate;
-    const untilP = maxDate;
-    const url = `https://api.github.com/repos/${owner}/${repoId}/pulls`;
-    const params = new URLSearchParams({
-        state: 'all',
-        sort: 'created',
-        direction: 'desc',
-        sinceP,
-        untilP
+function filterPulls(pulls, includeRepos, oneWeekAgo, currentDate) {
+    if (pulls.length === 0) {
+        return [];
+    }
+    // const repoURL = pulls[0].repository_url
+    // const repoBits = repoURL.split('/')
+    // const repoName = repoBits[repoBits.length - 1]
+    // if (includeRepos.length > 0 && !includeRepos.includes(repoName)) {
+    //   return []
+    // }
+    return pulls.filter((p) => {
+        const depoch = new Date(p.created_at).getTime();
+        const res = depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime();
+        return res;
     });
+}
+async function fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos = [], page = 1, beforeDate) {
+    let urlTmp = `https://api.github.com/search/issues?q=repo:${owner}/${repoName}+is:pr`;
+    urlTmp += `+created:<${beforeDate ?? maxDate}`;
+    // if (!beforeDate) {
+    //   urlTmp += `+created:${encodeURIComponent('<=')}${maxDate}+created:${encodeURIComponent('>')}${minDate}`
+    // } else {
+    //   urlTmp += `+created:${encodeURIComponent('<')}${beforeDate}`
+    // }
+    const url = urlTmp;
     try {
-        const response = await fetch(`${url}?${params}`, {
+        const response = await fetch(`${url}`, {
             headers: {
                 Authorization: `token ${token}`,
                 Accept: 'application/vnd.github.v3+json'
@@ -38513,37 +38509,46 @@ async function fetchPullRequestsOnly(minDate, maxDate, repoId, page = 1) {
         }
         // const sinceD = oneWeekAgo
         // const untilD = currentDate
-        const pulls = await response.json();
-        const pullsFiltered = pulls.filter((p) => {
-            const depoch = new Date(p.created_at).getTime();
-            const res = depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime();
-            return res;
+        const oneWeekAgo = new Date(minDate);
+        const currentDate = new Date(maxDate);
+        const pullsAndObj = await response.json();
+        const pullsAndMore = pullsAndObj.items;
+        pullsAndMore.sort((a, b) => {
+            // return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            return a.number - b.number;
         });
-        if (pulls.length === pullsFiltered.length) {
-            const newFiltered = await fetchPullRequestsOnly(minDate, maxDate, repoId, page + 1);
-            pullsFiltered.push(...newFiltered);
+        const pulls = pullsAndMore.filter((ppp) => !!ppp.pull_request);
+        const pullsFiltered = filterPulls(pulls, includeRepos, oneWeekAgo, currentDate);
+        // if (pulls.length > 0 && pulls.length === pullsFiltered.length) {
+        // if (pullsAndMore.length === 30 && pullsFiltered.length > 0) {
+        if (pullsAndMore.length === 30) {
+            // const befDate = new Date(pullsAndMore[0].created_at).toISOString().split('T')[0]
+            const befDate = pullsAndMore[0].created_at;
+            if (befDate !== beforeDate &&
+                new Date(befDate).getTime() >= oneWeekAgo.getTime()) {
+                const newFiltered = await fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos, page + 1, befDate);
+                // pullsFiltered.push(...newFiltered)
+                for (const rrr of newFiltered) {
+                    if (!pullsFiltered.some(pf => pf.number === rrr.number)) {
+                        pullsFiltered.push(rrr);
+                    }
+                }
+                console.log(`Total pulls: ${pullsFiltered.length}`);
+            }
         }
         return pullsFiltered; // Return the result as an object
     }
     catch (error) {
-        console.error('Error fetching pull requests only:', error);
+        // console.error('Error fetching pull requests only:', error)
+        console.error(`Error fetching pull requests only: ${error.message} (${url}, page ${page})`);
         return []; // Return an empty array in case of error
     }
 }
-async function fetchPullRequests(minDate, maxDate, repoId) {
+async function fetchPullRequests(minDate, maxDate, repoName, includeRepos) {
     try {
-        const pulls = await fetchPullRequestsOnly(minDate, maxDate, repoId);
+        const pulls = await fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos);
         const pullRequestsWithCommits = await Promise.all(pulls.map(async (pr) => {
-            const commits = await fetchCommitsForPullRequest(pr.number, repoId); // Updated to pr_number
-            // const allAuthors = Array.from(new Set(commits.map(c => c.author?.login)))
-            // const mainAuthor = commits.reduce((res: { done: string[], author: string }, item: Commit, all: Commit[]) => {
-            // 	const auth = item.author?.login
-            // 	if(!res.done.includes(auth)) {
-            // 		res.done.push(auth);
-            // 		const count = all.filter()
-            // 	}
-            // 	return res;
-            // }, { done: [], author: "" })
+            const commits = await fetchCommitsForPullRequest(pr.number, repoName); // Updated to pr_number
             return {
                 title: pr.title,
                 createdAt: pr.created_at,
@@ -38551,7 +38556,7 @@ async function fetchPullRequests(minDate, maxDate, repoId) {
                 author: pr.user?.login ?? ''
             };
         }));
-        return pullRequestsWithCommits; // Return the result as an object
+        return Promise.resolve(pullRequestsWithCommits); // Return the result as an object
     }
     catch (error) {
         console.error('Error fetching pull requests:', error);
@@ -38574,7 +38579,7 @@ async function fetchCommitsForPullRequest(prNumber, repoId) {
         return commits;
     }
     catch (error) {
-        console.error(`Error fetching commits for PR #${prNumber}:`, error);
+        console.error(`Error fetching commits for PR #${prNumber}: ${error.message} (${url})`);
         return [];
     }
 }
@@ -38594,13 +38599,18 @@ function makeStats(pullRequests) {
     }
     return res;
 }
-async function fetch_prs_for_repo(repoId, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+async function fetch_prs_for_repo(repoId, config = {
+    minDate: '2024-04-22',
+    maxDate: '2024-05-22',
+    includeRepos: []
+}) {
     // Execute the function to fetch pull requests and handle the result
     try {
-        const pullRequests = await fetchPullRequests(config.minDate, config.maxDate, repoId);
+        const pullRequests = await fetchPullRequests(config.minDate, config.maxDate, repoId, config.includeRepos);
         console.log(pullRequests); // Log the result
         const stats = makeStats(pullRequests);
         // console.log(JSON.stringify(stats, null, 2))
+        console.log('Got stats');
         return Promise.resolve(stats);
     }
     catch (e) {
@@ -38634,15 +38644,25 @@ function generateSummary(all) {
     }
     return obj;
 }
-async function getAllData(repos, config = { minDate: '2024-04-22', maxDate: '2024-05-22' }) {
+async function getAllData(repos, config = {
+    minDate: '2024-04-22',
+    maxDate: '2024-05-22',
+    includeRepos: []
+}) {
     if (repos === undefined) {
         repos = ['BrowserPuppeteerTests', 'CucuVAPI'];
     }
     const all = [];
     for (const r of repos) {
-        const rres = await fetch_prs_for_repo(r, config);
-        if (rres !== undefined) {
-            all.push(rres);
+        console.log(`Getting pr and commit data for ${r}`); // Log the result
+        try {
+            const rres = await fetch_prs_for_repo(r, config);
+            if (rres !== undefined && Object.keys(rres).length > 0) {
+                all.push(rres);
+            }
+        }
+        catch (err) {
+            console.warn('err: ', err.message);
         }
     }
     const summary = generateSummary(all);
@@ -38664,10 +38684,10 @@ async function getAllData(repos, config = { minDate: '2024-04-22', maxDate: '202
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.StatHelper = exports.ControlChartItem = exports.Utils = void 0;
+exports.statHelper = exports.ControlChartItem = exports.utils = void 0;
 const node_html_markdown_1 = __nccwpck_require__(8653);
 class Utils {
-    static millisecondsToHumanReadableTime(milliseconds) {
+    millisecondsToHumanReadableTime(milliseconds) {
         const seconds = Math.floor((milliseconds / 1000) % 60);
         const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);
         const hours = Math.floor((milliseconds / (1000 * 60 * 60)) % 24);
@@ -38682,20 +38702,20 @@ class Utils {
         const secondsStr = seconds < 10 ? `0${seconds}` : seconds;
         return `${monthsStr}${weeksStr}${daysStr}${hoursStr}:${minutesStr}:${secondsStr}`;
     }
-    static addDay(firstDayOfMonth, number) {
+    addDay(firstDayOfMonth, number) {
         const epoch = firstDayOfMonth.getTime();
-        return new Date(epoch + Utils.getDaysAsMs(number));
+        return new Date(epoch + this.getDaysAsMs(number));
     }
-    static getMsAsDays(ms) {
+    getMsAsDays(ms) {
         const trunced = Math.trunc(ms);
         const sigDigits = trunced.toString().length;
         const res = ms / 1000 / 60 / 60 / 24;
         return Number(res.toPrecision(sigDigits));
     }
-    static getDaysAsMs(days) {
+    getDaysAsMs(days) {
         return days * 1000 * 60 * 60 * 24;
     }
-    static htmlToMarkdown(fullHTML) {
+    htmlToMarkdown(fullHTML) {
         const mark = node_html_markdown_1.NodeHtmlMarkdown.translate(
         /* html */ fullHTML, 
         /* options (optional) */ {}, 
@@ -38703,23 +38723,23 @@ class Utils {
         /* customCodeBlockTranslators (optional) */ undefined);
         return mark;
     }
-    static isHex(str) {
+    isHex(str) {
         const hexRegex = /^[0-9A-Fa-f]+$/;
         return hexRegex.test(str);
     }
-    static issueNumberAsNumber(issueNumber) {
+    issueNumberAsNumber(issueNumber) {
         return Number(issueNumber.replace('#', ''));
     }
-    static issueNumberAsString(issueNumber) {
+    issueNumberAsString(issueNumber) {
         return `#${issueNumber.toFixed(0)}`;
     }
-    static async waitForTimeout(timeout) {
+    async waitForTimeout(timeout) {
         return new Promise(function (resolve) {
             setTimeout(resolve, timeout);
         });
     }
 }
-exports.Utils = Utils;
+exports.utils = new Utils();
 class ControlChartItem {
     _number;
     _htmlUrl;
@@ -38739,7 +38759,7 @@ class ControlChartItem {
         return this._comppleted.getTime() - this._started.getTime();
     }
     get completionTimeStr() {
-        // return Utils.millisecondsToHumanReadableTime(this.completionTime);
+        // return utils.millisecondsToHumanReadableTime(this.completionTime);
         return (this.completionTime / 1000 / 60 / 60 / 24).toFixed(0);
     }
     get number() {
@@ -38774,7 +38794,7 @@ class ControlChartItem {
 }
 exports.ControlChartItem = ControlChartItem;
 class StatHelper {
-    static getMedian(arr) {
+    getMedian(arr) {
         const middle = (arr.length + 1) / 2;
         const sorted = [...arr].sort((a, b) => a - b);
         const isEven = sorted.length % 2 === 0;
@@ -38782,17 +38802,35 @@ class StatHelper {
             ? (sorted[middle - 1.5] + sorted[middle - 0.5]) / 2
             : sorted[middle - 1];
     }
-    static getAverage(arr) {
+    getAverage(arr) {
         return arr.reduce((res, val) => res + val, 0) / arr.length;
     }
-    static getStats(arr) {
+    getStats(arr) {
         return {
-            average: StatHelper.getAverage(arr),
-            median: StatHelper.getMedian(arr)
+            average: this.getAverage(arr),
+            median: this.getMedian(arr)
         };
     }
 }
-exports.StatHelper = StatHelper;
+exports.statHelper = new StatHelper();
+
+
+/***/ }),
+
+/***/ 1252:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.filterDateBetweenConfig = filterDateBetweenConfig;
+function filterDateBetweenConfig(date0, minDate, maxDate) {
+    const date1 = new Date(date0);
+    const epoch = date1.getTime();
+    const minOk = minDate === undefined || epoch >= new Date(minDate).getTime();
+    const maxOk = maxDate === undefined || epoch <= new Date(maxDate).getTime();
+    return minOk && maxOk;
+}
 
 
 /***/ }),
@@ -38829,14 +38867,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Program = exports.FileUtils = void 0;
-/* eslint-disable @typescript-eslint/ban-ts-comment,@typescript-eslint/no-require-imports,@typescript-eslint/no-explicit-any,github/no-then */
+exports.Program = exports.fileUtils = void 0;
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const md5_1 = __importDefault(__nccwpck_require__(2296));
 const fs = __importStar(__nccwpck_require__(9896));
 const models_1 = __nccwpck_require__(6099);
 const path = __importStar(__nccwpck_require__(6760));
 const checkprreviewers1_1 = __nccwpck_require__(7708);
-const getPrAndCommits_1 = __nccwpck_require__(8194);
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 // const reviewer_call = require('./check_pr_reviewers.js')
 /*
@@ -38845,11 +38882,11 @@ const getPrAndCommits_1 = __nccwpck_require__(8194);
 const apiKey = process.env.API_KEY;
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class FileUtils {
-    static fileExists(filePath) {
+    fileExists(filePath) {
         return fs.existsSync(filePath);
     }
 }
-exports.FileUtils = FileUtils;
+exports.fileUtils = new FileUtils();
 class Program {
     _delim;
     _configHash;
@@ -38898,6 +38935,9 @@ class Program {
             }
             createdAt
             pullRequest
+            user {
+              login
+            }
           }
         }`;
     _bubbleBaseWith = 10;
@@ -38921,7 +38961,7 @@ class Program {
             release: ''
         };
         this._config = Object.assign(defaultConfig, config);
-        if (!models_1.Utils.isHex(this._config.workspaceId)) {
+        if (!models_1.utils.isHex(this._config.workspaceId)) {
             throw new Error('Bad workspace ID');
         }
         const currentFolder = process.cwd();
@@ -38939,14 +38979,13 @@ class Program {
                 fs.mkdirSync(targetFolder);
             }
         }
-        for (const key of Object.keys(this._config)) {
-            // @ts-ignore
-            if (!this._config[key]) {
-                // @ts-ignore
-                // this._config[key] = undefined;
-                delete this._config[key];
+        const partial = Object.assign({}, this._config);
+        for (const key of Object.keys(partial)) {
+            if (!partial[key]) {
+                delete partial[key];
             }
         }
+        this._config = partial;
         const str = JSON.stringify(this._config);
         this._configHash = (0, md5_1.default)(str);
         this._file = this._config.inputJsonFilename
@@ -39004,7 +39043,7 @@ class Program {
             ? issueObj.events
             : undefined;
         const events = existing ||
-            (await this.getEvents(issueObj.repositoryGhId, models_1.Utils.issueNumberAsNumber(issueNumber)).catch(err => {
+            (await this.getEvents(issueObj.repositoryGhId, models_1.utils.issueNumberAsNumber(issueNumber)).catch(err => {
                 this._errorMessages.push(err.message);
                 return [];
             }));
@@ -39077,7 +39116,7 @@ class Program {
                     data: {
                         count: 1,
                         duration: ev.duration,
-                        durationDays: models_1.Utils.getMsAsDays(ev.duration),
+                        durationDays: models_1.utils.getMsAsDays(ev.duration),
                         durationAverage: 0,
                         durationString: '',
                         durationAverageString: ''
@@ -39097,7 +39136,7 @@ class Program {
                                 itemEvents[itemEvents.length - 1]
                             ].filter(er => er.data.to_pipeline.name === ev.pipeline);
                             if (movedToEvs.length > 0 && movedToEvs[0].data.from_pipeline) {
-                                if (this.comparePipelines(movedToEvs[0].data.to_pipeline, movedToEvs[0].data.from_pipeline)) {
+                                if (this.comparePipelines(movedToEvs[0].data.to_pipeline.name, movedToEvs[0].data.from_pipeline.name)) {
                                     res.back++;
                                 }
                                 else {
@@ -39118,11 +39157,11 @@ class Program {
         }
         for (const pipelineKey of Object.keys(avgObj)) {
             avgObj[pipelineKey].data.durationString =
-                models_1.Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration);
+                models_1.utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.duration);
             avgObj[pipelineKey].data.durationAverage = Number((avgObj[pipelineKey].data.duration / avgObj[pipelineKey].data.count).toFixed(0));
             avgObj[pipelineKey].data.durationAverageString =
-                models_1.Utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.durationAverage);
-            avgObj[pipelineKey].data.durationDays = models_1.Utils.getMsAsDays(avgObj[pipelineKey].data.duration);
+                models_1.utils.millisecondsToHumanReadableTime(avgObj[pipelineKey].data.durationAverage);
+            avgObj[pipelineKey].data.durationDays = models_1.utils.getMsAsDays(avgObj[pipelineKey].data.duration);
         }
         return avgObj;
     }
@@ -39143,10 +39182,10 @@ class Program {
                 : undefined;
             return {
                 duration: diff,
-                durationString: models_1.Utils.millisecondsToHumanReadableTime(diff),
+                durationString: models_1.utils.millisecondsToHumanReadableTime(diff),
                 durationPerEstimate: diffPerEstimate,
                 durationStringPerEstimate: diffPerEstimate !== undefined
-                    ? models_1.Utils.millisecondsToHumanReadableTime(diffPerEstimate)
+                    ? models_1.utils.millisecondsToHumanReadableTime(diffPerEstimate)
                     : undefined,
                 pipeline: prevEv.data.to_pipeline.name,
                 event: `${prevEv.data.to_pipeline.name} to ${ev.data.to_pipeline.name}`,
@@ -39176,7 +39215,8 @@ class Program {
             body: JSON.stringify({ query, variables })
         });
         if (!response.ok) {
-            throw new Error('Failed to fetch ZenHub API');
+            const t = await response.text();
+            throw new Error(`Failed to fetch ZenHub API: ${t}`);
         }
         return response.json();
         // .then(data => {
@@ -39266,18 +39306,20 @@ class Program {
             const eventsTmp = item.issues;
             const issues0 = eventsTmp.map((ee) => {
                 const o = {
-                    number: models_1.Utils.issueNumberAsString(ee.number),
+                    number: models_1.utils.issueNumberAsString(ee.number),
                     estimateValue: ee.estimate !== null && ee.estimate !== undefined
                         ? Number(ee.estimate.value)
                         : undefined,
                     repositoryGhId: Number(ee.repository.ghId),
+                    repositoryGhName: ee.repository.name,
                     pipelineName: item.name,
                     labels: ee.labels?.nodes?.map((n) => n.name) || undefined,
                     releases: ee.releases?.nodes?.map((n) => n.title) || undefined,
                     events: ee.events,
                     pullRequest: !!ee.pullRequest,
                     htmlUrl: ee.htmlUrl,
-                    createdAt: new Date(ee.createdAt)
+                    createdAt: new Date(ee.createdAt),
+                    author: ee.user.login
                 };
                 return o;
             });
@@ -39287,8 +39329,11 @@ class Program {
     }
     async getBoardFull(workspaceId, last = 73) {
         // console.log('Getting board data')
+        console.log('Getting board');
         const base = await this.getBoard(workspaceId, last);
+        console.log('Getting releases');
         this._config.releaseID = await this.getReleases(workspaceId);
+        console.log('PArsing stuff');
         for (const pieline of base.pipelinesConnection) {
             const pipelineID = pieline.id;
             let endCursor = pieline.issueEndCursor;
@@ -39371,10 +39416,18 @@ fragment currentWorkspace on Workspace {
   }
 }`;
         const variables = { workspaceId };
-        const res1 = await this.callZenhub(query, variables);
-        const err = res1.errors?.map((e) => e.message) || [];
+        let res1 = null;
+        try {
+            res1 = await this.callZenhub(query, variables);
+        }
+        catch (e) {
+            res1 = { errors: [e] };
+        }
+        const err = res1?.errors?.map((e) => e.message) ?? [];
         if (err.length > 0) {
-            return Promise.reject(new Error(err.join('\n')));
+            const errr = new Error(`Error: ${err.join(' --- ')}`);
+            // return Promise.reject(errr)
+            throw errr;
         }
         const finalRes = Object.assign({ totalIssues: 0 }, res1.data.workspace);
         finalRes.pipelinesConnection = this.mapPipelineConnec(finalRes);
@@ -39465,373 +39518,6 @@ fragment currentWorkspace on Workspace {
         const avg = flat.sum / flat.data.length;
         return flat.data.filter((ff) => ff.duration > avg);
     }
-    async main(skipIssueIfFn, skipEventIfFn) {
-        // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
-        // this._pipelines = pipelines
-        //
-        // const issues = await this.getIssues(this._config.workspaceId)
-        // 	.catch((err) => {
-        // 		this._errorMessages.push(err.message);
-        // 		return [];
-        // 	});
-        // const board: IWorkspace = await this.getBoardFull(this._config.workspaceId);
-        const board = this.getFromFile() ||
-            (await this.getBoardFull(this._config.workspaceId, this._config.maxCount) // this.getBoard(this._config.workspaceId)
-                .then((b) => {
-                b.configHash = this._configHash;
-                return b;
-            })
-                .catch(err => {
-                this._errorMessages.push(err.message);
-                return null;
-            }));
-        if (board === null) {
-            const msg = process.env.API_KEY
-                ? `Couldn't get board data for ${this._config.workspaceId}`
-                : 'Need to export API_KEY';
-            for (const err of this._errorMessages) {
-                console.error(err);
-            }
-            throw new Error(msg);
-        }
-        const issues = await this.getIssuesFromBoard(board);
-        // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
-        const pipelines = await this.getPipelinesFromBoard(board);
-        this._pipelines = pipelines;
-        this._startTimestamp = Date.now();
-        const allEvs = [];
-        let handledCount = 0;
-        for (let i = 0; i < issues.length; ++i) {
-            console.clear();
-            if (this._errorMessages.length > 0) {
-                console.log(this._errorMessages.join('\n'));
-            }
-            const handledPerc = i / issues.length;
-            console.log(`${i} / ${issues.length} (${(handledPerc * 100).toFixed(1)}%)`);
-            this.printRemaining(i, issues.length);
-            const issue = issues[i];
-            if (!!issue.pullRequest !== !!this._config.pullRequest ||
-                (this._config.labels &&
-                    this._config.labels.length > 0 &&
-                    !issue.labels?.some(la => this._config.labels?.includes(la.toLowerCase()))) ||
-                (this._config.skipRepos.length > 0 &&
-                    this._config.skipRepos.includes(issue.repositoryGhId)) ||
-                (this._config.includeRepos.length > 0 &&
-                    !this._config.includeRepos.includes(issue.repositoryGhId)) ||
-                (!!this._config.release &&
-                    !issue.releases?.includes(this._config.release)) ||
-                (skipIssueIfFn !== undefined && (await skipIssueIfFn(issue)))) {
-                issue.filtered = true;
-                continue;
-            }
-            // if (this._config.maxCount > 0 && handledCount === this._config.maxCount) {
-            // 	break;
-            // }
-            const handleIssueResult = await this.handleIssue(issue, skipEventIfFn, false, this._config.fromPipeline, this._config.toPipeline);
-            const evs = handleIssueResult.csvItems;
-            if (evs.length > 0) {
-                allEvs.push(evs);
-                issue.handled = true;
-                handledCount++;
-            }
-            this._eventsPerIssue[issue.number] = handleIssueResult.events;
-        }
-        // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
-        const remainingOpenedIssues = issues.filter(iu => !iu.completed && !iu.filtered);
-        const userMoves = [];
-        // for (const iss of remainingOpenedIssues) {
-        for (const iss of issues.filter(iii => iii.handled)) {
-            // TODO
-            const events = this._eventsPerIssue[iss.number];
-            const last = events ? events[events.length - 1] : undefined;
-            const user = last?.data.github_user?.login;
-            if (!last || !user) {
-                continue;
-            }
-            const pipelineCompare = this.comparePipelines(iss.pipelineName, last.data.from_pipeline.name);
-            if (pipelineCompare === 0) {
-                continue;
-            }
-            userMoves.push({
-                user,
-                currentPipeline: iss.pipelineName,
-                previousPipeline: last.data.from_pipeline.name,
-                issueNumber: iss.number,
-                isForward: pipelineCompare > 0,
-                date: last.createdAt
-            });
-            // iss.lastEventData = last.createdAt
-            // iss.previousPipeline = last.data.from_pipeline.name
-            // iss.isForward = pipelineCompare < 0
-            // iss.user = user
-        }
-        const movesUsers = Array.from(new Set(userMoves.map(um => um.user)));
-        const movesAvgArr = [];
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const movesAvg = movesUsers.reduce((res, item) => {
-            const objs = userMoves.filter(um => um.user === item);
-            const movedForward = objs.filter(oo => oo.isForward).length;
-            res[item] = {
-                movedForward,
-                movedBackward: objs.length - movedForward
-            };
-            movesAvgArr.push({
-                user: item,
-                ...res[item]
-            });
-            return res;
-        }, {});
-        // @ts-ignore
-        const avg = this.getAverages([].concat(...allEvs), remainingOpenedIssues);
-        for (const pipeline of Object.keys(avg)) {
-            // TODO use all pipelines
-            avg[pipeline].issueCount = issues.filter(is => is.pipelineName === pipeline && !is.filtered).length;
-            // avg[pipeline].openedIssueCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length
-        }
-        const openedPipelines = Array.from(new Set(remainingOpenedIssues.map(r => r.pipelineName)));
-        fs.writeFileSync(this._config.outputJsonFilename.replace('.json', '_averages.json'), JSON.stringify(avg, null, 2), { encoding: 'utf8' });
-        const evs = Object.keys(avg).map((pipeline) => {
-            const avgPipeline = avg[pipeline];
-            return {
-                duration: avgPipeline.data.duration,
-                durationString: avgPipeline.data.durationString,
-                durationPerEstimate: undefined,
-                durationStringPerEstimate: undefined,
-                pipeline,
-                event: '',
-                number: ''
-            };
-        });
-        const date = new Date();
-        const timeChartItems = await this.generateChartFromObj(`Time spent in pipelines on ${date.toISOString()} (${handledCount} issues)`, evs, this._config.outputImageFilename, {
-            width: 1600,
-            height: 1200
-        }).catch(e => {
-            if (!e.message.includes("Cannot find module 'canvas'")) {
-                throw e;
-            }
-            console.warn(e.message);
-            return [];
-        });
-        // console.log(JSON.stringify(avg, null, 2))
-        const countChartItems = Object.keys(avg).map((pipeline) => {
-            return {
-                label: pipeline,
-                data: avg[pipeline].issueCount
-            };
-        });
-        // console.log(`Handled ${handledCount} issues`)
-        await this.doGenerateChartFromObj(`Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`, countChartItems, this._config.outputImageFilename.replace('.png', '_issues.png'), { width: 1600, height: 1200 }).catch(e => {
-            if (!e.message.includes("Cannot find module 'canvas'")) {
-                throw e;
-            }
-            console.warn(e.message);
-        });
-        let issueWithEventCount = 0;
-        board.pipelinesConnection.forEach((pipelineConnect) => {
-            pipelineConnect.issues.forEach((issue) => {
-                // if(issue.number) {
-                // 	issue.events = issue.number;
-                // } else {
-                // 	const issueNumberBits = issue.htmlUrl?.split("/") || [];
-                // 	const issueNumber = issueNumberBits[issueNumberBits.length - 1];
-                // 	issue.events = this._eventsPerIssue[issueNumber] || [];
-                // }
-                let issueNumber;
-                if (issue.number) {
-                    issueNumber = issue.number;
-                }
-                else {
-                    const issueNumberBits = issue.htmlUrl?.split('/') || [undefined];
-                    issueNumber = Number(issueNumberBits[issueNumberBits.length - 1]);
-                }
-                const issueEvents = issueNumber
-                    ? this._eventsPerIssue[models_1.Utils.issueNumberAsString(issueNumber)] || []
-                    : [];
-                issue.events = issueEvents;
-                if (issueEvents.length > 0) {
-                    issueWithEventCount++;
-                }
-            });
-        });
-        fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
-            encoding: 'utf8'
-        });
-        // console.log(`Wrote file ${this._file}`)
-        const chartData = this.getControlChartData(issues);
-        // console.log(chartData)
-        const completinList = chartData.map(c => Number(c.completionTimeStr));
-        const stats = models_1.StatHelper.getStats(completinList);
-        const openedPerPipeline = this.getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats);
-        // const chartWithEstimate: IControlChartItem[] = chartData.filter((cd: IControlChartItem) => cd.estimate > 0);
-        // const completinListEstimate: number[] = chartWithEstimate.map((c: IControlChartItem) => Number(c.completionTimeStr));
-        // const completionTot: number = completinListEstimate.reduce((res: number, item: number) => res + item, 0);
-        // const estimateTot: number = chartWithEstimate.reduce((res: number, item: IControlChartItem) => res + item.estimate, 0);
-        // const averagePerEstimate: number = completionTot / estimateTot;
-        const completinEstimateList = chartData
-            .filter((cd) => cd.estimate > 0)
-            .map(c => Number(c.completionTimeStr) / c.estimate);
-        const statsEstimate = models_1.StatHelper.getStats(completinEstimateList);
-        const veloccity = this.getVelocity(chartData);
-        // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
-        const outs = this.findOutstandingIssues(allEvs).slice(0, 5);
-        // // console.log(JSON.stringify(outs, null, 2));
-        const allRepos = issues
-            .filter((ii) => ii.handled)
-            .map((ii) => ii.htmlUrl.split('/')[4]);
-        const repos = Array.from(new Set([].concat(...allRepos)));
-        // const allD: ICheckPr[] = await Promise.all(
-        // 	repos.map(repo => {
-        // 		return reviewer_call.check_prs(repo, this._config).catch((err: Error) => {
-        // 			console.error(err.message);
-        // 			return {
-        // 				summary: [],
-        // 				users:[]
-        // 			};
-        // 		}) as ICheckPr;
-        // 	})
-        // );
-        // console.log('Getting pr data')
-        const res = await this.getGithubData(repos);
-        const weekCount = this.getWeekCount();
-        for (const user of res.newAllD.users) {
-            const target = res.ggdata.summary[user.user];
-            if (!target) {
-                continue;
-            }
-            user.totalCommits = target.commit_count;
-            user.created = target.pr_count;
-            user.createdPerc = target.pr_perc;
-            user.totalCommitsPerWeek = Number((target.commit_count / weekCount).toFixed(2));
-        }
-        // const allD: ICheckPr[] = res.allD;
-        const newAllD = res.newAllD;
-        const allResult = {
-            chartTime: timeChartItems,
-            chartCount: countChartItems,
-            statsIssue: stats,
-            statsEstimate,
-            controlChartList: chartData,
-            outstandingItems: outs,
-            velocity: veloccity,
-            avg,
-            prList: newAllD.summary,
-            // userReviewStats: d.users as IPrUser[]
-            userReviewStats: newAllD.users,
-            remainingOpenedIssues,
-            userMoves
-        };
-        const ccsv = this.generateAllCSV('', allResult);
-        fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allResult, null, 2), { encoding: 'utf8' }); // done at the end
-        const remainingOpenedIssuesCleaned = remainingOpenedIssues.map((f) => {
-            const clone = Object.assign({}, f);
-            delete clone.handled;
-            clone.estimateValue = clone.estimateValue || 0;
-            return clone;
-        });
-        this.generateHTML(outs);
-        const remainingEstimatedDays = this.getRemainingEstimatedDays(avg, openedPerPipeline, stats);
-        const openedPerPipeline0 = remainingEstimatedDays.slice(0, -1).map((e) => {
-            return {
-                pipeline: e.pipeline,
-                opened: e.count
-            };
-        });
-        try {
-            this.addStatsHTML(stats, statsEstimate, veloccity);
-            this.addControlChartListHTML(chartData);
-            this.writeMoreHTML();
-        }
-        catch (e) {
-            if (!e.message.includes("Cannot find module 'canvas'")) {
-                throw e;
-            }
-            console.warn(e.message);
-        }
-        const baseTableFn = (issueNumberKey) => {
-            return (key, item) => {
-                const itemStr = item[key];
-                if (key === issueNumberKey && itemStr.startsWith('#')) {
-                    const url = item.htmlUrl;
-                    return `<a href="${url}">${itemStr}</a>`;
-                }
-                else if (key === 'htmlUrl') {
-                    return '';
-                }
-                return null;
-            };
-        };
-        const fullHTML = `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
-            `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
-            `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2>` +
-            `<h2>Releases: ${this._config.release || ''}</h2>` +
-            `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
-            `<section>
-          <h3>Cool stats</h3>
-              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
-          </section>` +
-            `<section>
-            <h3>Control chart list</h3>
-              ${this.generateTable(chartData, baseTableFn('number'))}
-            <div>
-                ${await this.getControlChartHTML(chartData)}
-            </div>
-        </section>` +
-            `<section>
-          <h3>Outstanding issues</h3>
-          ${this.generateTable(outs, baseTableFn('number'))}
-        </section>` +
-            `<section>
-            <h3>Velocity list</h3>
-            ${this.generateTableFromCSV(ccsv.velocityList)}
-            <div>
-                ${await this.getVeloctiyChart(veloccity)}
-            </div>
-        </section>` +
-            `<section>
-            <h3>Main list</h3>
-            <div style="overflow-x: scroll;">
-                ${this.generateTableFromCSV(ccsv.mainList)}
-            </div>
-            <div>
-                ${await this.getMainChartHTML(avg)}
-            </div>
-        </section>` +
-            `<section>
-            <h3>Commits and PRs list</h3>
-            ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
-            <div>
-                ${await this.getCommitsChartHTML(allResult.userReviewStats)}
-            </div>
-        </section>` +
-            `<section>
-            <h3>Remaining opened issues</h3>
-            ${this.generateTable(remainingOpenedIssuesCleaned, baseTableFn('number'))}
-        </section>` +
-            `<section>
-            <h3>Remaining opened issues per pipeline</h3>
-            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
-            <div>
-                ${await this.getOpenedChartHTML(openedPerPipeline0, 100)}
-            </div>
-        </section>` +
-            `<section>
-            <h3>Movements summary</h3>
-            ${this.generateTable(movesAvgArr, undefined)}
-        </section>` +
-            `<section>
-            <h3>Movements</h3>
-            ${this.generateTable(userMoves, undefined)}
-        </section>`;
-        this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
-        const mark = `${models_1.Utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
-        fs.writeFileSync(path.join(this._mainOutputFolder, 'main_report.md'), mark, { encoding: 'utf8' });
-        console.log(`ev count: ${allEvs.length}, issue count: ${issues.filter(iu => !iu.filtered).length}, issues handled: ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`);
-        return Promise.resolve({
-            mark,
-            allResult
-        });
-    }
     printRemaining(i, length) {
         const elapsedMs = Date.now() - this._startTimestamp;
         const remainingCount = length - i;
@@ -39845,18 +39531,19 @@ fragment currentWorkspace on Workspace {
             this._estimatingCache.push(timePerIssueMs * remainingCount);
         }
         const strVal = this._estimateRemainingMs <= this._estimateRemainingPrveiousMs
-            ? `${models_1.Utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
+            ? `${models_1.utils.millisecondsToHumanReadableTime(this._estimateRemainingMs)}`
             : 'estimating...';
         console.log(`Remaining: ${strVal}`);
     }
     getFromFile() {
         // console.log(`Getting from file ${this._file}`)
-        if (!FileUtils.fileExists(this._file)) {
+        if (!exports.fileUtils.fileExists(this._file)) {
             // console.log(`File doesn't exist`)
             return null;
         }
-        const content = fs.readFileSync(this._file, { encoding: 'utf8' });
+        console.log('Getting from file');
         try {
+            const content = fs.readFileSync(this._file, { encoding: 'utf8' });
             const obj = JSON.parse(content);
             // console.log(`Got existing`)
             if (obj.configHash !== this._configHash &&
@@ -39888,7 +39575,7 @@ fragment currentWorkspace on Workspace {
         });
         const res = tmp
             .filter((r) => r !== null)
-            .map(r => r.toObj());
+            .map((r) => r.toObj());
         res.sort((a, b) => {
             return a.comppleted.getTime() - b.comppleted.getTime();
         });
@@ -39908,14 +39595,6 @@ fragment currentWorkspace on Workspace {
             .map((l) => {
             return `<tr>${headers
                 .map(lkey => {
-                // const it = l[lkey]
-                // const isArr = Array.isArray(it)
-                // const val =
-                //   !isArr ||
-                //   it.every((r: any) => typeof r === 'string')
-                //     ? it?.toString() || ''
-                //     : this.generateTable(it)
-                // return `<td>${val}</td>`
                 const specRes = specFn && specFn(lkey, l);
                 return `<td>${specRes !== undefined && specRes !== null
                     ? specRes
@@ -39972,7 +39651,6 @@ fragment currentWorkspace on Workspace {
             const it = data[item];
             res[0] += it.count;
             res[1] += it.estimate;
-            // @ts-ignore
             it.key = item;
             res[2].push(it);
             return res;
@@ -39988,9 +39666,9 @@ fragment currentWorkspace on Workspace {
         const firstDayOfMonth = new Date(date.getTime());
         firstDayOfMonth.setDate(1);
         const firstDayOfMonthPosInWeek = firstDayOfMonth.getDay();
-        const firstDayOfFirstWeek = models_1.Utils.addDay(firstDayOfMonth, firstDayOfMonthPosInWeek * -1);
+        const firstDayOfFirstWeek = models_1.utils.addDay(firstDayOfMonth, firstDayOfMonthPosInWeek * -1);
         let res = 1;
-        while (date.getDate() > models_1.Utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()) {
+        while (date.getDate() > models_1.utils.addDay(firstDayOfFirstWeek, 7 * res).getDate()) {
             ++res;
         }
         return `${date.getMonth()}${res}`;
@@ -40069,7 +39747,7 @@ fragment currentWorkspace on Workspace {
                     ${lines.map(l => `<tr>${l.map(h => `<td>${!isNaN(Number(h)) ? Number(h).toFixed(1) : h}</td>`).join('')}</tr>`).join('')}
                 </tbody>
             </table>`;
-        // return `<div> ${title ? `<h3>${title}</h3>` : ""}${tableStr} </div>`;
+        // return `<div> ${title ? `<h3>${title}</h3>` : ''}${tableStr} </div>`;
         return tableStr;
     }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -40099,7 +39777,7 @@ fragment currentWorkspace on Workspace {
         return Promise.resolve('');
     }
     async getChartGeneric(title, outputFile, csvPrAndCommits, key, labelKey) {
-        // await this.generateChartFromObj("", evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
+        // await this.generateChartFromObj('', evs, `output_issue_${issueNumber}.png`, {width: 1600, height: 1200});
         const items = csvPrAndCommits.map(c => {
             return {
                 label: labelKey === undefined ? '' : c[labelKey],
@@ -40126,8 +39804,9 @@ fragment currentWorkspace on Workspace {
     }
     averageOBjects(objects, includeKeys) {
         const result = {};
-        objects.forEach((obj) => {
-            Object.keys(obj).forEach(key => {
+        for (const obj of objects) {
+            const keys = Object.keys(obj);
+            for (const key of keys) {
                 if (Array.isArray(obj[key])) {
                     result[key] = this.averageOBjects(obj[key], includeKeys);
                 }
@@ -40139,13 +39818,13 @@ fragment currentWorkspace on Workspace {
                         result[key] += obj[key];
                     }
                 }
-            });
-        });
-        Object.keys(result).forEach(key => {
+            }
+        }
+        for (const key of Object.keys(result)) {
             if (typeof result[key] === 'number' && includeKeys.includes(key)) {
                 result[key] /= objects.length;
             }
-        });
+        }
         return result;
     }
     getStatsHTML(stats, statsEstimate, veloccity, remainingDays) {
@@ -40199,40 +39878,60 @@ fragment currentWorkspace on Workspace {
                 existing.didReviewCount += us.didReviewCount;
                 existing.totalCommits += us.totalCommits;
                 existing.totalCommitsPerWeek += us.totalCommitsPerWeek;
+                existing.totalCommentsInPr += us.totalCommentsInPr;
             }
             return res;
         }, []);
         const totalCreated = uu.reduce((res, it) => res + it.created, 0);
-        uu.forEach((u) => {
+        for (const u of uu) {
             const othersCreated = totalCreated - u.created;
-            u.createdPerc = Number((u.created / totalCreated).toFixed(2));
-            u.reviewedPerc = Number((u.didReviewCount / othersCreated).toFixed(2));
-        });
+            u.createdPerc =
+                totalCreated > 0 ? Number((u.created / totalCreated).toFixed(2)) : 0;
+            u.reviewedPerc =
+                othersCreated > 0
+                    ? Number((u.didReviewCount / othersCreated).toFixed(2))
+                    : 0;
+            u.totalCommitsPerWeek = Number(u.totalCommitsPerWeek.toFixed(2));
+            u.totalCommentsPerPr =
+                u.created > 0 ? Number((u.totalCommentsInPr / u.created).toFixed(2)) : 0;
+        }
         return uu;
     }
-    async getGithubData(repos) {
+    async getGithubData(allRepoNames) {
         // console.log(`[getGithubData]: ${repos?.join(',')}`)
+        const targetRepoNames = this.config.includeRepos.length > 0 ? [] : allRepoNames;
+        if (this.config.includeRepos.length > 0) {
+            // get include repo names
+            for (const repo of allRepoNames) {
+                const repoData = await (0, checkprreviewers1_1.getRepoInfo)(repo);
+                const repoId = repoData.data.id;
+                if (this._config.includeRepos.length > 0 &&
+                    !this._config.includeRepos.includes(repoId)) {
+                    continue;
+                }
+                targetRepoNames.push(repo);
+            }
+        }
         const allD = [];
-        for (const repo of repos) {
+        for (const repo of targetRepoNames) {
             const d = (await (0, checkprreviewers1_1.check_prs)(repo, this._config).catch((err) => {
                 const msg = `${new Date().toUTCString()} [getGithubData]: error: ${err.message}`;
-                console.warn(msg);
+                // console.warn(msg)
                 fs.writeFileSync('github_error.txt', msg, { encoding: 'utf8' });
                 return {
                     summary: [],
                     users: []
                 };
             }));
-            allD.push(d);
+            if (Object.values(d).some(arr => arr.length > 0)) {
+                allD.push(d);
+            }
         }
         // @ts-ignore
         const prUsers = [].concat(
         // @ts-ignore
         ...allD.map((ad) => ad.users));
-        // @ts-ignore
-        const users = Array.from(new Set([].concat(
-        // @ts-ignore
-        ...allD.map((f) => f.users.map((au) => au.user)))));
+        const users = Array.from(new Set(allD.map((f) => f.users.map((au) => au.user)).flat()));
         const usersAvg = users.reduce((res, us) => {
             // @ts-ignore
             const prUs = prUsers.filter((u) => u.user === us);
@@ -40255,17 +39954,13 @@ fragment currentWorkspace on Workspace {
         // newAllD.users = usersAvg.users;
         newAllD.users = this.averageUsers(usersAvg.users);
         newAllD.summary = usersAvg.summary;
-        const ggdata = await (0, getPrAndCommits_1.getAllData)(repos, this.config.minDate && this.config.maxDate
-            ? this.config
-            : undefined);
-        // eslint-disable-next-line no-debugger
-        // debugger
-        // TODO year commit
-        // const d: ICheckPr = newAllD;
-        //
-        // // const tb = this.averageOBjects(d.users, ["reviewedPerc", "createdPerc"]);
-        // const dUsers: IPrUser[] = this.averageUsers(d.users);
-        return Promise.resolve({ allD, newAllD, ggdata });
+        // const ggdata = await getAllData(
+        //   targetRepoNames,
+        //   this.config.minDate && this.config.maxDate
+        //     ? (this.config as any)
+        //     : undefined
+        // )
+        return Promise.resolve({ allD, newAllD, ggdata: undefined });
     }
     addRepoProps(item) {
         const clone = Object.assign({}, item);
@@ -40318,8 +40013,8 @@ fragment currentWorkspace on Workspace {
         return days / daysSum;
     }
     getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats) {
-        const fromPipelineIndex = this._pipelines.indexOf(this._config.fromPipeline);
-        const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline);
+        const fromPipelineIndex = this._pipelines.indexOf(this._config.fromPipeline ?? '');
+        const toPipelineIndex = this._pipelines.indexOf(this._config.toPipeline ?? '');
         const totalMsAverageFromPipelineToPipeline = this.getTotalMsAverageFromPipelineToPipeline(avg, fromPipelineIndex, toPipelineIndex);
         // console.log('')
         let openedTotals = 0;
@@ -40439,12 +40134,379 @@ fragment currentWorkspace on Workspace {
         return Promise.resolve('');
     }
     getWeekCount() {
-        return ((new Date(this._config.maxDate ?? 0).getTime() -
-            new Date(this._config.minDate ?? 0).getTime()) /
-            1000 /
-            3600 /
-            24 /
-            7);
+        return (0, checkprreviewers1_1.getWeekCount)(new Date(this._config.minDate ?? 0), new Date(this._config.maxDate ?? 0));
+    }
+    async main(skipIssueIfFn, skipEventIfFn) {
+        const board = this.getFromFile() ||
+            (await this.getBoardFull(this._config.workspaceId, this._config.maxCount) // this.getBoard(this._config.workspaceId)
+                .then((b) => {
+                b.configHash = this._configHash;
+                return b;
+            })
+                .catch(err => {
+                this._errorMessages.push(err.message);
+                return null;
+            }));
+        if (board === null) {
+            const msg = process.env.API_KEY
+                ? `Couldn't get board data for ${this._config.workspaceId}`
+                : 'Need to export API_KEY';
+            let allMsg = msg;
+            for (const err of this._errorMessages) {
+                console.error(err);
+                allMsg += `---${err}`;
+            }
+            throw new Error(allMsg);
+        }
+        const issuesRes = await this.getSortedIssues(board, skipIssueIfFn, skipEventIfFn);
+        const issues = issuesRes.sorted;
+        const allEvs = issuesRes.allEvs;
+        const handledCount = issuesRes.handledCount;
+        const remainingOpenedIssues = issues.filter(iu => !iu.completed && !iu.filtered);
+        const userMoves = [];
+        // for (const iss of remainingOpenedIssues) {
+        for (const iss of issues.filter(iii => iii.handled)) {
+            // TODO
+            const events = this._eventsPerIssue[iss.number];
+            const last = events ? events[events.length - 1] : undefined;
+            const user = last?.data.github_user?.login;
+            if (!last || !user) {
+                continue;
+            }
+            const pipelineCompare = this.comparePipelines(iss.pipelineName, last.data.from_pipeline.name);
+            if (pipelineCompare === 0) {
+                continue;
+            }
+            userMoves.push({
+                user,
+                currentPipeline: iss.pipelineName,
+                previousPipeline: last.data.from_pipeline.name,
+                issueNumber: iss.number,
+                isForward: pipelineCompare > 0,
+                date: last.createdAt
+            });
+        }
+        const movesUsers = Array.from(new Set(userMoves.map(um => um.user)));
+        const movesAvgArr = [];
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const movesAvg = movesUsers.reduce((res, item) => {
+            const objs = userMoves.filter(um => um.user === item);
+            const movedForward = objs.filter(oo => oo.isForward).length;
+            res[item] = {
+                movedForward,
+                movedBackward: objs.length - movedForward
+            };
+            movesAvgArr.push({
+                user: item,
+                ...res[item]
+            });
+            return res;
+        }, {});
+        // @ts-ignore
+        const avg = this.getAverages([].concat(...allEvs), remainingOpenedIssues);
+        for (const pipeline of Object.keys(avg)) {
+            // TODO use all pipelines
+            avg[pipeline].issueCount = issues.filter(is => is.pipelineName === pipeline && !is.filtered).length;
+            // avg[pipeline].openedIssueCount = remainingOpenedIssues.filter(r => r.pipelineName === pipeline).length
+        }
+        const openedPipelines = Array.from(new Set(remainingOpenedIssues.map(r => r.pipelineName)));
+        fs.writeFileSync(this._config.outputJsonFilename.replace('.json', '_averages.json'), JSON.stringify(avg, null, 2), { encoding: 'utf8' });
+        const evs = Object.keys(avg).map((pipeline) => {
+            const avgPipeline = avg[pipeline];
+            return {
+                duration: avgPipeline.data.duration,
+                durationString: avgPipeline.data.durationString,
+                durationPerEstimate: undefined,
+                durationStringPerEstimate: undefined,
+                pipeline,
+                event: '',
+                number: ''
+            };
+        });
+        const date = new Date();
+        const timeChartItems = await this.generateChartFromObj(`Time spent in pipelines on ${date.toISOString()} (${handledCount} issues)`, evs, this._config.outputImageFilename, {
+            width: 1600,
+            height: 1200
+        }).catch(e => {
+            if (!e.message.includes("Cannot find module 'canvas'")) {
+                throw e;
+            }
+            // console.warn(e.message)
+            return [];
+        });
+        // console.log(JSON.stringify(avg, null, 2))
+        const countChartItems = Object.keys(avg).map((pipeline) => {
+            return {
+                label: pipeline,
+                data: avg[pipeline].issueCount
+            };
+        });
+        // console.log(`Handled ${handledCount} issues`)
+        await this.doGenerateChartFromObj(`Total issues in pipelines on ${date.toISOString()} (${issues.length} issues)`, countChartItems, this._config.outputImageFilename.replace('.png', '_issues.png'), { width: 1600, height: 1200 }).catch(e => {
+            if (!e.message.includes("Cannot find module 'canvas'")) {
+                throw e;
+            }
+            // console.warn(e.message)
+        });
+        let issueWithEventCount = 0;
+        for (const pipelineConnect of board.pipelinesConnection) {
+            for (const issue of pipelineConnect.issues) {
+                let issueNumber;
+                if (issue.number) {
+                    issueNumber = issue.number;
+                }
+                else {
+                    const issueNumberBits = issue.htmlUrl?.split('/') || [undefined];
+                    issueNumber = Number(issueNumberBits[issueNumberBits.length - 1]);
+                }
+                const issueEvents = issueNumber
+                    ? this._eventsPerIssue[models_1.utils.issueNumberAsString(issueNumber)] || []
+                    : [];
+                issue.events = issueEvents;
+                if (issueEvents.length > 0) {
+                    issueWithEventCount++;
+                }
+            }
+        }
+        fs.writeFileSync(this._file, JSON.stringify(board, null, 2), {
+            encoding: 'utf8'
+        });
+        // console.log(`Wrote file ${this._file}`)
+        const chartData = this.getControlChartData(issues);
+        // console.log(chartData)
+        const completinList = chartData.map(c => Number(c.completionTimeStr));
+        const stats = models_1.statHelper.getStats(completinList);
+        const openedPerPipeline = this.getOpenedPerPipeline(avg, openedPipelines, remainingOpenedIssues, stats);
+        const completinEstimateList = chartData
+            .filter((cd) => cd.estimate > 0)
+            .map(c => Number(c.completionTimeStr) / c.estimate);
+        const statsEstimate = models_1.statHelper.getStats(completinEstimateList);
+        const veloccity = this.getVelocity(chartData);
+        // this.generateMainCSV(avg, date, stats, statsEstimate, veloccity);
+        const outs = this.findOutstandingIssues(allEvs).slice(0, 5);
+        // // console.log(JSON.stringify(outs, null, 2));
+        const repos = Array.from(new Set(issues.map(ii => ii.htmlUrl.split('/')[4])));
+        const githubDataRes = await this.getGithubData(repos);
+        // const newAllD: ICheckPr = githubDataRes.newAllD
+        const newAllD = this.getNewAllD(githubDataRes);
+        const githubUsers = Array.from(new Set(newAllD.users.map((nu) => nu.user)));
+        for (const githubUser of githubUsers) {
+            // const userIssues = issues.filter(
+            //   (iss: IIssue) =>
+            //     iss.events && iss.events?.length > 0 && iss.author === githubUser
+            // )
+            const userIssues = issues.filter((iss) => iss.author === githubUser &&
+                (!this.config.minDate ||
+                    new Date(iss.createdAt).getTime() >=
+                        new Date(this.config.minDate).getTime()));
+            const target = newAllD.users.find((us) => us.user === githubUser);
+            if (target !== undefined) {
+                target.issueCreated = userIssues.length;
+            }
+        }
+        for (const githubUser of githubUsers) {
+            const userIssues = issues.filter((iss) => iss.author === githubUser &&
+                (!this.config.minDate ||
+                    new Date(iss.createdAt).getTime() >=
+                        new Date(this.config.minDate).getTime()));
+            const target = newAllD.users.find((us) => us.user === githubUser);
+            if (target !== undefined) {
+                target.issueCreated = userIssues.length;
+            }
+        }
+        const allResult = {
+            chartTime: timeChartItems,
+            chartCount: countChartItems,
+            statsIssue: stats,
+            statsEstimate,
+            controlChartList: chartData,
+            outstandingItems: outs,
+            velocity: veloccity,
+            avg,
+            prList: newAllD.summary,
+            // userReviewStats: d.users as IPrUser[]
+            userReviewStats: newAllD.users,
+            remainingOpenedIssues,
+            userMoves
+        };
+        const ccsv = this.generateAllCSV('', allResult);
+        fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allResult, null, 2), { encoding: 'utf8' }); // done at the end
+        const remainingOpenedIssuesCleaned = remainingOpenedIssues.map((f) => {
+            const clone = Object.assign({}, f);
+            delete clone.handled;
+            clone.estimateValue = clone.estimateValue || 0;
+            return clone;
+        });
+        this.generateHTML(outs);
+        const remainingEstimatedDays = this.getRemainingEstimatedDays(avg, openedPerPipeline, stats);
+        const openedPerPipeline0 = remainingEstimatedDays.slice(0, -1).map((e) => {
+            return {
+                pipeline: e.pipeline,
+                opened: e.count
+            };
+        });
+        try {
+            this.addStatsHTML(stats, statsEstimate, veloccity);
+            this.addControlChartListHTML(chartData);
+            this.writeMoreHTML();
+        }
+        catch (e) {
+            if (!e.message.includes("Cannot find module 'canvas'")) {
+                throw e;
+            }
+            // console.warn(e.message)
+        }
+        const baseTableFn = (issueNumberKey) => {
+            return (key, item) => {
+                const itemStr = item[key];
+                if (key === issueNumberKey && itemStr.startsWith('#')) {
+                    const url = item.htmlUrl;
+                    return `<a href="${url}">${itemStr}</a>`;
+                }
+                else if (key === 'htmlUrl') {
+                    return '';
+                }
+                return null;
+            };
+        };
+        const fullHTML = `<h1>Zenhub report from ${this._config.minDate ? new Date(this._config.minDate).toLocaleDateString() : ''} to ${this._config.maxDate ? new Date(this._config.maxDate).toLocaleDateString() : ''}</h1>` +
+            `<h2>Board: ${this._config.workspaceId} - Repos: ${this._config.includeRepos.join(',')}</h2>` +
+            `<h2>From ${this._config.fromPipeline} to  ${this._config.toPipeline}</h2>` +
+            `<h2>Releases: ${this._config.release || ''}</h2>` +
+            `<h2>Labels: ${this._config.labels?.join(', ')}</h2><br>` +
+            `<section>
+          <h3>Cool stats</h3>
+              ${this.getStatsHTML(stats, statsEstimate, veloccity, remainingEstimatedDays[remainingEstimatedDays.length - 1]?.estimatedRemainingDays)}
+          </section>` +
+            `<section>
+            <h3>Control chart list</h3>
+              ${this.generateTable(chartData, baseTableFn('number'))}
+            <div>
+                ${await this.getControlChartHTML(chartData)}
+            </div>
+        </section>` +
+            `<section>
+          <h3>Outstanding issues</h3>
+          ${this.generateTable(outs, baseTableFn('number'))}
+        </section>` +
+            `<section>
+            <h3>Velocity list</h3>
+            ${this.generateTableFromCSV(ccsv.velocityList)}
+            <div>
+                ${await this.getVeloctiyChart(veloccity)}
+            </div>
+        </section>` +
+            `<section>
+            <h3>Main list</h3>
+            <div style="overflow-x: scroll;">
+                ${this.generateTableFromCSV(ccsv.mainList)}
+            </div>
+            <div>
+                ${await this.getMainChartHTML(avg)}
+            </div>
+        </section>` +
+            `<section>
+            <h3>Commits and PRs list</h3>
+            ${this.generateTableFromCSV(ccsv.csvPrAndCommits)}
+            <div>
+                ${await this.getCommitsChartHTML(allResult.userReviewStats)}
+            </div>
+        </section>` +
+            `<section>
+            <h3>Remaining opened issues</h3>
+            ${this.generateTable(remainingOpenedIssuesCleaned, baseTableFn('number'))}
+        </section>` +
+            `<section>
+            <h3>Remaining opened issues per pipeline</h3>
+            ${this.generateTable(remainingEstimatedDays, undefined, '25%')}
+            <div>
+                ${await this.getOpenedChartHTML(openedPerPipeline0, 100)}
+            </div>
+        </section>` +
+            `<section>
+            <h3>Movements summary</h3>
+            ${this.generateTable(movesAvgArr, undefined)}
+        </section>` +
+            `<section>
+            <h3>Movements</h3>
+            ${this.generateTable(userMoves, undefined)}
+        </section>`;
+        this.updateHTML(path.join(__dirname, 'main_report.html'), path.join(this._mainOutputFolder, 'main_index.html'), '__CONTROL_CHART_TABLE__', fullHTML);
+        const mark = `${models_1.utils.htmlToMarkdown(fullHTML)}\n_This report was generated with the [Zenhub Issue Metrics Action](https://github.com/lezhumain/zenhub_report_action)_`;
+        fs.writeFileSync(path.join(this._mainOutputFolder, 'main_report.md'), mark, { encoding: 'utf8' });
+        console.log(`ev count: ${allEvs.length}, issue count: ${issues.filter(iu => !iu.filtered).length}, issues handled: ${issues.filter(iu => iu.handled).length} ${issueWithEventCount}`);
+        return Promise.resolve({
+            mark,
+            allResult
+        });
+    }
+    getNewAllD(githubDataRes) {
+        return githubDataRes.newAllD;
+        // const first =
+        //   githubDataRes.ggdata.summary[Object.keys(githubDataRes.ggdata.summary)[0]]
+        //
+        // const users: IPrUser[] = [
+        //   {
+        //     user: Object.keys(summary)[0],
+        //     created: first.pr_count,
+        //     totalCommits: 0,
+        //     totalCommitsPerWeek: 0,
+        //     totalCommentsInPr: 0,
+        //     totalCommentsPerPr: 0,
+        //     issueCreated: 0,
+        //     shouldReviewCount: 0,
+        //     didReviewCount: 0,
+        //     reviewedPerc: 0,
+        //     createdPerc: 0
+        //   }
+        // ]
+    }
+    async getSortedIssues(board, skipIssueIfFn, skipEventIfFn) {
+        const issues = await this.getIssuesFromBoard(board);
+        // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
+        const pipelines = await this.getPipelinesFromBoard(board);
+        this._pipelines = pipelines;
+        this._startTimestamp = Date.now();
+        const allEvs = [];
+        let handledCount = 0;
+        for (let i = 0; i < issues.length; ++i) {
+            console.clear();
+            if (this._errorMessages.length > 0) {
+                console.log(this._errorMessages.join('\n'));
+            }
+            const handledPerc = i / issues.length;
+            console.log(`${i} / ${issues.length} (${(handledPerc * 100).toFixed(1)}%)`);
+            this.printRemaining(i, issues.length);
+            const issue = issues[i];
+            if (!!issue.pullRequest !== !!this._config.pullRequest ||
+                (this._config.labels &&
+                    this._config.labels.length > 0 &&
+                    !issue.labels?.some(la => this._config.labels?.includes(la.toLowerCase()))) ||
+                (this._config.skipRepos.length > 0 &&
+                    this._config.skipRepos.includes(issue.repositoryGhId)) ||
+                (this._config.includeRepos.length > 0 &&
+                    !this._config.includeRepos.includes(issue.repositoryGhId)) ||
+                (!!this._config.release &&
+                    !issue.releases?.includes(this._config.release)) ||
+                (skipIssueIfFn !== undefined && (await skipIssueIfFn(issue)))) {
+                issue.filtered = true;
+                continue;
+            }
+            const handleIssueResult = await this.handleIssue(issue, skipEventIfFn, false, this._config.fromPipeline, this._config.toPipeline);
+            const evs = handleIssueResult.csvItems;
+            if (evs.length > 0) {
+                allEvs.push(evs);
+                issue.handled = true;
+                handledCount++;
+            }
+            this._eventsPerIssue[issue.number] = handleIssueResult.events;
+        }
+        // fs.writeFileSync(this._config.outputJsonFilename, JSON.stringify(allEvs, null, 2), {encoding: 'utf8'}); // done at the end
+        const sorted = issues.slice();
+        sorted.sort((a, b) => {
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
+        return { sorted, handledCount, allEvs };
     }
 }
 exports.Program = Program;
