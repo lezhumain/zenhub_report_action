@@ -38874,7 +38874,6 @@ const fs = __importStar(__nccwpck_require__(9896));
 const models_1 = __nccwpck_require__(6099);
 const path = __importStar(__nccwpck_require__(6760));
 const checkprreviewers1_1 = __nccwpck_require__(7708);
-const getPrAndCommits_1 = __nccwpck_require__(8194);
 // eslint-disable-next-line import/extensions,@typescript-eslint/no-var-requires,import/no-commonjs
 // const reviewer_call = require('./check_pr_reviewers.js')
 /*
@@ -39955,10 +39954,13 @@ fragment currentWorkspace on Workspace {
         // newAllD.users = usersAvg.users;
         newAllD.users = this.averageUsers(usersAvg.users);
         newAllD.summary = usersAvg.summary;
-        const ggdata = await (0, getPrAndCommits_1.getAllData)(targetRepoNames, this.config.minDate && this.config.maxDate
-            ? this.config
-            : undefined);
-        return Promise.resolve({ allD, newAllD, ggdata });
+        // const ggdata = await getAllData(
+        //   targetRepoNames,
+        //   this.config.minDate && this.config.maxDate
+        //     ? (this.config as any)
+        //     : undefined
+        // )
+        return Promise.resolve({ allD, newAllD, ggdata: undefined });
     }
     addRepoProps(item) {
         const clone = Object.assign({}, item);
