@@ -38476,12 +38476,12 @@ function filterPulls(pulls, includeRepos, oneWeekAgo, currentDate) {
     if (pulls.length === 0) {
         return [];
     }
-    const repoURL = pulls[0].repository_url;
-    const repoBits = repoURL.split('/');
-    const repoName = repoBits[repoBits.length - 1];
-    if (includeRepos.length > 0 && !includeRepos.includes(repoName)) {
-        return [];
-    }
+    // const repoURL = pulls[0].repository_url
+    // const repoBits = repoURL.split('/')
+    // const repoName = repoBits[repoBits.length - 1]
+    // if (includeRepos.length > 0 && !includeRepos.includes(repoName)) {
+    //   return []
+    // }
     return pulls.filter((p) => {
         const depoch = new Date(p.created_at).getTime();
         const res = depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime();
@@ -38490,10 +38490,12 @@ function filterPulls(pulls, includeRepos, oneWeekAgo, currentDate) {
 }
 async function fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos = [], page = 1, beforeDate) {
     let urlTmp = `https://api.github.com/search/issues?q=repo:${owner}/${repoName}+is:pr`;
-    if (beforeDate) {
-        // urlTmp += `+created:<${beforeDate}`
-        urlTmp += `+created:${encodeURIComponent('<')}${beforeDate}`;
-    }
+    urlTmp += `+created:<${beforeDate ?? maxDate}`;
+    // if (!beforeDate) {
+    //   urlTmp += `+created:${encodeURIComponent('<=')}${maxDate}+created:${encodeURIComponent('>')}${minDate}`
+    // } else {
+    //   urlTmp += `+created:${encodeURIComponent('<')}${beforeDate}`
+    // }
     const url = urlTmp;
     try {
         const response = await fetch(`${url}`, {
@@ -38518,10 +38520,12 @@ async function fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos = 
         const pulls = pullsAndMore.filter((ppp) => !!ppp.pull_request);
         const pullsFiltered = filterPulls(pulls, includeRepos, oneWeekAgo, currentDate);
         // if (pulls.length > 0 && pulls.length === pullsFiltered.length) {
-        if (pullsAndMore.length === 30 && pullsFiltered.length > 0) {
+        // if (pullsAndMore.length === 30 && pullsFiltered.length > 0) {
+        if (pullsAndMore.length === 30) {
             // const befDate = new Date(pullsAndMore[0].created_at).toISOString().split('T')[0]
             const befDate = pullsAndMore[0].created_at;
-            if (befDate !== beforeDate) {
+            if (befDate !== beforeDate &&
+                new Date(befDate).getTime() >= oneWeekAgo.getTime()) {
                 const newFiltered = await fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos, page + 1, befDate);
                 // pullsFiltered.push(...newFiltered)
                 for (const rrr of newFiltered) {
