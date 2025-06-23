@@ -39336,7 +39336,8 @@ class Program {
         return Promise.resolve(pipelines);
     }
     async getIssuesFromBoard(board) {
-        const boardClosedIssues = await this.getBoardClosed(board.id);
+        // const boardClosedIssues: Issue[] = await this.getBoardClosed(board.id)
+        const boardClosedIssues = [];
         const issues = board.pipelinesConnection.reduce((res, item) => {
             // const eventsTmp: Issue[] = item.issues
             // const allIssues: Issue[] = eventsTmp.concat(boardClosedIssues);
