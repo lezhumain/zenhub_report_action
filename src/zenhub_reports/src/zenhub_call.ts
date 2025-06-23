@@ -609,7 +609,10 @@ export class Program {
       body: JSON.stringify({ query, variables })
     }
     console.log('=========[callZenhub]=========')
-    console.log(JSON.stringify(query, null, 2))
+    console.log(JSON.stringify({ query, variables }, null, 2))
+    console.log(process.env.GH_REPO_OWNER)
+    console.log(process.env.API_KEY)
+    console.log(process.env.GH_API_KEY)
     console.log('==============================')
 
     const response = await fetch(endpoint, conf)
