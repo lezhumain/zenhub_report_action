@@ -39206,14 +39206,18 @@ class Program {
     async callZenhub(query, variables) {
         // const endpoint = 'https://api.zenhub.io/graphql';
         const endpoint = 'https://api.zenhub.com/public/graphql';
-        const response = await fetch(endpoint, {
+        const conf = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${apiKey}`
             },
             body: JSON.stringify({ query, variables })
-        });
+        };
+        console.log('=========[callZenhub]=========');
+        console.log(JSON.stringify(query, null, 2));
+        console.log('==============================');
+        const response = await fetch(endpoint, conf);
         if (!response.ok) {
             const t = await response.text();
             throw new Error(`Failed to fetch ZenHub API: ${t}`);
