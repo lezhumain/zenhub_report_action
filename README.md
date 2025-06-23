@@ -57,7 +57,7 @@ jobs:
           API_KEY: ${{ secrets.ZH_TOKEN }}
           GH_API_KEY: ${{ github.token }}
           WORKSPACE_ID: '5e3018c2d1715f5725d0b8c7'
-          GH_REPO_OWNER: ""
+          GH_REPO_OWNER: ''
 
       - name: Create issue
         uses: peter-evans/create-issue-from-file@v5
