@@ -78,7 +78,7 @@ async function getPContributorsData(repoId: string): Promise<AxiosResponse> {
 
   res.data = Array.isArray(res.data)
     ? res.data.map(ee => {
-        ee.authorName = ee.author.login
+        ee.authorName = ee.author?.login
         delete ee.author
         return ee
       })
@@ -186,7 +186,7 @@ async function main(
       }
       // console.log('Within timespan')
 
-      const author = pr.user.login
+      const author = pr.user?.login ?? ""
 
       const comments = pr.comments_url
         ? await getByURL<{ user: { login: string } }[]>(
@@ -203,7 +203,7 @@ async function main(
       const commentators: string[] = Array.from(
         new Set(
           all_comments.map(
-            (comment: { user: { login: string } }) => comment.user.login
+            (comment: { user: { login: string } }) => comment.user?.login
           )
         )
       )

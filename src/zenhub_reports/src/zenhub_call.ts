@@ -166,12 +166,7 @@ export class Program {
   private _eventsPerIssue: { [issueNumber: string]: IGhEvent[] } = {}
   private _preparedHTML: string[] = []
 
-  private _issueQueryTemplate = `pageInfo {
-          hasNextPage
-          startCursor
-          endCursor
-        }
-          nodes {
+  private _issueQueryProps = `
             repository {
               ghId
             }
@@ -194,7 +189,14 @@ export class Program {
             pullRequest
             user {
               login
-            }
+            }`
+  private _issueQueryTemplate = `pageInfo {
+          hasNextPage
+          startCursor
+          endCursor
+        }
+          nodes {
+            ${this._issueQueryProps}
           }
         }`
 
@@ -734,36 +736,19 @@ export class Program {
   }
 
   private async getIssuesFromBoard(board: IWorkspace): Promise<IIssue[]> {
+    const boardClosedIssues: Issue[] = await this.getBoardClosed(board.id)
     const issues: IIssue[] = board.pipelinesConnection.reduce(
       (res: IIssue[], item: IPipelinesConnection) => {
-        const eventsTmp: Issue[] = item.issues
-        const issues0: IIssue[] = eventsTmp.map((ee: Issue) => {
-          const o: IIssue = {
-            number: utils.issueNumberAsString(ee.number),
-            estimateValue:
-              ee.estimate !== null && ee.estimate !== undefined
-                ? Number(ee.estimate.value)
-                : undefined,
-            repositoryGhId: Number(ee.repository.ghId),
-            repositoryGhName: ee.repository.name,
-            pipelineName: item.name,
-            labels: ee.labels?.nodes?.map((n: any) => n.name) || undefined,
-            releases: ee.releases?.nodes?.map((n: any) => n.title) || undefined,
-            events: ee.events,
-            pullRequest: !!ee.pullRequest,
-            htmlUrl: ee.htmlUrl,
-            createdAt: new Date(ee.createdAt),
-            author: ee.user.login
-          } as IIssue
-          return o
-        })
-
+        // const eventsTmp: Issue[] = item.issues
+        // const allIssues: Issue[] = eventsTmp.concat(boardClosedIssues);
+        const issues0 = this.mapIssues(item.issues.slice(), item.name)
         return res.concat(issues0)
       },
       []
     )
 
-    return Promise.resolve(issues)
+    const closedIssues = this.mapIssues(boardClosedIssues.slice(), "Closed")
+    return Promise.resolve(issues.concat(closedIssues))
   }
 
   private async getBoardFull(
@@ -908,6 +893,88 @@ fragment currentWorkspace on Workspace {
     finalRes.pipelinesConnection = this.mapPipelineConnec(finalRes)
 
     return Promise.resolve(finalRes)
+  }
+
+  private async getBoardClosed(workspaceId: string, last = 100, afterCursor?: string): Promise<Issue[]> {
+    // TODO last
+    const query = `query workspaceClosedIssues($workspaceId: ID!, $query: String, $issuesAfter: String, $numberOfIssues: Int!, $filters: IssueSearchFiltersInput!) {
+  searchClosedIssues(
+    workspaceId: $workspaceId
+    query: $query
+    filters: $filters
+    after: $issuesAfter
+    first: $numberOfIssues
+  ) {
+    pageInfo {
+      endCursor
+      startCursor
+      hasNextPage
+      __typename
+    }
+    nodes {
+      ...boardIssueData
+      __typename
+    }
+    __typename
+  }
+}
+
+fragment boardIssueData on Issue {
+  id
+  ${this._issueQueryProps}
+}`
+
+    const variables: any = {
+      "workspaceId": workspaceId,
+      "numberOfIssues": last,
+      "filters": {
+        "matchType": "all",
+        "issueIssueTypeDisposition": "BOARD",
+        "repositoryIds": []
+      }
+    };
+
+    if(afterCursor) {
+      variables["issuesAfter"] = afterCursor;
+    }
+
+    let res1 = null
+    try {
+      res1 = await this.callZenhub(query, variables)
+    } catch (e) {
+      res1 = { errors: [e] }
+    }
+
+    const err = res1?.errors?.map((e: any) => e.message) ?? []
+    if (err.length > 0) {
+      const errr = new Error(`Error: ${err.join(' --- ')}`)
+      throw errr
+    }
+
+    const finalRes: Issue[] = res1.data.searchClosedIssues.nodes.filter((n: Issue) => n.pullRequest === false);
+    finalRes.sort((a: Issue, b: Issue) => {
+      if(!a.number) {
+        a.number = Number(a.htmlUrl.replace(/^.+\/issues\/(\d+)$/, "$1"))
+      }
+      if(!b.number) {
+        b.number = Number(b.htmlUrl.replace(/^.+\/issues\/(\d+)$/, "$1"))
+      }
+      return (new Date(a.createdAt)).getTime() - (new Date(b.createdAt)).getTime()
+    });
+
+    // if(res1.data.searchClosedIssues.pageInfo.hasNextPage && res1.data.searchClosedIssues.pageInfo.endCursor !== afterCursor) {
+    //   const nextIssues = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor);
+    //   finalRes.push(...nextIssues);
+    // }
+    //
+    // return Promise.resolve(finalRes)
+
+    if(!res1.data.searchClosedIssues.pageInfo.hasNextPage || res1.data.searchClosedIssues.pageInfo.endCursor === afterCursor) {
+      return Promise.resolve(finalRes)
+    }
+
+    const nexts = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor)
+    return Promise.resolve(finalRes.concat(nexts))
   }
 
   private generateMainCSV(
@@ -1103,18 +1170,25 @@ fragment currentWorkspace on Workspace {
     }
   }
 
-  private getControlChartData(issues: IIssue[]): IControlChartItem[] {
+  private getControlChartData(pIssues: IIssue[]): IControlChartItem[] {
     const configMaxDate: string | undefined = this._config.maxDate
     const configMinDate: string | undefined = this._config.minDate
 
+    if(!configMaxDate || !configMinDate) {
+      throw new Error("Need min and max dates");
+    }
+    const configMax = new Date(configMaxDate).getTime()
+    const configMin = new Date(configMinDate).getTime()
+
+
+    // const issues = pIssues.filter(o => o.completed && !o.filtered)
+    const issues = pIssues.slice();
     const filteered: IIssue[] = issues.filter((i: IIssue) => {
       const endTime: number | undefined = i.completed?.end.getTime()
       return (
         endTime !== undefined &&
-        (configMaxDate === undefined ||
-          endTime <= new Date(configMaxDate).getTime()) &&
-        (configMinDate === undefined ||
-          endTime >= new Date(configMinDate).getTime())
+        endTime <= configMax &&
+        endTime >= configMin
       )
     })
     const tmp: (ControlChartItem | null)[] = filteered.map((i: IIssue) => {
@@ -2521,5 +2595,33 @@ fragment currentWorkspace on Workspace {
     })
 
     return { sorted, handledCount, allEvs }
+  }
+
+  private mapIssues(allIssues: Issue[], pipelineName: string): IIssue[] {
+    const ot = allIssues.map((ee: Issue) => {
+      try {
+        const o: IIssue = {
+          number: utils.issueNumberAsString(ee.number),
+          estimateValue:
+            ee.estimate !== null && ee.estimate !== undefined
+              ? Number(ee.estimate.value)
+              : undefined,
+          repositoryGhId: Number(ee.repository.ghId),
+          repositoryGhName: ee.repository.name,
+          pipelineName,
+          labels: ee.labels?.nodes?.map((n: any) => n.name) || undefined,
+          releases: ee.releases?.nodes?.map((n: any) => n.title) || undefined,
+          events: ee.events,
+          pullRequest: !!ee.pullRequest,
+          htmlUrl: ee.htmlUrl,
+          createdAt: new Date(ee.createdAt),
+          author: ee.user?.login
+        } as IIssue
+        return o
+      } catch (e) {
+        return undefined;
+      }
+    })
+    return ot.filter(l => l !== undefined)
   }
 }

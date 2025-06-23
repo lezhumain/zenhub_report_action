@@ -104,6 +104,11 @@ export interface ISarchIssuesByPipeline {
   nodes: Issue[]
 }
 
+export interface ClosedIssue extends Issue{
+  completed: boolean
+  closed: true
+}
+
 export interface Issue {
   releases: { nodes: { title: string; id: string }[] }
   labels: { nodes: { name: string }[] }

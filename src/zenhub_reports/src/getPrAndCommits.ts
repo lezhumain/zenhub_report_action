@@ -65,6 +65,37 @@ function filterPulls(
   })
 }
 
+export async function fetchClosedIssues(
+  repoName: string,
+  beforeDate?: string
+): Promise<any[]> {
+  let urlTmp = `https://api.github.com/search/issues?q=repo:${owner}/${repoName}+is:issue+state:closed`
+  if (beforeDate) {
+    urlTmp += `+created:<${beforeDate}`
+  }
+
+  const url = urlTmp
+
+  try {
+    const response = await fetch(`${url}`, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const res = await response.json();
+    return Promise.resolve(res.items);
+  } catch (error) {
+    console.error((error as Error).message);
+    return []
+  }
+}
+
 async function fetchPullRequestsOnly(
   minDate: string,
   maxDate: string,
