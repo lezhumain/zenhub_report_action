@@ -38258,7 +38258,7 @@ async function getPContributorsData(repoId) {
     }
     res.data = Array.isArray(res.data)
         ? res.data.map(ee => {
-            ee.authorName = ee.author.login;
+            ee.authorName = ee.author?.login;
             delete ee.author;
             return ee;
         })
@@ -38329,7 +38329,7 @@ async function main(repoName, config = {
                 continue;
             }
             // console.log('Within timespan')
-            const author = pr.user.login;
+            const author = pr.user?.login ?? '';
             const comments = pr.comments_url
                 ? await getByURL(pr.comments_url.replace('/issues/', '/pulls/'))
                 : [];
@@ -38338,7 +38338,7 @@ async function main(repoName, config = {
                 : [];
             const all_comments = comments.concat(review_comments);
             // console.log(`rr ${all_comments.length} comments for ${pr.url}`)
-            const commentators = Array.from(new Set(all_comments.map((comment) => comment.user.login)));
+            const commentators = Array.from(new Set(all_comments.map((comment) => comment.user?.login)));
             const allCommitData = await (0, getPrAndCommits_1.fetchCommitsForPullRequest)(pr.number, repoName);
             const filteredCommit = allCommitData.filter((item) => {
                 const commitDate = new Date(item.commit.committer.date);
@@ -38467,6 +38467,7 @@ exports.IssueFilter = IssueFilter;
 
 /* eslint-disable no-tabs,@typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fetchClosedIssues = fetchClosedIssues;
 exports.fetchCommitsForPullRequest = fetchCommitsForPullRequest;
 exports.getAllData = getAllData;
 const owner = process.env.GH_REPO_OWNER; // Replace with the repository owner's username or organization name
@@ -38487,6 +38488,30 @@ function filterPulls(pulls, includeRepos, oneWeekAgo, currentDate) {
         const res = depoch > oneWeekAgo.getTime() && depoch < currentDate.getTime();
         return res;
     });
+}
+async function fetchClosedIssues(repoName, beforeDate) {
+    let urlTmp = `https://api.github.com/search/issues?q=repo:${owner}/${repoName}+is:issue+state:closed`;
+    if (beforeDate) {
+        urlTmp += `+created:<${beforeDate}`;
+    }
+    const url = urlTmp;
+    try {
+        const response = await fetch(`${url}`, {
+            headers: {
+                Authorization: `token ${token}`,
+                Accept: 'application/vnd.github.v3+json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const res = await response.json();
+        return Promise.resolve(res.items);
+    }
+    catch (error) {
+        console.error(error.message);
+        return [];
+    }
 }
 async function fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos = [], page = 1, beforeDate) {
     let urlTmp = `https://api.github.com/search/issues?q=repo:${owner}/${repoName}+is:pr`;
@@ -38909,12 +38934,7 @@ class Program {
     _estimateRemainingPrveiousMs = 0;
     _eventsPerIssue = {};
     _preparedHTML = [];
-    _issueQueryTemplate = `pageInfo {
-          hasNextPage
-          startCursor
-          endCursor
-        }
-          nodes {
+    _issueQueryProps = `
             repository {
               ghId
             }
@@ -38937,7 +38957,14 @@ class Program {
             pullRequest
             user {
               login
-            }
+            }`;
+    _issueQueryTemplate = `pageInfo {
+          hasNextPage
+          startCursor
+          endCursor
+        }
+          nodes {
+            ${this._issueQueryProps}
           }
         }`;
     _bubbleBaseWith = 10;
@@ -39309,30 +39336,15 @@ class Program {
         return Promise.resolve(pipelines);
     }
     async getIssuesFromBoard(board) {
+        const boardClosedIssues = await this.getBoardClosed(board.id);
         const issues = board.pipelinesConnection.reduce((res, item) => {
-            const eventsTmp = item.issues;
-            const issues0 = eventsTmp.map((ee) => {
-                const o = {
-                    number: models_1.utils.issueNumberAsString(ee.number),
-                    estimateValue: ee.estimate !== null && ee.estimate !== undefined
-                        ? Number(ee.estimate.value)
-                        : undefined,
-                    repositoryGhId: Number(ee.repository.ghId),
-                    repositoryGhName: ee.repository.name,
-                    pipelineName: item.name,
-                    labels: ee.labels?.nodes?.map((n) => n.name) || undefined,
-                    releases: ee.releases?.nodes?.map((n) => n.title) || undefined,
-                    events: ee.events,
-                    pullRequest: !!ee.pullRequest,
-                    htmlUrl: ee.htmlUrl,
-                    createdAt: new Date(ee.createdAt),
-                    author: ee.user.login
-                };
-                return o;
-            });
+            // const eventsTmp: Issue[] = item.issues
+            // const allIssues: Issue[] = eventsTmp.concat(boardClosedIssues);
+            const issues0 = this.mapIssues(item.issues.slice(), item.name);
             return res.concat(issues0);
         }, []);
-        return Promise.resolve(issues);
+        const closedIssues = this.mapIssues(boardClosedIssues.slice(), 'Closed');
+        return Promise.resolve(issues.concat(closedIssues));
     }
     async getBoardFull(workspaceId, last = 73) {
         // console.log('Getting board data')
@@ -39439,6 +39451,81 @@ fragment currentWorkspace on Workspace {
         const finalRes = Object.assign({ totalIssues: 0 }, res1.data.workspace);
         finalRes.pipelinesConnection = this.mapPipelineConnec(finalRes);
         return Promise.resolve(finalRes);
+    }
+    async getBoardClosed(workspaceId, last = 100, afterCursor) {
+        // TODO last
+        const query = `query workspaceClosedIssues($workspaceId: ID!, $query: String, $issuesAfter: String, $numberOfIssues: Int!, $filters: IssueSearchFiltersInput!) {
+  searchClosedIssues(
+    workspaceId: $workspaceId
+    query: $query
+    filters: $filters
+    after: $issuesAfter
+    first: $numberOfIssues
+  ) {
+    pageInfo {
+      endCursor
+      startCursor
+      hasNextPage
+      __typename
+    }
+    nodes {
+      ...boardIssueData
+      __typename
+    }
+    __typename
+  }
+}
+
+fragment boardIssueData on Issue {
+  id
+  ${this._issueQueryProps}
+}`;
+        const variables = {
+            workspaceId: workspaceId,
+            numberOfIssues: last,
+            filters: {
+                matchType: 'all',
+                issueIssueTypeDisposition: 'BOARD',
+                repositoryIds: []
+            }
+        };
+        if (afterCursor) {
+            variables['issuesAfter'] = afterCursor;
+        }
+        let res1 = null;
+        try {
+            res1 = await this.callZenhub(query, variables);
+        }
+        catch (e) {
+            res1 = { errors: [e] };
+        }
+        const err = res1?.errors?.map((e) => e.message) ?? [];
+        if (err.length > 0) {
+            const errr = new Error(`Error: ${err.join(' --- ')}`);
+            throw errr;
+        }
+        const finalRes = res1.data.searchClosedIssues.nodes.filter((n) => n.pullRequest === false);
+        finalRes.sort((a, b) => {
+            if (!a.number) {
+                a.number = Number(a.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'));
+            }
+            if (!b.number) {
+                b.number = Number(b.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'));
+            }
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
+        // if(res1.data.searchClosedIssues.pageInfo.hasNextPage && res1.data.searchClosedIssues.pageInfo.endCursor !== afterCursor) {
+        //   const nextIssues = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor);
+        //   finalRes.push(...nextIssues);
+        // }
+        //
+        // return Promise.resolve(finalRes)
+        if (!res1.data.searchClosedIssues.pageInfo.hasNextPage ||
+            res1.data.searchClosedIssues.pageInfo.endCursor === afterCursor) {
+            return Promise.resolve(finalRes);
+        }
+        const nexts = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor);
+        return Promise.resolve(finalRes.concat(nexts));
     }
     generateMainCSV(avg, date, stats, statsEstimate, veloccity) {
         const keys = Object.keys(avg);
@@ -39564,16 +39651,19 @@ fragment currentWorkspace on Workspace {
             return null;
         }
     }
-    getControlChartData(issues) {
+    getControlChartData(pIssues) {
         const configMaxDate = this._config.maxDate;
         const configMinDate = this._config.minDate;
+        if (!configMaxDate || !configMinDate) {
+            throw new Error('Need min and max dates');
+        }
+        const configMax = new Date(configMaxDate).getTime();
+        const configMin = new Date(configMinDate).getTime();
+        // const issues = pIssues.filter(o => o.completed && !o.filtered)
+        const issues = pIssues.slice();
         const filteered = issues.filter((i) => {
             const endTime = i.completed?.end.getTime();
-            return (endTime !== undefined &&
-                (configMaxDate === undefined ||
-                    endTime <= new Date(configMaxDate).getTime()) &&
-                (configMinDate === undefined ||
-                    endTime >= new Date(configMinDate).getTime()));
+            return (endTime !== undefined && endTime <= configMax && endTime >= configMin);
         });
         const tmp = filteered.map((i) => {
             return i.completed?.start
@@ -40514,6 +40604,33 @@ fragment currentWorkspace on Workspace {
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         });
         return { sorted, handledCount, allEvs };
+    }
+    mapIssues(allIssues, pipelineName) {
+        const ot = allIssues.map((ee) => {
+            try {
+                const o = {
+                    number: models_1.utils.issueNumberAsString(ee.number),
+                    estimateValue: ee.estimate !== null && ee.estimate !== undefined
+                        ? Number(ee.estimate.value)
+                        : undefined,
+                    repositoryGhId: Number(ee.repository.ghId),
+                    repositoryGhName: ee.repository.name,
+                    pipelineName,
+                    labels: ee.labels?.nodes?.map((n) => n.name) || undefined,
+                    releases: ee.releases?.nodes?.map((n) => n.title) || undefined,
+                    events: ee.events,
+                    pullRequest: !!ee.pullRequest,
+                    htmlUrl: ee.htmlUrl,
+                    createdAt: new Date(ee.createdAt),
+                    author: ee.user?.login
+                };
+                return o;
+            }
+            catch (e) {
+                return undefined;
+            }
+        });
+        return ot.filter(l => l !== undefined);
     }
 }
 exports.Program = Program;

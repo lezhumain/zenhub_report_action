@@ -747,7 +747,7 @@ export class Program {
       []
     )
 
-    const closedIssues = this.mapIssues(boardClosedIssues.slice(), "Closed")
+    const closedIssues = this.mapIssues(boardClosedIssues.slice(), 'Closed')
     return Promise.resolve(issues.concat(closedIssues))
   }
 
@@ -895,7 +895,11 @@ fragment currentWorkspace on Workspace {
     return Promise.resolve(finalRes)
   }
 
-  private async getBoardClosed(workspaceId: string, last = 100, afterCursor?: string): Promise<Issue[]> {
+  private async getBoardClosed(
+    workspaceId: string,
+    last = 100,
+    afterCursor?: string
+  ): Promise<Issue[]> {
     // TODO last
     const query = `query workspaceClosedIssues($workspaceId: ID!, $query: String, $issuesAfter: String, $numberOfIssues: Int!, $filters: IssueSearchFiltersInput!) {
   searchClosedIssues(
@@ -925,17 +929,17 @@ fragment boardIssueData on Issue {
 }`
 
     const variables: any = {
-      "workspaceId": workspaceId,
-      "numberOfIssues": last,
-      "filters": {
-        "matchType": "all",
-        "issueIssueTypeDisposition": "BOARD",
-        "repositoryIds": []
+      workspaceId: workspaceId,
+      numberOfIssues: last,
+      filters: {
+        matchType: 'all',
+        issueIssueTypeDisposition: 'BOARD',
+        repositoryIds: []
       }
-    };
+    }
 
-    if(afterCursor) {
-      variables["issuesAfter"] = afterCursor;
+    if (afterCursor) {
+      variables['issuesAfter'] = afterCursor
     }
 
     let res1 = null
@@ -951,16 +955,18 @@ fragment boardIssueData on Issue {
       throw errr
     }
 
-    const finalRes: Issue[] = res1.data.searchClosedIssues.nodes.filter((n: Issue) => n.pullRequest === false);
+    const finalRes: Issue[] = res1.data.searchClosedIssues.nodes.filter(
+      (n: Issue) => n.pullRequest === false
+    )
     finalRes.sort((a: Issue, b: Issue) => {
-      if(!a.number) {
-        a.number = Number(a.htmlUrl.replace(/^.+\/issues\/(\d+)$/, "$1"))
+      if (!a.number) {
+        a.number = Number(a.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'))
       }
-      if(!b.number) {
-        b.number = Number(b.htmlUrl.replace(/^.+\/issues\/(\d+)$/, "$1"))
+      if (!b.number) {
+        b.number = Number(b.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'))
       }
-      return (new Date(a.createdAt)).getTime() - (new Date(b.createdAt)).getTime()
-    });
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    })
 
     // if(res1.data.searchClosedIssues.pageInfo.hasNextPage && res1.data.searchClosedIssues.pageInfo.endCursor !== afterCursor) {
     //   const nextIssues = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor);
@@ -969,11 +975,18 @@ fragment boardIssueData on Issue {
     //
     // return Promise.resolve(finalRes)
 
-    if(!res1.data.searchClosedIssues.pageInfo.hasNextPage || res1.data.searchClosedIssues.pageInfo.endCursor === afterCursor) {
+    if (
+      !res1.data.searchClosedIssues.pageInfo.hasNextPage ||
+      res1.data.searchClosedIssues.pageInfo.endCursor === afterCursor
+    ) {
       return Promise.resolve(finalRes)
     }
 
-    const nexts = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor)
+    const nexts = await this.getBoardClosed(
+      workspaceId,
+      last,
+      res1.data.searchClosedIssues.pageInfo.endCursor
+    )
     return Promise.resolve(finalRes.concat(nexts))
   }
 
@@ -1174,21 +1187,18 @@ fragment boardIssueData on Issue {
     const configMaxDate: string | undefined = this._config.maxDate
     const configMinDate: string | undefined = this._config.minDate
 
-    if(!configMaxDate || !configMinDate) {
-      throw new Error("Need min and max dates");
+    if (!configMaxDate || !configMinDate) {
+      throw new Error('Need min and max dates')
     }
     const configMax = new Date(configMaxDate).getTime()
     const configMin = new Date(configMinDate).getTime()
 
-
     // const issues = pIssues.filter(o => o.completed && !o.filtered)
-    const issues = pIssues.slice();
+    const issues = pIssues.slice()
     const filteered: IIssue[] = issues.filter((i: IIssue) => {
       const endTime: number | undefined = i.completed?.end.getTime()
       return (
-        endTime !== undefined &&
-        endTime <= configMax &&
-        endTime >= configMin
+        endTime !== undefined && endTime <= configMax && endTime >= configMin
       )
     })
     const tmp: (ControlChartItem | null)[] = filteered.map((i: IIssue) => {
@@ -2619,7 +2629,7 @@ fragment boardIssueData on Issue {
         } as IIssue
         return o
       } catch (e) {
-        return undefined;
+        return undefined
       }
     })
     return ot.filter(l => l !== undefined)

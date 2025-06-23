@@ -88,10 +88,10 @@ export async function fetchClosedIssues(
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    const res = await response.json();
-    return Promise.resolve(res.items);
+    const res = await response.json()
+    return Promise.resolve(res.items)
   } catch (error) {
-    console.error((error as Error).message);
+    console.error((error as Error).message)
     return []
   }
 }

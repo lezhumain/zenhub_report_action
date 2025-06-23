@@ -104,7 +104,7 @@ export interface ISarchIssuesByPipeline {
   nodes: Issue[]
 }
 
-export interface ClosedIssue extends Issue{
+export interface ClosedIssue extends Issue {
   completed: boolean
   closed: true
 }

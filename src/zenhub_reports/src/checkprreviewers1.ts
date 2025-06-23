@@ -186,7 +186,7 @@ async function main(
       }
       // console.log('Within timespan')
 
-      const author = pr.user?.login ?? ""
+      const author = pr.user?.login ?? ''
 
       const comments = pr.comments_url
         ? await getByURL<{ user: { login: string } }[]>(
