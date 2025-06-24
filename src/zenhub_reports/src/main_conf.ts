@@ -24,7 +24,7 @@ export const mainConfig: IMainConfig = {
   outputImageFilename: `output/output_average.png`,
   minDate: '',
   maxDate: '',
-  labels: ['regression'],
+  labels: [],
   skipRepos: [],
   issuesToSkip: [],
   fromPipeline: 'Backlog',

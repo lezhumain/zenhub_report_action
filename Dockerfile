@@ -40,8 +40,7 @@ CMD ["bash", "/app/run_with_inputs.sh"]
 # docker build -t zenhub_reports .
 # docker build --build-arg ARG_API_KEY="$API_KEY" --build-arg ARG_GH_API_KEY="$GH_API_KEY" -t zenhub_reports .
 
-# docker run --name zenhub_reports_container -t zenhub_reports
-# docker run --env API_KEY --env GH_API_KEY --name zenhub_reports_container -t zenhub_reports
+# docker run --rm -v //$(PWD)/my_output:/app/output --env GH_REPO_OWNER --env API_KEY --env GH_API_KEY --name zenhub_reports_container -t zenhub_reports
 
 # docker run -v "$(pwd)/my_output:/app/output" -t zenhub_reports
 # docker run -v "$(pwd)/my_output:/app/output" -v "~/.certificates:/.certificates" -t zenhub_reports
