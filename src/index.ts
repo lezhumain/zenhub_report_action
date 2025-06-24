@@ -3,6 +3,7 @@
  */
 import { run, main } from './main'
 import { circularReplacer } from './JsonUtils'
+import * as process from 'node:process'
 
 export const action_stuff = {
   run,
@@ -16,5 +17,7 @@ console.log(
 )
 console.log('')
 
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-run()
+if (process.env.IS_LIB !== 'true') {
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  run()
+}

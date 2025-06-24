@@ -97,6 +97,7 @@ jobs:
           GH_API_KEY: ${{ github.token }}
           GH_REPO_OWNER: 'owner'
           GH_CLOSED_AFTER: '2025-06-23'
+          IS_LIB: true
 
       #      - name: Print Output
       #        id: output

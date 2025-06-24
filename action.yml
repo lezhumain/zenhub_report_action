@@ -1,6 +1,6 @@
-name: 'The name of your action here TODO'
+name: 'Zenhub Report Action'
 description: 'Provide a description here TODO'
-author: 'Your name or organization here TODO'
+author: 'lezhumain'
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:

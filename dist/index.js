@@ -38051,6 +38051,58 @@ function circularReplacer(censor) {
 
 /***/ }),
 
+/***/ 9407:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.action_stuff = void 0;
+/**
+ * The entrypoint for the action.
+ */
+const main_1 = __nccwpck_require__(1730);
+const JsonUtils_1 = __nccwpck_require__(8624);
+const process = __importStar(__nccwpck_require__(1708));
+exports.action_stuff = {
+    run: main_1.run,
+    main: main_1.main,
+    test: 'test'
+};
+console.log('[process.mainModule]');
+console.log(JSON.stringify(process.mainModule, (0, JsonUtils_1.circularReplacer)(process.mainModule), 2));
+console.log('');
+if (process.env.IS_LIB !== 'true') {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (0, main_1.run)();
+}
+
+
+/***/ }),
+
 /***/ 1730:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -40817,6 +40869,14 @@ module.exports = require("node:fs");
 
 "use strict";
 module.exports = require("node:path");
+
+/***/ }),
+
+/***/ 1708:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:process");
 
 /***/ }),
 
@@ -47429,33 +47489,13 @@ module.exports = /*#__PURE__*/JSON.parse('{"application/1d-interleaved-parityfec
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
 /******/ 	
 /************************************************************************/
-var __webpack_exports__ = {};
-// This entry need to be wrapped in an IIFE because it need to be in strict mode.
-(() => {
-"use strict";
-var exports = __webpack_exports__;
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.action_stuff = void 0;
-/**
- * The entrypoint for the action.
- */
-const main_1 = __nccwpck_require__(1730);
-const JsonUtils_1 = __nccwpck_require__(8624);
-exports.action_stuff = {
-    run: main_1.run,
-    main: main_1.main,
-    test: 'test'
-};
-console.log('[process.mainModule]');
-console.log(JSON.stringify(process.mainModule, (0, JsonUtils_1.circularReplacer)(process.mainModule), 2));
-console.log('');
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-(0, main_1.run)();
-
-})();
-
-module.exports = __webpack_exports__;
+/******/ 	
+/******/ 	// startup
+/******/ 	// Load entry module and return exports
+/******/ 	// This entry module is referenced by other modules so it can't be inlined
+/******/ 	var __webpack_exports__ = __nccwpck_require__(9407);
+/******/ 	module.exports = __webpack_exports__;
+/******/ 	
 /******/ })()
 ;
 //# sourceMappingURL=index.js.map
