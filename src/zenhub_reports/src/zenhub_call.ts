@@ -736,8 +736,8 @@ export class Program {
   }
 
   private async getIssuesFromBoard(board: IWorkspace): Promise<IIssue[]> {
-    // const boardClosedIssues: Issue[] = await this.getBoardClosed(board.id)
-    const boardClosedIssues: Issue[] = []
+    const boardClosedIssues: Issue[] = await this.getBoardClosed(board.id)
+    // const boardClosedIssues: Issue[] = []
     const issues: IIssue[] = board.pipelinesConnection.reduce(
       (res: IIssue[], item: IPipelinesConnection) => {
         // const eventsTmp: Issue[] = item.issues
