@@ -38025,6 +38025,32 @@ module.exports = {
 
 /***/ }),
 
+/***/ 8624:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.circularReplacer = circularReplacer;
+function circularReplacer(censor) {
+    let i = 0;
+    return function (key, value) {
+        if (i !== 0 &&
+            typeof censor === 'object' &&
+            typeof value == 'object' &&
+            censor == value)
+            return '[Circular]';
+        if (i >= 29)
+            // seems to be a harded maximum of 30 serialized objects?
+            return '[Unknown]';
+        ++i; // so we know we aren't using the original object anymore
+        return value;
+    };
+}
+
+
+/***/ }),
+
 /***/ 1730:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -47415,11 +47441,15 @@ exports.action_stuff = void 0;
  * The entrypoint for the action.
  */
 const main_1 = __nccwpck_require__(1730);
+const JsonUtils_1 = __nccwpck_require__(8624);
 exports.action_stuff = {
     run: main_1.run,
     main: main_1.main,
     test: 'test'
 };
+console.log('[process.mainModule]');
+console.log(JSON.stringify(process.mainModule, (0, JsonUtils_1.circularReplacer)(process.mainModule), 2));
+console.log('');
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 (0, main_1.run)();
 
