@@ -47410,10 +47410,16 @@ var __webpack_exports__ = {};
 var exports = __webpack_exports__;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.action_stuff = void 0;
 /**
  * The entrypoint for the action.
  */
 const main_1 = __nccwpck_require__(1730);
+exports.action_stuff = {
+    run: main_1.run,
+    main: main_1.main,
+    test: 'test'
+};
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 (0, main_1.run)();
 
