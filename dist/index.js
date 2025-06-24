@@ -39858,12 +39858,12 @@ fragment boardIssueData on Issue {
             res[2].push(it);
             return res;
         }, [0, 0, []]);
-        const maxVal = Math.max(...totalCounts[2].map(o => Number(o.key)));
-        for (const velItem of totalCounts[2]) {
-            if (!velItem.key) {
-                velItem.key = (maxVal + 1).toFixed(1);
-            }
-        }
+        // const maxVal = Math.max(...totalCounts[2].map(o => Number(o.key)))
+        // for (const velItem of totalCounts[2]) {
+        //   if (!velItem.key) {
+        //     velItem.key = (maxVal + 1).toFixed(1)
+        //   }
+        // }
         // new Date().getD
         return {
             velocityIssue: totalCounts[0] / Object.keys(data).length,
