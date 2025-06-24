@@ -38574,11 +38574,19 @@ async function fetchPullRequests(minDate, maxDate, repoName, includeRepos) {
         const pulls = await fetchPullRequestsOnly(minDate, maxDate, repoName, includeRepos);
         const pullRequestsWithCommits = await Promise.all(pulls.map(async (pr) => {
             const commits = await fetchCommitsForPullRequest(pr.number, repoName); // Updated to pr_number
+            const authorCommits = commits.filter(commit => commit.author?.login === pr.user?.login);
+            authorCommits.sort((a, b) => {
+                return (new Date(a.commit.committer.date).getTime() -
+                    new Date(b.commit.committer.date).getTime());
+            });
+            const elapsed = Math.abs(new Date(authorCommits[0].commit.committer.date).getTime() -
+                new Date(authorCommits[authorCommits.length - 1].commit.committer.date).getTime());
             return {
                 title: pr.title,
                 createdAt: pr.created_at,
-                commits: commits.filter(commit => commit.author?.login === pr.user?.login),
-                author: pr.user?.login ?? ''
+                commits: authorCommits,
+                author: pr.user?.login ?? '',
+                elapsed
             };
         }));
         return Promise.resolve(pullRequestsWithCommits); // Return the result as an object
@@ -39241,12 +39249,12 @@ class Program {
             },
             body: JSON.stringify({ query, variables })
         };
-        console.log('=========[callZenhub]=========');
-        console.log(JSON.stringify({ query, variables }, null, 2));
-        console.log(process.env.GH_REPO_OWNER);
-        console.log(process.env.API_KEY);
-        console.log(process.env.GH_API_KEY);
-        console.log('==============================');
+        // console.log('=========[callZenhub]=========')
+        // console.log(JSON.stringify({ query, variables }, null, 2))
+        // console.log(process.env.GH_REPO_OWNER)
+        // console.log(process.env.API_KEY)
+        // console.log(process.env.GH_API_KEY)
+        // console.log('==============================')
         const response = await fetch(endpoint, conf);
         if (!response.ok) {
             const t = await response.text();
@@ -39336,7 +39344,7 @@ class Program {
         return Promise.resolve(pipelines);
     }
     async getIssuesFromBoard(board) {
-        const boardClosedIssues = await this.getBoardClosed(board.id);
+        const boardClosedIssues = await this.getBoardClosedCached(board.id);
         // const boardClosedIssues: Issue[] = []
         const issues = board.pipelinesConnection.reduce((res, item) => {
             // const eventsTmp: Issue[] = item.issues
@@ -39453,8 +39461,23 @@ fragment currentWorkspace on Workspace {
         finalRes.pipelinesConnection = this.mapPipelineConnec(finalRes);
         return Promise.resolve(finalRes);
     }
+    async getBoardClosedCached(workspaceId, last = 100, afterCursor) {
+        const cacheKey = `${workspaceId}_${last}_${afterCursor ?? ''}_${new Date().toDateString().replace(/ /g, '_')}`;
+        try {
+            const cachStr = fs.readFileSync(`${cacheKey}.json`, { encoding: 'utf8' });
+            const cache = JSON.parse(cachStr);
+            return Promise.resolve(cache);
+        }
+        catch (e) {
+            console.warn('No cache found: ' + (e.message ?? ''));
+        }
+        const all = await this.getBoardClosed(workspaceId, last, afterCursor);
+        fs.writeFileSync(`${cacheKey}.json`, JSON.stringify(all), {
+            encoding: 'utf8'
+        });
+        return Promise.resolve(all);
+    }
     async getBoardClosed(workspaceId, last = 100, afterCursor) {
-        // TODO last
         const query = `query workspaceClosedIssues($workspaceId: ID!, $query: String, $issuesAfter: String, $numberOfIssues: Int!, $filters: IssueSearchFiltersInput!) {
   searchClosedIssues(
     workspaceId: $workspaceId
@@ -39506,21 +39529,25 @@ fragment boardIssueData on Issue {
             throw errr;
         }
         const finalRes = res1.data.searchClosedIssues.nodes.filter((n) => n.pullRequest === false);
-        finalRes.sort((a, b) => {
-            if (!a.number) {
+        finalRes.forEach((a) => {
+            if (!a.number && a.htmlUrl) {
                 a.number = Number(a.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'));
             }
-            if (!b.number) {
-                b.number = Number(b.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'));
-            }
+        });
+        finalRes.sort((a, b) => {
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         });
-        // if(res1.data.searchClosedIssues.pageInfo.hasNextPage && res1.data.searchClosedIssues.pageInfo.endCursor !== afterCursor) {
-        //   const nextIssues = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor);
-        //   finalRes.push(...nextIssues);
-        // }
-        //
-        // return Promise.resolve(finalRes)
+        if (process.env.GH_CLOSED_AFTER) {
+            const maxx = new Date(process.env.GH_CLOSED_AFTER).getTime();
+            for (let i = 0; i < finalRes.length; i++) {
+                const item = finalRes[i];
+                const completedAt = new Date(item.createdAt).getTime();
+                if (completedAt < maxx) {
+                    finalRes.splice(i, 1);
+                    i--;
+                }
+            }
+        }
         if (!res1.data.searchClosedIssues.pageInfo.hasNextPage ||
             res1.data.searchClosedIssues.pageInfo.endCursor === afterCursor) {
             return Promise.resolve(finalRes);

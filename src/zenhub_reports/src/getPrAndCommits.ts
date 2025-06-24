@@ -35,6 +35,7 @@ interface PullRequestWithCommits {
   createdAt: string
   author: string
   commits: Commit[]
+  elapsed: number
 }
 
 const owner = process.env.GH_REPO_OWNER // Replace with the repository owner's username or organization name
@@ -201,14 +202,28 @@ async function fetchPullRequests(
     const pullRequestsWithCommits: PullRequestWithCommits[] = await Promise.all(
       pulls.map(async pr => {
         const commits = await fetchCommitsForPullRequest(pr.number, repoName) // Updated to pr_number
+        const authorCommits = commits.filter(
+          commit => commit.author?.login === pr.user?.login
+        )
+        authorCommits.sort((a: Commit, b: Commit) => {
+          return (
+            new Date(a.commit.committer.date).getTime() -
+            new Date(b.commit.committer.date).getTime()
+          )
+        })
+        const elapsed = Math.abs(
+          new Date(authorCommits[0].commit.committer.date).getTime() -
+            new Date(
+              authorCommits[authorCommits.length - 1].commit.committer.date
+            ).getTime()
+        )
 
         return {
           title: pr.title,
           createdAt: pr.created_at,
-          commits: commits.filter(
-            commit => commit.author?.login === pr.user?.login
-          ),
-          author: pr.user?.login ?? ''
+          commits: authorCommits,
+          author: pr.user?.login ?? '',
+          elapsed
         }
       })
     )

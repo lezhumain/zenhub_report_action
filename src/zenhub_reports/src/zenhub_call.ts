@@ -610,12 +610,12 @@ export class Program {
       },
       body: JSON.stringify({ query, variables })
     }
-    console.log('=========[callZenhub]=========')
-    console.log(JSON.stringify({ query, variables }, null, 2))
-    console.log(process.env.GH_REPO_OWNER)
-    console.log(process.env.API_KEY)
-    console.log(process.env.GH_API_KEY)
-    console.log('==============================')
+    // console.log('=========[callZenhub]=========')
+    // console.log(JSON.stringify({ query, variables }, null, 2))
+    // console.log(process.env.GH_REPO_OWNER)
+    // console.log(process.env.API_KEY)
+    // console.log(process.env.GH_API_KEY)
+    // console.log('==============================')
 
     const response = await fetch(endpoint, conf)
 
@@ -736,7 +736,7 @@ export class Program {
   }
 
   private async getIssuesFromBoard(board: IWorkspace): Promise<IIssue[]> {
-    const boardClosedIssues: Issue[] = await this.getBoardClosed(board.id)
+    const boardClosedIssues: Issue[] = await this.getBoardClosedCached(board.id)
     // const boardClosedIssues: Issue[] = []
     const issues: IIssue[] = board.pipelinesConnection.reduce(
       (res: IIssue[], item: IPipelinesConnection) => {
@@ -895,13 +895,32 @@ fragment currentWorkspace on Workspace {
 
     return Promise.resolve(finalRes)
   }
+  private async getBoardClosedCached(
+    workspaceId: string,
+    last = 100,
+    afterCursor?: string
+  ): Promise<Issue[]> {
+    const cacheKey = `${workspaceId}_${last}_${afterCursor ?? ''}_${new Date().toDateString().replace(/ /g, '_')}`
+    try {
+      const cachStr = fs.readFileSync(`${cacheKey}.json`, { encoding: 'utf8' })
+      const cache = JSON.parse(cachStr) as Issue[]
+      return Promise.resolve(cache)
+    } catch (e: any) {
+      console.warn('No cache found: ' + (e.message ?? ''))
+    }
+
+    const all = await this.getBoardClosed(workspaceId, last, afterCursor)
+    fs.writeFileSync(`${cacheKey}.json`, JSON.stringify(all), {
+      encoding: 'utf8'
+    })
+    return Promise.resolve(all)
+  }
 
   private async getBoardClosed(
     workspaceId: string,
     last = 100,
     afterCursor?: string
   ): Promise<Issue[]> {
-    // TODO last
     const query = `query workspaceClosedIssues($workspaceId: ID!, $query: String, $issuesAfter: String, $numberOfIssues: Int!, $filters: IssueSearchFiltersInput!) {
   searchClosedIssues(
     workspaceId: $workspaceId
@@ -959,22 +978,27 @@ fragment boardIssueData on Issue {
     const finalRes: Issue[] = res1.data.searchClosedIssues.nodes.filter(
       (n: Issue) => n.pullRequest === false
     )
-    finalRes.sort((a: Issue, b: Issue) => {
-      if (!a.number) {
+    finalRes.forEach((a: Issue) => {
+      if (!a.number && a.htmlUrl) {
         a.number = Number(a.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'))
       }
-      if (!b.number) {
-        b.number = Number(b.htmlUrl.replace(/^.+\/issues\/(\d+)$/, '$1'))
-      }
+    })
+
+    finalRes.sort((a: Issue, b: Issue) => {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     })
 
-    // if(res1.data.searchClosedIssues.pageInfo.hasNextPage && res1.data.searchClosedIssues.pageInfo.endCursor !== afterCursor) {
-    //   const nextIssues = await this.getBoardClosed(workspaceId, last, res1.data.searchClosedIssues.pageInfo.endCursor);
-    //   finalRes.push(...nextIssues);
-    // }
-    //
-    // return Promise.resolve(finalRes)
+    if (process.env.GH_CLOSED_AFTER) {
+      const maxx = new Date(process.env.GH_CLOSED_AFTER).getTime()
+      for (let i = 0; i < finalRes.length; i++) {
+        const item = finalRes[i]
+        const completedAt = new Date(item.createdAt).getTime()
+        if (completedAt < maxx) {
+          finalRes.splice(i, 1)
+          i--
+        }
+      }
+    }
 
     if (
       !res1.data.searchClosedIssues.pageInfo.hasNextPage ||
@@ -2540,6 +2564,7 @@ fragment boardIssueData on Issue {
     skipEventIfFn?: (issue: IGhEvent) => Promise<boolean>
   ): Promise<{ sorted: IIssue[]; handledCount: number; allEvs: ICSVItem[][] }> {
     const issues: IIssue[] = await this.getIssuesFromBoard(board)
+
     // const pipelines: string[] = await this.getPipelines(this._config.workspaceId);
     const pipelines: string[] = await this.getPipelinesFromBoard(board)
     this._pipelines = pipelines
